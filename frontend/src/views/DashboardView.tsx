@@ -1,0 +1,215 @@
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getTicketCounts } from '../services/api';
+
+// Importamos los componentes que hemos creado
+import StatCard from '../components/metrics/StatCard';
+import TicketStatusChart from '../components/charts/TicketStatusChart';
+import TicketTrendsChart from '../components/charts/TicketTrendsChart';
+import TicketsByOrganizationChart from '../components/charts/TicketsByOrganizationChart';
+import TicketsByAgentChart from '../components/charts/TicketsByAgentChart';
+
+/**
+ * Vista principal del Dashboard OsTicket
+ * Implementa la guía de diseño UX/UI y muestra
+ * métricas relevantes para el departamento de Soporte IT
+ */
+const DashboardView: React.FC = () => {
+  const [selectedDate, setSelectedDate] = React.useState(new Date());
+
+  const handleMonthChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newMonth = parseInt(event.target.value, 10);
+    setSelectedDate(new Date(selectedDate.getFullYear(), newMonth, 1));
+  };
+
+  const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newYear = parseInt(event.target.value, 10);
+    setSelectedDate(new Date(newYear, selectedDate.getMonth(), 1));
+  };
+
+  const selectedYear = selectedDate.getFullYear();
+  const selectedMonth = selectedDate.getMonth();
+
+  // Consulta unificada para obtener todas las métricas del mes seleccionado
+  const { data: ticketCounts, isLoading: isLoadingCounts, isError: isErrorCounts } = useQuery({
+    queryKey: ['ticketCounts', selectedYear, selectedMonth],
+    queryFn: () => {
+      const startDate = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
+      const endDate = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
+      return getTicketCounts(startDate, endDate);
+    },
+  });
+
+  // Preparar datos para el gráfico de estado usando React.useMemo para optimización
+  const statusChartData = React.useMemo(() => {
+    if (!ticketCounts?.byStatus) return [{ name: 'Sin datos', value: 1, color: '#94a3b8' }];
+
+    const data = Object.entries(ticketCounts.byStatus).map(([status, value]) => {
+      let displayName = status;
+      let color = '#6b7280'; // color por defecto
+
+      switch (status.toLowerCase()) {
+        case 'open': color = '#fbbf24'; displayName = 'Abierto'; break;
+        case 'closed': color = '#6b7280'; displayName = 'Cerrado'; break;
+        case 'resolved': color = '#10b981'; displayName = 'Resuelto'; break;
+        case 'pending': color = '#f59e0b'; displayName = 'Pendiente'; break;
+        default: displayName = status;
+      }
+      return { name: displayName, value, color };
+    });
+
+    return data.length > 0 ? data : [{ name: 'Sin datos', value: 1, color: '#94a3b8' }];
+  }, [ticketCounts]);
+
+
+
+  // Estado de carga
+  if (isLoadingCounts) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="flex animate-pulse flex-col items-center">
+          <div className="h-10 w-10 rounded-full bg-[#2d3441]"></div>
+          <div className="mt-4 text-[#b8c5d6]">Cargando datos...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Estado de error
+  if (isErrorCounts) {
+    return (
+      <div className="rounded-lg border border-[#ef4444] bg-[#1a1f29] p-6 text-center">
+        <p className="font-medium text-[#ef4444]">Error al cargar los datos del dashboard.</p>
+        <button className="mt-4 rounded-md bg-[#252a35] px-4 py-2 text-[#b8c5d6] hover:bg-[#2d3441]">
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
+  const monthTitle = selectedDate.toLocaleString('es-ES', { month: 'long' });
+  const yearTitle = selectedDate.getFullYear();
+  const fullMonthTitle = `${monthTitle} ${yearTitle}`;
+
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
+  const months = Array.from({ length: 12 }, (_, i) => ({
+    value: i,
+    name: new Date(2000, i).toLocaleString('es-ES', { month: 'long' })
+  }));
+
+  return (
+    <div className="dashboard-container bg-[var(--bg-primary)] min-h-screen p-6 text-[var(--text-primary)]">
+      {/* Header con efecto de glassmorphism */}
+      <div className="dashboard-header backdrop-blur-md bg-[var(--bg-secondary)]/80 rounded-xl p-6 mb-8 shadow-lg border border-[var(--bg-accent)]/20">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
+          <div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] bg-clip-text text-transparent">Dashboard Soporte IT</h1>
+            <p className="text-[var(--text-secondary)] mt-1">Vista general de tickets - {fullMonthTitle}</p>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Selector de fecha con estilo moderno */}
+            <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--bg-accent)]/30">
+              <select
+                value={selectedMonth}
+                onChange={handleMonthChange}
+                className="bg-transparent text-[var(--text-secondary)] px-3 py-2 border-none focus:ring-1 focus:ring-[var(--accent-primary)] rounded-md capitalize"
+              >
+                {months.map(month => (
+                  <option key={month.value} value={month.value} className="bg-[var(--bg-tertiary)] capitalize">{month.name}</option>
+                ))}
+              </select>
+              <select
+                value={selectedYear}
+                onChange={handleYearChange}
+                className="bg-transparent text-[var(--text-secondary)] px-3 py-2 border-none focus:ring-1 focus:ring-[var(--accent-primary)] rounded-md"
+              >
+                {years.map(year => (
+                  <option key={year} value={year} className="bg-[var(--bg-tertiary)]">{year}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Badge de última actualización con animación sutil */}
+            <div className="flex items-center gap-2 bg-[var(--bg-tertiary)]/40 rounded-full px-3 py-1 text-xs">
+              <span className="inline-block h-2 w-2 rounded-full bg-[var(--success)] animate-pulse"></span>
+              <span className="text-[var(--text-muted)]">Actualizado: {new Date().toLocaleTimeString()}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Hero Metrics - KPIs principales con diseño de tarjetas modernas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatCard 
+          title="Total Tickets" 
+          value={ticketCounts?.totalInDateRange ?? 0} 
+          subtitle={fullMonthTitle}
+          icon="total"
+          trend="+5%"
+        />
+        <StatCard 
+          title="Tickets Abiertos" 
+          value={ticketCounts?.openInDateRange ?? 0} 
+          subtitle={fullMonthTitle}
+          icon="open"
+          trend="-2%"
+        />
+        <StatCard 
+          title="Total Pendientes" 
+          value={ticketCounts?.totalOpen ?? 0}
+          subtitle="Acumulado"
+          icon="pending"
+          trend="+8%"
+        />
+        <StatCard 
+          title="Tickets Cerrados" 
+          value={ticketCounts?.closedInDateRange ?? 0} 
+          subtitle={fullMonthTitle}
+          icon="closed"
+          trend="+12%"
+        />
+      </div>
+
+      {/* Analytics Grid - Primera fila */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="bg-[var(--bg-secondary)] rounded-xl p-6 shadow-lg border border-[var(--bg-accent)]/10 hover:border-[var(--accent-primary)]/20 transition-all duration-300">
+          <h2 className="text-lg font-medium mb-4 flex items-center">
+            <span className="inline-block w-2 h-6 bg-[var(--info)] rounded-sm mr-3"></span>
+            Distribución por Estado
+          </h2>
+          <TicketStatusChart data={statusChartData} />
+        </div>
+        
+        <div className="bg-[var(--bg-secondary)] rounded-xl p-6 shadow-lg border border-[var(--bg-accent)]/10 hover:border-[var(--accent-primary)]/20 transition-all duration-300">
+          <h2 className="text-lg font-medium mb-4 flex items-center">
+            <span className="inline-block w-2 h-6 bg-[var(--accent-primary)] rounded-sm mr-3"></span>
+            Tendencia de Tickets
+          </h2>
+          <TicketTrendsChart year={selectedYear} month={selectedMonth + 1} />
+        </div>
+      </div>
+
+      {/* Analytics Grid - Segunda fila */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-[var(--bg-secondary)] rounded-xl p-6 shadow-lg border border-[var(--bg-accent)]/10 hover:border-[var(--accent-primary)]/20 transition-all duration-300">
+          <h2 className="text-lg font-medium mb-4 flex items-center">
+            <span className="inline-block w-2 h-6 bg-[var(--warning)] rounded-sm mr-3"></span>
+            Tickets por Agente
+          </h2>
+          <TicketsByAgentChart year={selectedYear} month={selectedMonth + 1} />
+        </div>
+        
+        <div className="bg-[var(--bg-secondary)] rounded-xl p-6 shadow-lg border border-[var(--bg-accent)]/10 hover:border-[var(--accent-primary)]/20 transition-all duration-300">
+          <h2 className="text-lg font-medium mb-4 flex items-center">
+            <span className="inline-block w-2 h-6 bg-[var(--success)] rounded-sm mr-3"></span>
+            Tickets por Empresa
+          </h2>
+          <TicketsByOrganizationChart year={selectedYear} month={selectedMonth + 1} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DashboardView;

@@ -1,0 +1,11 @@
+/* Las directivas @tailwind se han movido a index.css para evitar duplicación y conflictos */
+
+/* Estilos Globales y Resets Básicos */
+body, html, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: sans-serif; /* Tailwind lo sobrescribirá con sus valores predeterminados */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
