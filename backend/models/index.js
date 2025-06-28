@@ -29,6 +29,19 @@ const db = {
   TicketCdata,
   ListItems,
   List,
+  models: {
+    User,
+    Ticket,
+    TicketStatus,
+    Department,
+    Staff,
+    Organization,
+    TicketPriority,
+    HelpTopic,
+    TicketCdata,
+    ListItems,
+    List,
+  }
 };
 
 // --- Definir Asociaciones ---

@@ -20,38 +20,37 @@ const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="sidebar">
+    <aside className="dashboard-sidebar">
       {/* Logo/Brand */}
-      <div className="sidebar-brand">
-        <div className="brand-logo">
-          <svg viewBox="0 0 24 24" fill="currentColor" className="brand-icon">
-            <path fillRule="evenodd" d="M3 6a3 3 0 013-3h12a3 3 0 013 3v12a3 3 0 01-3 3H6a3 3 0 01-3-3V6zm4.5 7.5a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0v-2.25a.75.75 0 01.75-.75zm3.75-1.5a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0V12zm3-.75a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V12a.75.75 0 01.75-.75zm3.75-2.25a.75.75 0 00-1.5 0v6a.75.75 0 001.5 0v-6z" clipRule="evenodd" />
-          </svg>
+      <div className="header-brand">
+        <div className="brand-link">
+          <div className="brand-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M3 6a3 3 0 013-3h12a3 3 0 013 3v12a3 3 0 01-3 3H6a3 3 0 01-3-3V6zm4.5 7.5a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0v-2.25a.75.75 0 01.75-.75zm3.75-1.5a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0V12zm3-.75a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V12a.75.75 0 01.75-.75zm3.75-2.25a.75.75 0 00-1.5 0v6a.75.75 0 001.5 0v-6z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <span>OsTicket</span>
         </div>
-        <h1 className="brand-title">OsTicket</h1>
       </div>
       
       {/* Navigation */}
-      <nav className="sidebar-nav">
-        <ul className="nav-list">
-          {navLinks.map((item) => {
-            const IconComponent = item.icon;
-            return (
-              <li key={item.name} className="nav-item">
-                <NavLink
-                  to={item.href}
-                  end={item.href === '/'}
-                  className={({ isActive }) =>
-                    `nav-link ${isActive ? 'nav-link-active' : ''}`
-                  }
-                >
-                  <IconComponent className="nav-icon" aria-hidden="true" />
-                  <span className="nav-text">{item.name}</span>
-                </NavLink>
-              </li>
-            );
-          })}
-        </ul>
+      <nav className="nav-menu">
+        {navLinks.map((item) => {
+          const IconComponent = item.icon;
+          return (
+            <NavLink
+              key={item.name}
+              to={item.href}
+              end={item.href === '/'}
+              className={({ isActive }) =>
+                `nav-item ${isActive ? 'active' : ''}`
+              }
+            >
+              <IconComponent className="nav-icon" aria-hidden="true" />
+              <span>{item.name}</span>
+            </NavLink>
+          );
+        })}
       </nav>
       
       {/* Footer */}
@@ -66,5 +65,3 @@ const Sidebar: React.FC = () => {
 };
 
 export default Sidebar;
-
-

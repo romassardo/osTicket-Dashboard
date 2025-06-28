@@ -71,9 +71,9 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
         }
       };
 
-      fetchData('http://localhost:3001/api/statuses/simple', setStatuses);
-      fetchData('http://localhost:3001/api/organizations/simple', setOrganizations);
-      fetchData('http://localhost:3001/api/staff/simple', setStaff);
+      fetchData('/api/statuses/simple', setStatuses);
+      fetchData('/api/organizations/simple', setOrganizations);
+      fetchData('/api/staff/simple', setStaff);
     }
   }, [isOpen]);
 

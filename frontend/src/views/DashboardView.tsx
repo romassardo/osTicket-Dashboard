@@ -46,13 +46,13 @@ const DashboardView: React.FC = () => {
 
     const data = Object.entries(ticketCounts.byStatus).map(([status, value]) => {
       let displayName = status;
-      let color = '#6b7280'; // color por defecto
+      let color = 'var(--text-muted)'; // color por defecto
 
       switch (status.toLowerCase()) {
-        case 'open': color = '#fbbf24'; displayName = 'Abierto'; break;
-        case 'closed': color = '#6b7280'; displayName = 'Cerrado'; break;
-        case 'resolved': color = '#10b981'; displayName = 'Resuelto'; break;
-        case 'pending': color = '#f59e0b'; displayName = 'Pendiente'; break;
+        case 'open': color = 'var(--status-open)'; displayName = 'Abierto'; break;
+        case 'closed': color = 'var(--status-closed)'; displayName = 'Cerrado'; break;
+        case 'resolved': color = 'var(--status-resolved)'; displayName = 'Resuelto'; break;
+        case 'pending': color = 'var(--status-pending)'; displayName = 'Pendiente'; break;
         default: displayName = status;
       }
       return { name: displayName, value, color };
@@ -101,13 +101,13 @@ const DashboardView: React.FC = () => {
     <div className="dashboard-container bg-[var(--bg-primary)] min-h-screen p-6 text-[var(--text-primary)]">
       {/* Header con efecto de glassmorphism */}
       <div className="dashboard-header backdrop-blur-md bg-[var(--bg-secondary)]/80 rounded-xl p-6 mb-8 shadow-lg border border-[var(--bg-accent)]/20">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
+        <div className="flex flex-wrap justify-between items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] bg-clip-text text-transparent">Dashboard Soporte IT</h1>
             <p className="text-[var(--text-secondary)] mt-1">Vista general de tickets - {fullMonthTitle}</p>
           </div>
           
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-4">
             {/* Selector de fecha con estilo moderno */}
             <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--bg-accent)]/30">
               <select

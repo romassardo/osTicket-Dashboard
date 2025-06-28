@@ -2,6 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 
 // Cargar variables de entorno desde el archivo .env PRIMERO
 dotenv.config({ path: './config/.env' });
@@ -13,12 +14,12 @@ const db = require('./models'); // Esto importa el objeto db de ./models/index.j
 // Importar manejadores de rutas
 const ticketRoutes = require('./routes/ticketRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
-const userRoutes = require('./routes/userRoutes');
-const staffRoutes = require('./routes/staffRoutes');
-const organizationRoutes = require('./routes/organizationRoutes');
-const statusRoutes = require('./routes/statusRoutes');
-const priorityRoutes = require('./routes/priorityRoutes');
-const helpTopicRoutes = require('./routes/helpTopicRoutes');
+// const userRoutes = require('./routes/userRoutes');
+// const staffRoutes = require('./routes/staffRoutes');
+// const organizationRoutes = require('./routes/organizationRoutes');
+// const statusRoutes = require('./routes/statusRoutes');
+// const priorityRoutes = require('./routes/priorityRoutes');
+// const helpTopicRoutes = require('./routes/helpTopicRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 // Crear una instancia de la aplicación Express
@@ -37,38 +38,80 @@ app.use(cors()); // Esto permitirá todas las solicitudes CORS por defecto
 // Ejemplo: app.use(cors({ origin: 'http://localhost:5173' }));
 
 // Ruta de prueba para verificar que el servidor funciona
-app.get('/', (req, res) => {
-  res.json({ message: '¡Bienvenido al API del Dashboard de OsTicket!' });
-});
+// Ruta de prueba que ahora será manejada por el servidor de archivos estáticos
+// app.get('/', (req, res) => {
+//   res.json({ message: '¡Bienvenido al API del Dashboard de OsTicket!' });
+// });
 
 // Ruta de prueba para la base de datos
-app.get('/api/db-test', async (req, res) => {
-  try {
-    const [results, metadata] = await db.sequelize.query("SELECT COUNT(*) as ticket_count FROM ost_ticket;");
-    res.json({
-      message: 'Conexión a BD exitosa y consulta realizada.',
-      data: results[0] // results es un array, tomamos el primer elemento
-    });
-  } catch (error) {
-    console.error('Error en /api/db-test:', error);
-    res.status(500).json({
-      message: 'Error al realizar la consulta a la base de datos.',
-      error: error.message
-    });
-  }
-});
+// app.get('/api/db-test', async (req, res) => {
+//   try {
+//     const [results, metadata] = await db.sequelize.query("SELECT COUNT(*) as ticket_count FROM ost_ticket;");
+//     res.json({
+//       message: 'Conexión a BD exitosa y consulta realizada.',
+//       data: results[0] // results es un array, tomamos el primer elemento
+//     });
+//   } catch (error) {
+//     console.error('Error en /api/db-test:', error);
+//     res.status(500).json({
+//       message: 'Error al realizar la consulta a la base de datos.',
+//       error: error.message
+//     });
+//   }
+// });
 
 // --- API Endpoints ---
 
 // Usar los manejadores de rutas
+console.log('DEBUG: Registrando ruta /api/tickets...');
 app.use('/api/tickets', ticketRoutes);
+console.log('DEBUG: ✓ Ruta /api/tickets registrada exitosamente');
+
+console.log('DEBUG: Registrando ruta /api/departments...');
 app.use('/api/departments', departmentRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/staff', staffRoutes);
-app.use('/api/organizations', organizationRoutes);
-app.use('/api/statuses', statusRoutes);
-app.use('/api/priorities', priorityRoutes);
-app.use('/api/helptopics', helpTopicRoutes);
+console.log('DEBUG: ✓ Ruta /api/departments registrada exitosamente');
+
+// console.log('DEBUG: Registrando ruta /api/users...');
+// app.use('/api/users', userRoutes);
+// console.log('DEBUG: ✓ Ruta /api/users registrada exitosamente');
+
+// console.log('DEBUG: Registrando ruta /api/staff...');
+// app.use('/api/staff', staffRoutes);
+// console.log('DEBUG: ✓ Ruta /api/staff registrada exitosamente');
+
+// console.log('DEBUG: Registrando ruta /api/organizations...');
+// app.use('/api/organizations', organizationRoutes);
+// console.log('DEBUG: ✓ Ruta /api/organizations registrada exitosamente');
+
+// console.log('DEBUG: Registrando ruta /api/statuses...');
+// app.use('/api/statuses', statusRoutes);
+// console.log('DEBUG: ✓ Ruta /api/statuses registrada exitosamente');
+
+// console.log('DEBUG: Registrando ruta /api/priorities...');
+// app.use('/api/priorities', priorityRoutes);
+// console.log('DEBUG: ✓ Ruta /api/priorities registrada exitosamente');
+
+// console.log('DEBUG: Registrando ruta /api/helptopics...');
+// app.use('/api/helptopics', helpTopicRoutes);
+// console.log('DEBUG: ✓ Ruta /api/helptopics registrada exitosamente');
+
+console.log('DEBUG: ✓ Todas las rutas API registradas exitosamente');
+
+// --- Servir Frontend Estático ---
+
+// Construir la ruta a la carpeta 'dist' del frontend
+const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
+
+// Servir los archivos estáticos de la aplicación de React
+app.use(express.static(frontendDistPath));
+
+// Para cualquier otra ruta no manejada por la API o los archivos estáticos,
+// servir el index.html de la aplicación de React.
+// Esto es crucial para que el enrutamiento del lado del cliente (React Router) funcione.
+// Usando expresión regular para evitar errores de path-to-regexp
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(frontendDistPath, 'index.html'));
+});
 
 // Middleware de manejo de errores centralizado
 // Debe ser el último middleware que se añade
@@ -80,8 +123,7 @@ async function startServer() {
     // Sincronizar todos los modelos con la base de datos
     // Esto también autenticará la conexión
     await db.sequelize.sync(); // { force: true } o { alter: true } si se necesitan cambios destructivos
-    console.log('Todos los modelos fueron sincronizados exitosamente.');
-    console.log('Modelos disponibles:', Object.keys(db.sequelize.models).join(', '));
+    console.log('Modelos disponibles:', Object.keys(db.models));
 
     app.listen(PORT, () => {
       console.log(`Servidor backend escuchando en http://localhost:${PORT}`);

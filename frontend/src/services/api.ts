@@ -10,7 +10,7 @@ export interface TicketCounts {
 }
 
 const apiClient = axios.create({
-  baseURL: 'http://localhost:3001/api', // Asegúrate que coincida con tu backend
+  baseURL: '/api', // Usamos una ruta relativa para que funcione en producción
   headers: {
     'Content-Type': 'application/json',
   },

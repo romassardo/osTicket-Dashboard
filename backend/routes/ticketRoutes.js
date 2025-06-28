@@ -477,16 +477,11 @@ router.get('/stats/by-organization', async (req, res, next) => {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
-    const whereCondition = {
-      created: {
-        [Op.between]: [startDate, endDate]
-      }
-    };
-
-    // Primera consulta: obtener tickets agrupados por organización con departamento filtrado
-    let orgStats = await Ticket.findAll({
+    // Consulta simplificada: usar datos del sector desde TicketCdata en lugar de Organization
+    const orgStats = await Ticket.findAll({
       attributes: [
-        [sequelize.fn('COUNT', sequelize.col('Ticket.ticket_id')), 'ticket_count']
+        [sequelize.fn('COUNT', sequelize.col('Ticket.ticket_id')), 'ticket_count'],
+        [sequelize.col('cdata.SectorName.value'), 'sector_name']
       ],
       include: [
         {
@@ -498,33 +493,44 @@ router.get('/stats/by-organization', async (req, res, next) => {
           attributes: []
         },
         {
-          model: User,
-          as: 'user',
+          model: TicketCdata,
+          as: 'cdata',
+          attributes: [],
+          required: true, // Solo tickets que tengan datos de sector
           include: [
             {
-              model: Organization,
-              as: 'Organization',
-              attributes: ['id', 'name'],
-              required: false // Hacemos esta relación opcional
+              model: ListItems,
+              as: 'SectorName',
+              attributes: ['value'],
+              required: true
             }
-          ],
-          attributes: [],
-          required: true
+          ]
         }
       ],
-      where: whereCondition,
-      group: ['user.Organization.id'],
+      where: {
+        created: {
+          [Op.between]: [startDate, endDate]
+        }
+      },
+      group: ['cdata.SectorName.value'],
+      having: sequelize.where(sequelize.col('cdata.SectorName.value'), {
+        [Op.not]: null,
+        [Op.ne]: ''
+      }),
       order: [[sequelize.fn('COUNT', sequelize.col('Ticket.ticket_id')), 'DESC']],
-      raw: false
+      raw: true,
+      limit: 15
     });
 
-    // Si no hay resultados, intentamos una consulta sin el filtro de fecha
-    if (orgStats.length === 0) {
+    // Si no hay datos en el período, intentar sin filtro de fecha
+    let finalStats = orgStats;
+    if (finalStats.length === 0) {
       console.log('No se encontraron datos para el período específico. Intentando sin filtro de fecha...');
       
-      orgStats = await Ticket.findAll({
+      finalStats = await Ticket.findAll({
         attributes: [
-          [sequelize.fn('COUNT', sequelize.col('Ticket.ticket_id')), 'ticket_count']
+          [sequelize.fn('COUNT', sequelize.col('Ticket.ticket_id')), 'ticket_count'],
+          [sequelize.col('cdata.SectorName.value'), 'sector_name']
         ],
         include: [
           {
@@ -536,53 +542,41 @@ router.get('/stats/by-organization', async (req, res, next) => {
             attributes: []
           },
           {
-            model: User,
-            as: 'user',
+            model: TicketCdata,
+            as: 'cdata',
+            attributes: [],
+            required: true,
             include: [
               {
-                model: Organization,
-                as: 'Organization',
-                attributes: ['id', 'name'],
-                required: false
+                model: ListItems,
+                as: 'SectorName',
+                attributes: ['value'],
+                required: true
               }
-            ],
-            attributes: [],
-            required: true
+            ]
           }
         ],
-        group: ['user.Organization.id'],
+        group: ['cdata.SectorName.value'],
+        having: sequelize.where(sequelize.col('cdata.SectorName.value'), {
+          [Op.not]: null,
+          [Op.ne]: ''
+        }),
         order: [[sequelize.fn('COUNT', sequelize.col('Ticket.ticket_id')), 'DESC']],
-        raw: false,
-        limit: 15 // Limitamos a 15 organizaciones como máximo
+        raw: true,
+        limit: 15
       });
     }
 
-    // Si aún no hay resultados, proporcionar datos de ejemplo para desarrollo
-    if (orgStats.length === 0) {
-      console.log('No se encontraron datos incluso sin filtro de fecha. Devolviendo datos de ejemplo para desarrollo...');
-      
-      // Datos demo para desarrollo y pruebas visuales del gráfico
-      res.json([
-        { organization_id: 1, name: "Empresa A", ticket_count: 42 },
-        { organization_id: 2, name: "Soporte General", ticket_count: 28 },
-        { organization_id: 3, name: "Sector Finanzas", ticket_count: 23 },
-        { organization_id: 4, name: "Sector TI", ticket_count: 18 },
-        { organization_id: 5, name: "Recursos Humanos", ticket_count: 12 },
-      ]);
-      return;
-    }
+    // Formatear respuesta usando los datos reales del sector
+    const formattedStats = finalStats.map((stat, index) => ({
+      organization_id: index + 1, // ID secuencial para el gráfico
+      name: stat.sector_name || "Sin Sector",
+      ticket_count: parseInt(stat.ticket_count, 10)
+    }));
 
-    // Formatear respuesta
-    const formattedStats = orgStats
-      .filter(ticket => ticket.user?.Organization) // Filtramos tickets sin organización
-      .map(ticket => ({
-        organization_id: ticket.user.Organization.id,
-        name: ticket.user.Organization.name || "Sin Sector", 
-        ticket_count: parseInt(ticket.dataValues.ticket_count, 10)
-      }));
-
-    // Si después del filtrado no quedan registros, enviar datos de ejemplo
+    // Si aún no hay datos, usar datos de ejemplo como último recurso
     if (formattedStats.length === 0) {
+      console.log('No se encontraron datos reales. Devolviendo datos de ejemplo...');
       res.json([
         { organization_id: 1, name: "Empresa A", ticket_count: 35 },
         { organization_id: 2, name: "Soporte General", ticket_count: 22 },
@@ -591,7 +585,7 @@ router.get('/stats/by-organization', async (req, res, next) => {
       return;
     }
 
-    console.log(`Se encontraron ${formattedStats.length} organizaciones con tickets`);
+    console.log(`Se encontraron ${formattedStats.length} sectores con tickets:`, formattedStats);
     res.json(formattedStats);
   } catch (error) {
     console.error('Error en /stats/by-organization:', error);
@@ -656,64 +650,6 @@ router.get('/stats/tendencies', async (req, res, next) => {
     res.json(formattedTrends);
   } catch (error) {
     console.error('Error en /stats/tendencies:', error);
-    next(error);
-  }
-});
-
-// GET tickets agrupados por organización (para el gráfico "Tickets por sector")
-router.get('/stats/by-organization', async (req, res, next) => {
-  try {
-    const { year, month } = req.query;
-    const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
-    
-    if (!year || !month) {
-      return res.status(400).json({ error: 'Los parámetros year y month son requeridos' });
-    }
-
-    // Crear rango de fechas para el mes especificado
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-
-    const ticketsByOrg = await Ticket.findAll({
-      attributes: [
-        [sequelize.fn('COUNT', sequelize.col('Ticket.ticket_id')), 'ticket_count']
-      ],
-      include: [
-        {
-          model: Department,
-          as: 'department',
-          where: {
-            name: { [Op.in]: allowedDepartmentNames }
-          },
-          attributes: []
-        },
-        {
-          model: Organization,
-          as: 'organization',
-          attributes: ['id', 'name']
-        }
-      ],
-      where: {
-        created: {
-          [Op.between]: [startDate, endDate]
-        }
-      },
-      group: ['organization.id', 'organization.name'],
-      having: sequelize.literal('COUNT(Ticket.ticket_id) > 0'),
-      order: [[sequelize.fn('COUNT', sequelize.col('Ticket.ticket_id')), 'DESC']],
-      raw: true
-    });
-
-    // Formatear los datos para el gráfico de barras del frontend
-    const formattedData = ticketsByOrg.map(item => ({
-      organizationName: item['organization.name'] || 'Sin organización',
-      organizationId: item['organization.id'],
-      ticketCount: parseInt(item.ticket_count, 10)
-    }));
-
-    res.json(formattedData);
-  } catch (error) {
-    console.error('Error en /stats/by-organization:', error);
     next(error);
   }
 });

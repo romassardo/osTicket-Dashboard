@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import type { Ticket, PaginationInfo } from '../types'; // Corregido para apuntar al directorio types/index.ts
-import FilterPanel from '../components/analytics/FilterPanel';
-import DataTable from '../components/analytics/DataTable';
-import Pagination from '../components/tables/Pagination'; // Importar el componente de paginación
+import FilterPanel from '../components/analytics/FilterPanel.tsx';
+import { DataTable } from '../components/tables/DataTable.tsx';
+
+import Pagination from '../components/tables/Pagination.tsx'; // Importar el componente de paginación
 // Importamos íconos para mejorar la UI según la guía de diseño
 import { ArrowPathIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
 // Importar librería xlsx para exportación a Excel
@@ -30,10 +31,10 @@ const AnalyticsView: React.FC = () => {
     try {
       console.log('Fetching filter options...');
       const [transporteRes, staffRes, sectorRes, statusRes] = await Promise.all([
-        fetch('http://localhost:3001/api/tickets/options/transporte'),
-        fetch('http://localhost:3001/api/tickets/options/staff'),
-        fetch('http://localhost:3001/api/tickets/options/sector'),
-        fetch('http://localhost:3001/api/tickets/options/status'),
+        fetch('/api/tickets/options/transporte'),
+        fetch('/api/tickets/options/staff'),
+        fetch('/api/tickets/options/sector'),
+        fetch('/api/tickets/options/status'),
       ]);
 
       // Procesar opciones de transporte
@@ -129,7 +130,7 @@ const AnalyticsView: React.FC = () => {
       if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
       if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
 
-      const url = `http://localhost:3001/api/tickets?${params.toString()}`;
+      const url = `/api/tickets?${params.toString()}`;
       
       console.log('Fetching tickets with URL:', url);
       const response = await fetch(url);

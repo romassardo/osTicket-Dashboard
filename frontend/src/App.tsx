@@ -9,7 +9,7 @@ import './App.css'; // Mantendremos App.css por si queremos estilos globales ini
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/dashboard">
       <Routes>
         <Route path="/" element={<DashboardLayout />}>
           <Route index element={<DashboardView />} />

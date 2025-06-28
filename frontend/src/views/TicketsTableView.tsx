@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DataTable } from '../components/tables/DataTable';
-import SearchBar from '../components/tables/SearchBar';
-import Pagination from '../components/tables/Pagination';
+import { DataTable } from '../components/tables/DataTable.tsx';
+import SearchBar from '../components/tables/SearchBar.tsx';
+import Pagination from '../components/tables/Pagination.tsx';
 import type { Ticket, PaginationInfo, AdvancedFilters } from '../types';
 
 const TicketsTableView: React.FC = () => {
@@ -67,7 +67,7 @@ const TicketsTableView: React.FC = () => {
         console.log('Frontend: enviando staff:', selectedStaff);
       }
 
-      const url = `http://localhost:3001/api/tickets?${params.toString()}`;
+      const url = `/api/tickets?${params.toString()}`;
       console.log('Frontend: URL completa:', url);
       const response = await fetch(url);
       if (!response.ok) {
