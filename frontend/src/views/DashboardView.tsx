@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getTicketCounts } from '../services/api';
 
@@ -17,15 +17,15 @@ import TicketsByAgentChart from '../components/charts/TicketsByAgentChart';
 const DashboardView: React.FC = () => {
   const [selectedDate, setSelectedDate] = React.useState(new Date());
 
-  const handleMonthChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleMonthChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     const newMonth = parseInt(event.target.value, 10);
     setSelectedDate(new Date(selectedDate.getFullYear(), newMonth, 1));
-  };
+  }, [selectedDate]);
 
-  const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleYearChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     const newYear = parseInt(event.target.value, 10);
     setSelectedDate(new Date(newYear, selectedDate.getMonth(), 1));
-  };
+  }, [selectedDate]);
 
   const selectedYear = selectedDate.getFullYear();
   const selectedMonth = selectedDate.getMonth();

@@ -6,8 +6,8 @@ import { DataTable } from '../components/tables/DataTable.tsx';
 import Pagination from '../components/tables/Pagination.tsx'; // Importar el componente de paginación
 // Importamos íconos para mejorar la UI según la guía de diseño
 import { ArrowPathIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
-// Importar librería xlsx para exportación a Excel
-import * as XLSX from 'xlsx';
+// Importar utilidades de exportación seguras
+import { exportTicketsToExcel, exportTicketsToCSV } from '../utils/exportUtils';
 
 // Definir interfaces para las opciones de filtro
 interface TransporteOption {
@@ -167,68 +167,32 @@ const AnalyticsView: React.FC = () => {
   useEffect(() => {
     fetchFilterOptions();
     fetchTickets(filters, currentPage);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Empty dependency array is correct here for initial load
 
   const exportToExcel = () => {
-    if (tickets.length === 0) {
-      alert('No hay datos para exportar. Aplique filtros o espere a que se carguen los datos.');
-      return;
-    }
-
-    // Formatear los datos para el Excel con nombres de columnas legibles
-    const formattedData = tickets.map(ticket => ({
-      'Nº Ticket': ticket.number,
-      'Asunto': ticket.cdata?.subject || '-',
-      'Estado': ticket.status?.name || '-',
-      'Usuario': ticket.user ? `${ticket.user.name}` : '-',
-      'Agente': ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}` : '-',
-      'Sector/Sucursal': ticket.cdata?.SectorName?.value || ticket.cdata?.sector || '-',
-      'Transporte': (ticket.cdata as any)?.TransporteName?.value || '-',
-      'Fecha Creación': ticket.created ? new Date(ticket.created).toLocaleDateString('es-ES') : '-'
-    }));
-
-    // Crear hoja de trabajo
-    const workSheet = XLSX.utils.json_to_sheet(formattedData);
-    
-    // Crear libro de trabajo
-    const workBook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workBook, workSheet, 'Tickets');
-
-    // Agregar una segunda hoja con información de filtros aplicados
-    const filterInfo = [];
-    filterInfo.push({ 'Filtro': 'Fecha de exportación', 'Valor': new Date().toLocaleString('es-ES') });
-    filterInfo.push({ 'Filtro': 'Total de registros', 'Valor': tickets.length });
-    
-    if (filters && Object.keys(filters).length > 0) {
-      filterInfo.push({ 'Filtro': '--- FILTROS APLICADOS ---', 'Valor': '' });
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) {
-          let filterName = key;
-          switch (key) {
-            case 'transporte': filterName = 'Transporte'; break;
-            case 'staff': filterName = 'Agente'; break;
-            case 'organization': filterName = 'Sector/Organización'; break;
-            case 'statuses': filterName = 'Estados'; break;
-            case 'startDate': filterName = 'Fecha desde'; break;
-            case 'endDate': filterName = 'Fecha hasta'; break;
-          }
-          filterInfo.push({ 'Filtro': filterName, 'Valor': value });
-        }
-      });
-    } else {
-      filterInfo.push({ 'Filtro': 'Filtros aplicados', 'Valor': 'Ninguno (todos los registros)' });
-    }
-
-    const filterSheet = XLSX.utils.json_to_sheet(filterInfo);
-    XLSX.utils.book_append_sheet(workBook, filterSheet, 'Filtros');
-
-    // Generar nombre de archivo con fecha y hora
+    // Generate filename with current date and time
     const now = new Date();
-    const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.xlsx`;
+    const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.xls`;
     
-    // Descargar archivo
-    XLSX.writeFile(workBook, fileName);
+    // Use the secure export function
+    exportTicketsToExcel(tickets, {
+      filename: fileName,
+      includeFilters: true,
+      filters: filters
+    });
+  };
+
+  const exportToCSV = () => {
+    // Generate filename with current date and time
+    const now = new Date();
+    const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.csv`;
+    
+    // Use the secure CSV export function
+    exportTicketsToCSV(tickets, {
+      filename: fileName,
+      includeFilters: true,
+      filters: filters
+    });
   };
 
   return (
@@ -240,13 +204,24 @@ const AnalyticsView: React.FC = () => {
           <span className="text-small text-[0.75rem] leading-[1.4] text-[#7a8394]">Última actualización: {new Date().toLocaleTimeString()}</span>
         </div>
         <div className="header-right flex space-x-4">
-          <button 
-            onClick={exportToExcel}
-            className="flex items-center px-4 py-2 bg-[#252a35] hover:bg-[#2d3441] rounded-lg transition-all duration-200 text-[#b8c5d6]"
-          >
-            <DocumentChartBarIcon className="w-5 h-5 mr-2" />
-            <span>Exportar</span>
-          </button>
+          <div className="flex space-x-2">
+            <button 
+              onClick={exportToExcel}
+              className="flex items-center px-4 py-2 bg-[#252a35] hover:bg-[#2d3441] rounded-lg transition-all duration-200 text-[#b8c5d6]"
+              title="Exportar como Excel (.xls)"
+            >
+              <DocumentChartBarIcon className="w-5 h-5 mr-2" />
+              <span>Excel</span>
+            </button>
+            <button 
+              onClick={exportToCSV}
+              className="flex items-center px-4 py-2 bg-[#252a35] hover:bg-[#2d3441] rounded-lg transition-all duration-200 text-[#b8c5d6]"
+              title="Exportar como CSV (.csv)"
+            >
+              <DocumentChartBarIcon className="w-5 h-5 mr-2" />
+              <span>CSV</span>
+            </button>
+          </div>
           <button 
             onClick={() => fetchTickets(filters, currentPage)}
             className="flex items-center px-4 py-2 bg-[#252a35] hover:bg-[#2d3441] rounded-lg transition-all duration-200 text-[#b8c5d6]"
