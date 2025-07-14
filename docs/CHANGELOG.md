@@ -1,5 +1,26 @@
 # CHANGELOG - Dashboard osTicket
 
+## [0.35.0] - 2025-01-22
+
+### Added
+- **Frontend: Información de Versión y Desarrollador en Sidebar:**
+  - Implementado footer informativo en el sidebar con badge de versión "v1.0" destacado con colores accent del sistema de tokens.
+  - Agregada información del desarrollador "Rodrigo Massardo" y año "2025" con tipografía jerárquica apropiada.
+  - Integrado sistema de separadores visuales entre estado del sistema y información de versión usando bordes sutiles.
+
+### Changed
+- **Frontend: Diseño del Footer del Sidebar:**
+  - Actualizado componente `Sidebar.tsx` con nueva sección `version-info` que incluye badge de versión y datos del desarrollador.
+  - Implementados estilos CSS siguiendo la guía de diseño del proyecto con sistema de tokens para colores, espaciado y tipografía.
+  - Aplicada jerarquía visual clara: badge de versión centrado, información del desarrollador en texto secundario y muted.
+
+### Technical Improvements
+- **UI/UX Consistency:**
+  - Badge de versión usa `--accent-primary` para destacar información importante.
+  - Tipografía diferenciada: version-label (600 weight, uppercase), developer-name (500 weight), developer-year (400 weight, muted).
+  - Espaciado coherente usando tokens `--space-1`, `--space-2`, `--space-3`, `--space-4` del sistema de diseño.
+  - Bordes redondeados `--radius-full` para el badge siguiendo convenciones del proyecto.
+
 ## [0.34.0] - 2025-01-22
 
 ### 🗄️ **DATABASE OPTIMIZATION COMPLETADO**
