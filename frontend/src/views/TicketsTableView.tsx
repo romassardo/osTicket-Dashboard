@@ -1,10 +1,16 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { DataTable } from '../components/tables/DataTable.tsx';
 import SearchBar from '../components/tables/SearchBar.tsx';
 import Pagination from '../components/tables/Pagination.tsx';
 import type { Ticket, PaginationInfo, AdvancedFilters } from '../types';
+import { useDebounce } from '../lib/hooks';
+import logger from '../utils/logger';
 
-const TicketsTableView: React.FC = () => {
+/**
+ * TicketsTableView optimizado con React.memo y useDebounce
+ * Optimización de dependency arrays y uso de custom hooks [[memory:2988538]]
+ */
+const TicketsTableView: React.FC = memo(() => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -13,6 +19,9 @@ const TicketsTableView: React.FC = () => {
   
   // Separar los filtros en estados individuales para mejor control
   const [searchTerm, setSearchTerm] = useState<string>('');
+  
+  // Usar custom hook useDebounce para optimizar búsquedas
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
   const [selectedOrganization, setSelectedOrganization] = useState<string>('');
@@ -39,36 +48,36 @@ const TicketsTableView: React.FC = () => {
       params.append('page', currentPage.toString());
       params.append('limit', '15');
 
-      if (searchTerm) {
-        params.append('search', searchTerm);
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm);
       }
       if (selectedStatuses && selectedStatuses.length > 0) {
         // Convertir a strings si son números
         const statusesStr = selectedStatuses.map(s => s.toString()).join(',');
         params.append('statuses', statusesStr);
-        console.log('Frontend: enviando statuses:', statusesStr);
+        logger.debug('Frontend: enviando statuses:', statusesStr);
       }
       if (dateRange && dateRange[0]) {
         const startDateStr = dateRange[0].toISOString().split('T')[0];
         params.append('startDate', startDateStr);
-        console.log('Frontend: enviando startDate:', startDateStr);
+        logger.debug('Frontend: enviando startDate:', startDateStr);
       }
       if (dateRange && dateRange[1]) {
         const endDateStr = dateRange[1].toISOString().split('T')[0];
         params.append('endDate', endDateStr);
-        console.log('Frontend: enviando endDate:', endDateStr);
+        logger.debug('Frontend: enviando endDate:', endDateStr);
       }
       if (selectedOrganization) {
         params.append('organization', selectedOrganization.toString());
-        console.log('Frontend: enviando organization:', selectedOrganization);
+        logger.debug('Frontend: enviando organization:', selectedOrganization);
       }
       if (selectedStaff) {
         params.append('staff', selectedStaff.toString());
-        console.log('Frontend: enviando staff:', selectedStaff);
+        logger.debug('Frontend: enviando staff:', selectedStaff);
       }
 
       const url = `/api/tickets?${params.toString()}`;
-      console.log('Frontend: URL completa:', url);
+      logger.debug('Frontend: URL completa:', url);
       const response = await fetch(url);
       if (!response.ok) {
         const errorData = await response.json();
@@ -82,7 +91,7 @@ const TicketsTableView: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchTerm, selectedStatuses, dateRange, selectedOrganization, selectedStaff]);
+  }, [currentPage, debouncedSearchTerm, selectedStatuses, dateRange, selectedOrganization, selectedStaff]);
 
   useEffect(() => {
     fetchTickets();
@@ -110,9 +119,10 @@ const TicketsTableView: React.FC = () => {
     fetchTickets();
   }, [fetchTickets]);
   
+  // Memoizar contador de filtros activos para optimización
   const getActiveFilterCount = useMemo(() => {
     let count = 0;
-    if (searchTerm) count++;
+    if (searchTerm) count++; // Usar searchTerm inmediato para UX responsive
     if (selectedStatuses && selectedStatuses.length > 0) count++;
     if (dateRange && (dateRange[0] || dateRange[1])) count++;
     if (selectedOrganization) count++;
@@ -188,6 +198,9 @@ const TicketsTableView: React.FC = () => {
       )}
     </div>
   );
-};
+});
+
+// Asignar displayName para debugging en React DevTools
+TicketsTableView.displayName = 'TicketsTableView';
 
 export default TicketsTableView;

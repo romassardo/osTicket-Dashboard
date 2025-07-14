@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import type { Ticket, PaginationInfo } from '../types'; // Corregido para apuntar al directorio types/index.ts
 import FilterPanel from '../components/analytics/FilterPanel.tsx';
 import { DataTable } from '../components/tables/DataTable.tsx';
@@ -8,6 +8,7 @@ import Pagination from '../components/tables/Pagination.tsx'; // Importar el com
 import { ArrowPathIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
 // Importar utilidades de exportación seguras
 import { exportTicketsToExcel, exportTicketsToCSV } from '../utils/exportUtils';
+import logger from '../utils/logger';
 
 // Definir interfaces para las opciones de filtro
 interface TransporteOption {
@@ -15,21 +16,28 @@ interface TransporteOption {
   value: string;
 }
 
-const AnalyticsView: React.FC = () => {
+/**
+ * AnalyticsView optimizado con React.memo y useCallback para evitar re-renders innecesarios
+ * Vista principal de analytics - useEffect optimization needed según memorias del proyecto [[memory:2988538]]
+ */
+const AnalyticsView: React.FC = memo(() => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [filters, setFilters] = useState({});
-  const [transporteOptions, setTransporteOptions] = useState<TransporteOption[]>([]); // Cambiado a objetos {id, value}
-  const [staffOptions, setStaffOptions] = useState<{ staff_id: number; name: string }[]>([]);
-  const [sectorOptions, setSectorOptions] = useState<{ id: number; name: string }[]>([]);
-  const [statusOptions, setStatusOptions] = useState<{ id: number; name: string; state: string }[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isExporting, setIsExporting] = useState<boolean>(false); // Nuevo estado para exportación
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [filters, setFilters] = useState({});
+  
+  // Estados para opciones de filtro
+  const [transporteOptions, setTransporteOptions] = useState<TransporteOption[]>([]);
+  const [staffOptions, setStaffOptions] = useState<any[]>([]);
+  const [sectorOptions, setSectorOptions] = useState<any[]>([]);
+  const [statusOptions, setStatusOptions] = useState<any[]>([]);
 
-  // Función para cargar opciones de filtros
-  const fetchFilterOptions = async () => {
+  // Memoizar función fetchFilterOptions para evitar recreaciones
+  const fetchFilterOptions = useCallback(async () => {
     try {
-      console.log('Fetching filter options...');
+      logger.info('Fetching filter options...');
       const [transporteRes, staffRes, sectorRes, statusRes] = await Promise.all([
         fetch('/api/tickets/options/transporte'),
         fetch('/api/tickets/options/staff'),
@@ -41,20 +49,20 @@ const AnalyticsView: React.FC = () => {
       if (transporteRes.ok) {
         try {
           const transporteData = await transporteRes.json();
-          console.log('Transporte data:', transporteData);
+          logger.info('Transporte data:', transporteData);
           if (Array.isArray(transporteData) && transporteData.length > 0) {
             // Guardar los objetos completos {id, value}
             setTransporteOptions(transporteData);
           } else {
-            console.warn('Transporte data is empty');
+            logger.warn('Transporte data is empty');
             setTransporteOptions([]);
           }
         } catch (e) {
-          console.error('Error parsing transporte data:', e);
+          logger.error('Error parsing transporte data:', e);
           setTransporteOptions([]);
         }
       } else {
-        console.warn('Transporte response not OK');
+        logger.warn('Transporte response not OK');
         setTransporteOptions([]);
       }
       
@@ -62,10 +70,10 @@ const AnalyticsView: React.FC = () => {
       if (staffRes.ok) {
         try {
           const staffData = await staffRes.json();
-          console.log('Staff data:', staffData);
+          logger.info('Staff data:', staffData);
           setStaffOptions(Array.isArray(staffData) ? staffData : []);
         } catch (e) {
-          console.error('Error parsing staff data:', e);
+          logger.error('Error parsing staff data:', e);
           setStaffOptions([]);
         }
       } else {
@@ -76,19 +84,19 @@ const AnalyticsView: React.FC = () => {
       if (sectorRes.ok) {
         try {
           const sectorData = await sectorRes.json();
-          console.log('Sector data:', sectorData);
+          logger.info('Sector data:', sectorData);
           if (Array.isArray(sectorData) && sectorData.length > 0) {
             setSectorOptions(sectorData);
           } else {
-            console.warn('Sector data is empty');
+            logger.warn('Sector data is empty');
             setSectorOptions([]);
           }
         } catch (e) {
-          console.error('Error parsing sector data:', e);
+          logger.error('Error parsing sector data:', e);
           setSectorOptions([]);
         }
       } else {
-        console.warn('Sector response not OK');
+        logger.warn('Sector response not OK');
         setSectorOptions([]);
       }
       
@@ -96,26 +104,27 @@ const AnalyticsView: React.FC = () => {
       if (statusRes.ok) {
         try {
           const statusData = await statusRes.json();
-          console.log('Status data:', statusData);
+          logger.info('Status data:', statusData);
           setStatusOptions(Array.isArray(statusData) ? statusData : []);
         } catch (e) {
-          console.error('Error parsing status data:', e);
+          logger.error('Error parsing status data:', e);
           setStatusOptions([]);
         }
       } else {
         setStatusOptions([]);
       }
     } catch (error) {
-      console.error('Error fetching filter options:', error);
+      logger.error('Error fetching filter options:', error);
       // Inicializar con arreglos vacíos en caso de error
       setTransporteOptions([]);
       setStaffOptions([]);
       setSectorOptions([]);
       setStatusOptions([]);
     }
-  };
+  }, []); // Sin dependencias ya que solo configura estados internos
 
-  const fetchTickets = async (currentFilters: any = {}, page: number = 1) => {
+  // Memoizar función fetchTickets para evitar recreaciones
+  const fetchTickets = useCallback(async (currentFilters: any = {}, page: number = 1) => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
@@ -132,68 +141,144 @@ const AnalyticsView: React.FC = () => {
 
       const url = `/api/tickets?${params.toString()}`;
       
-      console.log('Fetching tickets with URL:', url);
+      logger.info('Fetching tickets with URL:', url);
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Error: ${response.status}`);
       }
       const data = await response.json();
       // El endpoint /api/tickets devuelve {data: [...], pagination: {...}}
-      console.log('Tickets recibidos:', data.data?.length || 0);
+      logger.info('Tickets recibidos:', data.data?.length || 0);
       setTickets(data.data || []);
       setPagination(data.pagination || null);
     } catch (error) {
-      console.error('Error fetching tickets:', error);
+      logger.error('Error fetching tickets:', error);
       setTickets([]);
       setPagination(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // Sin dependencias externas ya que usa parámetros
 
-  const applyFilters = (newFilters: any) => {
-    console.log('Aplicando filtros:', newFilters);
+  // Memoizar función fetchAllTicketsForExport para evitar recreaciones  
+  const fetchAllTicketsForExport = useCallback(async (currentFilters: any = {}) => {
+    try {
+      const params = new URLSearchParams();
+      params.append('limit', '99999'); // Usar número muy alto en lugar de 'all' para obtener todos los registros
+      params.append('page', '1'); // Especificar página 1
+
+      // Añadir parámetros de filtro si existen
+      if (currentFilters.transporte) params.append('transporte', currentFilters.transporte);
+      if (currentFilters.staff) params.append('staff', currentFilters.staff);
+      if (currentFilters.organization) params.append('organization', currentFilters.organization);
+      if (currentFilters.statuses) params.append('statuses', currentFilters.statuses);
+      if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
+      if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
+
+      const url = `/api/tickets?${params.toString()}`;
+      
+      logger.info('Fetching ALL tickets for export with URL:', url);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+      }
+      const data = await response.json();
+      logger.info('Total tickets para exportación:', data.data?.length || 0);
+      logger.info('Pagination info:', data.pagination);
+      return data.data || [];
+    } catch (error) {
+      logger.error('Error fetching all tickets for export:', error);
+      throw error;
+    }
+  }, []); // Sin dependencias externas ya que usa parámetros
+
+  // Memoizar applyFilters para evitar recreaciones
+  const applyFilters = useCallback((newFilters: any) => {
+    logger.info('Aplicando filtros:', newFilters);
     setFilters(newFilters);
     setCurrentPage(1); // Resetear a la primera página al aplicar filtros
     fetchTickets(newFilters, 1);
-  };
+  }, [fetchTickets]);
 
-  const handlePageChange = (page: number) => {
+  // Memoizar handlePageChange para evitar recreaciones
+  const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
     fetchTickets(filters, page);
-  };
+  }, [fetchTickets, filters]);
 
-  // Cargar tickets al montar el componente
+  // Cargar opciones de filtro solo al montar el componente
   useEffect(() => {
     fetchFilterOptions();
+  }, [fetchFilterOptions]); // Ejecutar solo cuando fetchFilterOptions cambie
+
+  // Cargar tickets cuando cambien filters o currentPage
+  useEffect(() => {
     fetchTickets(filters, currentPage);
-  }, []); // Empty dependency array is correct here for initial load
+  }, [fetchTickets, filters, currentPage]); // Dependencias correctas
 
-  const exportToExcel = () => {
-    // Generate filename with current date and time
-    const now = new Date();
-    const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.xls`;
-    
-    // Use the secure export function
-    exportTicketsToExcel(tickets, {
-      filename: fileName,
-      includeFilters: true,
-      filters: filters
-    });
-  };
+  // Memoizar exportToExcel para evitar recreaciones
+  const exportToExcel = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      // Obtener TODOS los tickets filtrados para exportación
+      const allTicketsForExport = await fetchAllTicketsForExport(filters);
+      
+      if (allTicketsForExport.length === 0) {
+        alert('No hay datos para exportar con los filtros aplicados.');
+        return;
+      }
 
-  const exportToCSV = () => {
-    // Generate filename with current date and time
-    const now = new Date();
-    const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.csv`;
-    
-    // Use the secure CSV export function
-    exportTicketsToCSV(tickets, {
-      filename: fileName,
-      includeFilters: true,
-      filters: filters
-    });
-  };
+      // Generate filename with current date and time
+      const now = new Date();
+      const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.html`;
+      
+      // Use the secure export function with ALL filtered data
+      exportTicketsToExcel(allTicketsForExport, {
+        filename: fileName,
+        includeFilters: true,
+        filters: filters
+      });
+
+      logger.info(`Excel exportado exitosamente con ${allTicketsForExport.length} registros`);
+    } catch (error) {
+      logger.error('Error durante la exportación a Excel:', error);
+      alert('Error al exportar a Excel. Por favor, inténtelo de nuevo.');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [fetchAllTicketsForExport, filters]);
+
+  // Memoizar exportToCSV para evitar recreaciones
+  const exportToCSV = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      // Obtener TODOS los tickets filtrados para exportación
+      const allTicketsForExport = await fetchAllTicketsForExport(filters);
+      
+      if (allTicketsForExport.length === 0) {
+        alert('No hay datos para exportar con los filtros aplicados.');
+        return;
+      }
+
+      // Generate filename with current date and time
+      const now = new Date();
+      const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.csv`;
+      
+      // Use the secure CSV export function with ALL filtered data
+      exportTicketsToCSV(allTicketsForExport, {
+        filename: fileName,
+        includeFilters: true,
+        filters: filters
+      });
+
+      logger.info(`CSV exportado exitosamente con ${allTicketsForExport.length} registros`);
+    } catch (error) {
+      logger.error('Error durante la exportación a CSV:', error);
+      alert('Error al exportar a CSV. Por favor, inténtelo de nuevo.');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [fetchAllTicketsForExport, filters]);
 
   return (
     <div className="max-w-1400 mx-auto px-8 py-12 bg-[#0a0e14] text-[#ffffff]">
@@ -207,24 +292,35 @@ const AnalyticsView: React.FC = () => {
           <div className="flex space-x-2">
             <button 
               onClick={exportToExcel}
-              className="flex items-center px-4 py-2 bg-[#252a35] hover:bg-[#2d3441] rounded-lg transition-all duration-200 text-[#b8c5d6]"
-              title="Exportar como Excel (.xls)"
+              disabled={isExporting || isLoading}
+              className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200 ${
+                isExporting || isLoading 
+                  ? 'bg-[#1a1f29] text-[#7a8394] cursor-not-allowed' 
+                  : 'bg-[#252a35] hover:bg-[#2d3441] text-[#b8c5d6]'
+              }`}
+              title="Exportar como Excel (.html - compatible con Excel)"
             >
               <DocumentChartBarIcon className="w-5 h-5 mr-2" />
-              <span>Excel</span>
+              <span>{isExporting ? 'Exportando...' : 'Excel'}</span>
             </button>
             <button 
               onClick={exportToCSV}
-              className="flex items-center px-4 py-2 bg-[#252a35] hover:bg-[#2d3441] rounded-lg transition-all duration-200 text-[#b8c5d6]"
+              disabled={isExporting || isLoading}
+              className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200 ${
+                isExporting || isLoading 
+                  ? 'bg-[#1a1f29] text-[#7a8394] cursor-not-allowed' 
+                  : 'bg-[#252a35] hover:bg-[#2d3441] text-[#b8c5d6]'
+              }`}
               title="Exportar como CSV (.csv)"
             >
               <DocumentChartBarIcon className="w-5 h-5 mr-2" />
-              <span>CSV</span>
+              <span>{isExporting ? 'Exportando...' : 'CSV'}</span>
             </button>
           </div>
           <button 
             onClick={() => fetchTickets(filters, currentPage)}
-            className="flex items-center px-4 py-2 bg-[#252a35] hover:bg-[#2d3441] rounded-lg transition-all duration-200 text-[#b8c5d6]"
+            disabled={isLoading}
+            className="flex items-center px-4 py-2 bg-[#252a35] hover:bg-[#2d3441] rounded-lg transition-all duration-200 text-[#b8c5d6] disabled:opacity-50"
           >
             <ArrowPathIcon className="w-5 h-5 mr-2" />
             <span>Actualizar</span>
@@ -257,8 +353,22 @@ const AnalyticsView: React.FC = () => {
           )}
         </>
       )}
+
+      {/* Indicador de exportación */}
+      {isExporting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-[#1a1f29] rounded-xl p-8 border border-[#2d3441] flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#00d9ff] mb-4"></div>
+            <p className="text-[#b8c5d6] text-lg">Procesando exportación...</p>
+            <p className="text-[#7a8394] text-sm mt-2">Obteniendo todos los registros filtrados</p>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
+});
+
+// Asignar displayName para debugging en React DevTools
+AnalyticsView.displayName = 'AnalyticsView';
 
 export default AnalyticsView;

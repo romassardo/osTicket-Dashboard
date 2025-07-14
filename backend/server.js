@@ -10,6 +10,7 @@ dotenv.config({ path: './config/.env' });
 // LUEGO importar módulos que usen las variables de entorno
 // Importar la instancia de Sequelize y los modelos desde el archivo index.js de la carpeta models
 const db = require('./models'); // Esto importa el objeto db de ./models/index.js
+const logger = require('./utils/logger');
 
 // Importar manejadores de rutas
 const ticketRoutes = require('./routes/ticketRoutes');
@@ -63,39 +64,39 @@ app.use(cors()); // Esto permitirá todas las solicitudes CORS por defecto
 // --- API Endpoints ---
 
 // Usar los manejadores de rutas
-console.log('DEBUG: Registrando ruta /api/tickets...');
+logger.debug('Registrando ruta /api/tickets...');
 app.use('/api/tickets', ticketRoutes);
-console.log('DEBUG: ✓ Ruta /api/tickets registrada exitosamente');
+logger.debug('✓ Ruta /api/tickets registrada exitosamente');
 
-console.log('DEBUG: Registrando ruta /api/departments...');
+logger.debug('Registrando ruta /api/departments...');
 app.use('/api/departments', departmentRoutes);
-console.log('DEBUG: ✓ Ruta /api/departments registrada exitosamente');
+logger.debug('✓ Ruta /api/departments registrada exitosamente');
 
-// console.log('DEBUG: Registrando ruta /api/users...');
+// logger.debug('Registrando ruta /api/users...');
 // app.use('/api/users', userRoutes);
-// console.log('DEBUG: ✓ Ruta /api/users registrada exitosamente');
+// logger.debug('✓ Ruta /api/users registrada exitosamente');
 
-// console.log('DEBUG: Registrando ruta /api/staff...');
+// logger.debug('Registrando ruta /api/staff...');
 // app.use('/api/staff', staffRoutes);
-// console.log('DEBUG: ✓ Ruta /api/staff registrada exitosamente');
+// logger.debug('✓ Ruta /api/staff registrada exitosamente');
 
-// console.log('DEBUG: Registrando ruta /api/organizations...');
+// logger.debug('Registrando ruta /api/organizations...');
 // app.use('/api/organizations', organizationRoutes);
-// console.log('DEBUG: ✓ Ruta /api/organizations registrada exitosamente');
+// logger.debug('✓ Ruta /api/organizations registrada exitosamente');
 
-// console.log('DEBUG: Registrando ruta /api/statuses...');
+// logger.debug('Registrando ruta /api/statuses...');
 // app.use('/api/statuses', statusRoutes);
-// console.log('DEBUG: ✓ Ruta /api/statuses registrada exitosamente');
+// logger.debug('✓ Ruta /api/statuses registrada exitosamente');
 
-// console.log('DEBUG: Registrando ruta /api/priorities...');
+// logger.debug('Registrando ruta /api/priorities...');
 // app.use('/api/priorities', priorityRoutes);
-// console.log('DEBUG: ✓ Ruta /api/priorities registrada exitosamente');
+// logger.debug('✓ Ruta /api/priorities registrada exitosamente');
 
-// console.log('DEBUG: Registrando ruta /api/helptopics...');
+// logger.debug('Registrando ruta /api/helptopics...');
 // app.use('/api/helptopics', helpTopicRoutes);
-// console.log('DEBUG: ✓ Ruta /api/helptopics registrada exitosamente');
+// logger.debug('✓ Ruta /api/helptopics registrada exitosamente');
 
-console.log('DEBUG: ✓ Todas las rutas API registradas exitosamente');
+logger.info('✓ Todas las rutas API registradas exitosamente');
 
 // --- Servir Frontend Estático ---
 
@@ -123,13 +124,13 @@ async function startServer() {
     // Sincronizar todos los modelos con la base de datos
     // Esto también autenticará la conexión
     await db.sequelize.sync(); // { force: true } o { alter: true } si se necesitan cambios destructivos
-    console.log('Modelos disponibles:', Object.keys(db.models));
+    logger.info('Modelos disponibles:', Object.keys(db.models));
 
     app.listen(PORT, () => {
-      console.log(`Servidor backend escuchando en http://localhost:${PORT}`);
+      logger.info(`Servidor backend escuchando en http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error('No se pudo conectar y sincronizar con la base de datos al iniciar el servidor:', error);
+    logger.error('No se pudo conectar y sincronizar con la base de datos al iniciar el servidor:', error);
     // Opcionalmente, puedes decidir no iniciar el servidor si la BD no está disponible:
     // process.exit(1); 
   }

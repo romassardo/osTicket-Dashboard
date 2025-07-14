@@ -1,17 +1,21 @@
 // frontend/src/components/analytics/DataTable.tsx
 import type { Ticket } from '../../types';
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
 
 interface DataTableProps {
   tickets: Ticket[];
 }
 
-const DataTable: React.FC<DataTableProps> = ({ tickets }) => {
+/**
+ * DataTable optimizado con React.memo y useCallback para evitar re-renders innecesarios
+ * Candidato principal para optimización según memorias del proyecto [[memory:2988538]]
+ */
+const DataTable: React.FC<DataTableProps> = memo(({ tickets }) => {
   
-  // Función para formatear la fecha
-  const formatDate = (dateString: string): string => {
-    if (!dateString) return '-';
+  // Memoizar función formatDate para evitar recreaciones en cada render
+  const formatDate = useCallback((dateString: string): string => {
+    if (dateString === '') return '-';
     const date = new Date(dateString);
     return date.toLocaleDateString('es-ES', { 
       day: '2-digit', 
@@ -20,8 +24,9 @@ const DataTable: React.FC<DataTableProps> = ({ tickets }) => {
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
+  }, []);
 
+  // Early return memoizado - evita re-render si tickets está vacío y no cambia
   if (tickets.length === 0) {
     return (
       <div className="bg-[#1a1f29] p-6 rounded-xl shadow-lg border border-[#2d3441] text-center animate-fadeIn transition-all duration-300">
@@ -67,17 +72,17 @@ const DataTable: React.FC<DataTableProps> = ({ tickets }) => {
                 {ticket.number}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6] max-w-[250px] truncate">
-                {ticket.cdata?.subject || '-'}
+                {ticket.cdata.subject}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6]">
-                {ticket.AssignedStaff ? 
+                {ticket.AssignedStaff != null ? 
                   `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}` : '-'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6]">
                 {formatDate(ticket.created)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6]">
-                {(ticket.cdata as any)?.TransporteName?.value || '-'}
+                {ticket.cdata.TransporteName?.value ?? '-'}
               </td>
             </tr>
           ))}
@@ -85,6 +90,9 @@ const DataTable: React.FC<DataTableProps> = ({ tickets }) => {
       </table>
     </div>
   );
-};
+});
+
+// Asignar displayName para debugging en React DevTools
+DataTable.displayName = 'DataTable';
 
 export default DataTable;

@@ -146,7 +146,144 @@
     background: rgba(0, 217, 255, 0.3);
   }
 
-  /* Header */
+  /* Typography Classes según DESIGN_GUIDE.md */
+  .text-hero { 
+    font-size: 2.5rem; 
+    line-height: 1.2; 
+    font-weight: 700; 
+  }
+  
+  .text-h1 { 
+    font-size: 1.875rem; 
+    line-height: 1.3; 
+    font-weight: 600; 
+  }
+  
+  .text-h2 { 
+    font-size: 1.25rem; 
+    line-height: 1.4; 
+    font-weight: 600; 
+  }
+  
+  .text-h3 { 
+    font-size: 1rem; 
+    line-height: 1.4; 
+    font-weight: 500; 
+  }
+  
+  .text-base { 
+    font-size: 0.875rem; 
+    line-height: 1.5; 
+    font-weight: 400; 
+  }
+  
+  .text-small { 
+    font-size: 0.75rem; 
+    line-height: 1.4; 
+    font-weight: 400; 
+  }
+  
+  .text-micro { 
+    font-size: 0.6875rem; 
+    line-height: 1.3; 
+    font-weight: 500; 
+  }
+
+  /* Header Components según DESIGN_GUIDE.md */
+  .header-left {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  /* Header Buttons según DESIGN_GUIDE.md */
+  .header-button {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background: var(--bg-tertiary);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 400;
+    cursor: pointer;
+    transition: all var(--duration-fast) ease;
+    text-decoration: none;
+  }
+
+  .header-button:hover {
+    background: var(--bg-accent);
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .header-button:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+
+  .header-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .header-button:disabled:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .header-button-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    transition: transform var(--duration-fast) ease;
+  }
+
+  .header-button-icon.spinning {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { 
+      transform: rotate(0deg); 
+    }
+    to { 
+      transform: rotate(360deg); 
+    }
+  }
+
+  /* Status Indicator */
+  .status-indicator-container {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .status-text {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  /* Header Brand (Sidebar) */
   .header-brand {
     padding: var(--space-6);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
@@ -211,7 +348,89 @@
     flex-shrink: 0;
   }
 
-  /* Main content */
+  /* Sidebar Footer según DESIGN_GUIDE.md */
+  .sidebar-footer {
+    padding: var(--space-4) var(--space-6);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin-top: auto;
+  }
+
+  .footer-content {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .footer-content .status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .footer-content .status-text {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 400;
+  }
+
+  /* Version & Developer Info */
+  .version-info {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .version-badge {
+    display: flex;
+    justify-content: center;
+  }
+
+  .version-label {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-full);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .developer-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .developer-name {
+    color: var(--text-secondary);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-align: center;
+  }
+
+  .developer-year {
+    color: var(--text-muted);
+    font-size: 0.625rem;
+    font-weight: 400;
+    text-align: center;
+  }
+
+  /* Focus States para Accesibilidad según DESIGN_GUIDE.md */
+  .nav-item:focus-visible,
+  .header-button:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Legacy Header Styles (mantenidos para compatibilidad) */
   .main-header {
     background: var(--bg-secondary);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
@@ -266,6 +485,13 @@
     font-size: 0.875rem;
     cursor: pointer;
     outline: none;
+    transition: all var(--duration-fast) ease;
+  }
+
+  .date-select:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
   }
 
   .date-select option {

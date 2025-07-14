@@ -59,6 +59,17 @@ const Sidebar: React.FC = () => {
           <div className="status-indicator"></div>
           <span className="status-text">Sistema Activo</span>
         </div>
+        
+        {/* Version & Developer Info */}
+        <div className="version-info">
+          <div className="version-badge">
+            <span className="version-label">v1.0</span>
+          </div>
+          <div className="developer-info">
+            <span className="developer-name">Rodrigo Massardo</span>
+            <span className="developer-year">2025</span>
+          </div>
+        </div>
       </div>
     </aside>
   );

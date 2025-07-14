@@ -1,6 +1,7 @@
 // frontend/src/components/analytics/FilterPanel.tsx
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import logger from '../../utils/logger';
 
 // Define los tipos para las opciones de los filtros
 interface StaffOption {
@@ -24,16 +25,30 @@ interface TransporteOption {
   value: string;
 }
 
+// Define el tipo para los filtros aplicados
+interface AppliedFilters {
+  transporte?: number;
+  staff?: number;
+  organization?: number;
+  statuses?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
 // Define las props del componente
 interface FilterPanelProps {
   transporteOptions: TransporteOption[];
   staffOptions: StaffOption[];
   sectorOptions: SectorOption[];
   statusOptions: StatusOption[];
-  onApplyFilters: (filters: any) => void;
+  onApplyFilters: (filters: AppliedFilters) => void;
 }
 
-const FilterPanel: React.FC<FilterPanelProps> = ({ 
+/**
+ * FilterPanel optimizado con React.memo y useCallback para evitar re-renders innecesarios
+ * Candidato #1 para optimización según memorias del proyecto [[memory:2988538]]
+ */
+const FilterPanel: React.FC<FilterPanelProps> = memo(({ 
   transporteOptions, 
   staffOptions,
   sectorOptions,
@@ -48,20 +63,22 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const handleApply = () => {
-    const filters: any = {};
-    if (selectedTransporte) filters.transporte = parseInt(selectedTransporte, 10);
-    if (selectedStaff) filters.staff = parseInt(selectedStaff, 10);
-    if (selectedSector) filters.organization = parseInt(selectedSector, 10); // El backend espera 'organization'
-    if (selectedStatus) filters.statuses = parseInt(selectedStatus, 10); // El backend espera 'statuses'
-    if (startDate) filters.startDate = startDate;
-    if (endDate) filters.endDate = endDate;
+  // Memoizar función handleApply para evitar recreaciones
+  const handleApply = useCallback(() => {
+    const filters: AppliedFilters = {};
+    if (selectedTransporte !== '') filters.transporte = parseInt(selectedTransporte, 10);
+    if (selectedStaff !== '') filters.staff = parseInt(selectedStaff, 10);
+    if (selectedSector !== '') filters.organization = parseInt(selectedSector, 10); // El backend espera 'organization'
+    if (selectedStatus !== '') filters.statuses = parseInt(selectedStatus, 10); // El backend espera 'statuses'
+    if (startDate !== '') filters.startDate = startDate;
+    if (endDate !== '') filters.endDate = endDate;
     
-    console.log('Aplicando filtros:', filters);
+    logger.info('Aplicando filtros:', filters);
     onApplyFilters(filters);
-  };
+  }, [selectedTransporte, selectedStaff, selectedSector, selectedStatus, startDate, endDate, onApplyFilters]);
 
-  const handleReset = () => {
+  // Memoizar función handleReset para evitar recreaciones
+  const handleReset = useCallback(() => {
     setSelectedTransporte('');
     setSelectedStaff('');
     setSelectedSector('');
@@ -69,7 +86,32 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     setStartDate('');
     setEndDate('');
     onApplyFilters({});
-  };
+  }, [onApplyFilters]);
+
+  // Memoizar onChange handlers para evitar recreaciones en cada render
+  const handleTransporteChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedTransporte(e.target.value);
+  }, []);
+
+  const handleStaffChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedStaff(e.target.value);
+  }, []);
+
+  const handleSectorChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedSector(e.target.value);
+  }, []);
+
+  const handleStatusChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedStatus(e.target.value);
+  }, []);
+
+  const handleStartDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setStartDate(e.target.value);
+  }, []);
+
+  const handleEndDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setEndDate(e.target.value);
+  }, []);
 
   return (
     <div className="bg-[#1a1f29] p-6 rounded-xl shadow-lg mb-6 border border-[#2d3441] transition-all duration-300 hover:shadow-xl animate-slideInUp">
@@ -94,7 +136,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           <select
             id="staff"
             value={selectedStaff}
-            onChange={(e) => setSelectedStaff(e.target.value)}
+            onChange={handleStaffChange}
             className="mt-1 block w-full pl-3 pr-10 py-2 text-[0.875rem] border border-[#2d3441] focus:outline-none focus:ring-[#7c3aed] focus:border-[#00d9ff] rounded-lg bg-[#252a35] text-[#ffffff] transition-colors duration-200"
           >
             <option value="">Todos</option>
@@ -110,11 +152,11 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           <select
             id="sector"
             value={selectedSector}
-            onChange={(e) => setSelectedSector(e.target.value)}
+            onChange={handleSectorChange}
             className="mt-1 block w-full pl-3 pr-10 py-2 text-[0.875rem] border border-[#2d3441] focus:outline-none focus:ring-[#7c3aed] focus:border-[#00d9ff] rounded-lg bg-[#252a35] text-[#ffffff] transition-colors duration-200"
           >
             <option value="">Todos</option>
-            {sectorOptions && sectorOptions.length > 0 ? (
+            {sectorOptions.length > 0 ? (
               sectorOptions.map(option => (
                 <option key={option.id} value={option.id}>{option.name}</option>
               ))
@@ -130,7 +172,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           <select
             id="status"
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
+            onChange={handleStatusChange}
             className="mt-1 block w-full pl-3 pr-10 py-2 text-[0.875rem] border border-[#2d3441] focus:outline-none focus:ring-[#7c3aed] focus:border-[#00d9ff] rounded-lg bg-[#252a35] text-[#ffffff] transition-colors duration-200"
           >
             <option value="">Todos</option>
@@ -146,11 +188,11 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           <select
             id="transporte"
             value={selectedTransporte}
-            onChange={(e) => setSelectedTransporte(e.target.value)}
+            onChange={handleTransporteChange}
             className="mt-1 block w-full pl-3 pr-10 py-2 text-[0.875rem] border border-[#2d3441] focus:outline-none focus:ring-[#7c3aed] focus:border-[#00d9ff] rounded-lg bg-[#252a35] text-[#ffffff] transition-colors duration-200"
           >
             <option value="">Todos</option>
-            {transporteOptions && transporteOptions.length > 0 ? (
+            {transporteOptions.length > 0 ? (
               transporteOptions.map(option => (
                 <option key={option.id} value={option.id}>{option.value}</option>
               ))
@@ -167,7 +209,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             type="date"
             id="start-date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={handleStartDateChange}
             className="mt-1 block w-full rounded-lg border border-[#2d3441] bg-[#252a35] text-[#ffffff] py-2 px-3 focus:outline-none focus:ring-[#7c3aed] focus:border-[#00d9ff] text-[0.875rem] transition-colors duration-200"
           />
         </div>
@@ -179,7 +221,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             type="date"
             id="end-date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={handleEndDateChange}
             className="mt-1 block w-full rounded-lg border border-[#2d3441] bg-[#252a35] text-[#ffffff] py-2 px-3 focus:outline-none focus:ring-[#7c3aed] focus:border-[#00d9ff] text-[0.875rem] transition-colors duration-200"
           />
         </div>
@@ -196,6 +238,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
       </div>
     </div>
   );
-};
+});
+
+// Asignar displayName para debugging en React DevTools
+FilterPanel.displayName = 'FilterPanel';
 
 export default FilterPanel;

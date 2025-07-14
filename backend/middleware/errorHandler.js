@@ -1,8 +1,9 @@
 // backend/middleware/errorHandler.js
 const { Sequelize } = require('sequelize');
+const logger = require('../utils/logger');
 
 const errorHandler = (err, req, res, next) => {
-  console.error('ERROR DETECTADO:', err); // Loguear el error completo en el servidor
+  logger.error('ERROR DETECTADO:', err); // Loguear el error completo en el servidor
 
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Ha ocurrido un error inesperado en el servidor.';

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import logger from '../utils/logger';
 
 // Define el nuevo tipo de respuesta para el endpoint de conteos
 export interface TicketCounts {
@@ -29,7 +30,7 @@ export const getTicketCounts = async (startDate?: string, endDate?: string): Pro
     const response = await apiClient.get('/tickets/count', { params });
     return response.data;
   } catch (error) {
-    console.error('Error al obtener conteo de tickets:', error);
+    logger.error('Error al obtener conteo de tickets:', error);
     throw error;
   }
 };
@@ -42,7 +43,7 @@ export const getDepartments = async () => {
     const response = await apiClient.get('/departments');
     return response.data;
   } catch (error) {
-    console.error('Error al obtener departamentos:', error);
+    logger.error('Error al obtener departamentos:', error);
     throw error;
   }
 };
@@ -59,7 +60,7 @@ export const getOrganizations = async (year?: number, month?: number) => {
     const response = await apiClient.get('/organizations', { params });
     return response.data;
   } catch (error) {
-    console.error('Error al obtener organizaciones:', error);
+    logger.error('Error al obtener organizaciones:', error);
     throw error;
   }
 };
@@ -72,7 +73,7 @@ export const getOrganizationsDebug = async () => {
     const response = await apiClient.get('/organizations/debug');
     return response.data;
   } catch (error) {
-    console.error('Error al obtener debug de organizaciones:', error);
+    logger.error('Error al obtener debug de organizaciones:', error);
     throw error;
   }
 };
@@ -85,7 +86,7 @@ export const getStaff = async () => {
     const response = await apiClient.get('/staff');
     return response.data;
   } catch (error) {
-    console.error('Error al obtener staff:', error);
+    logger.error('Error al obtener staff:', error);
     throw error;
   }
 };
@@ -98,7 +99,7 @@ export const getTicketsByDepartment = async (departmentId: string, page: number 
     const response = await apiClient.get(`/departments/${departmentId}/tickets`, { params: { page, limit } });
     return response.data;
   } catch (error) {
-    console.error(`Error al obtener tickets del departamento ${departmentId}:`, error);
+    logger.error(`Error al obtener tickets del departamento ${departmentId}:`, error);
     throw error;
   }
 };
@@ -111,7 +112,7 @@ export const getTicketsByStaff = async (staffId: string, page: number = 1, limit
     const response = await apiClient.get(`/staff/${staffId}/tickets`, { params: { page, limit, year, month } });
     return response.data;
   } catch (error) {
-    console.error(`Error al obtener tickets del agente ${staffId}:`, error);
+    logger.error(`Error al obtener tickets del agente ${staffId}:`, error);
     throw error;
   }
 };
@@ -124,7 +125,7 @@ export const getTicketsByOrganization = async (organizationId: string, page: num
     const response = await apiClient.get(`/organizations/${organizationId}/tickets`, { params: { page, limit, year, month } });
     return response.data;
   } catch (error) {
-    console.error(`Error al obtener tickets de la organización ${organizationId}:`, error);
+    logger.error(`Error al obtener tickets de la organización ${organizationId}:`, error);
     throw error;
   }
 };
@@ -137,7 +138,7 @@ export const getTicketTrends = async (year: number, month: number) => {
     const response = await apiClient.get('/tickets/stats/tendencies', { params: { year, month } });
     return response.data;
   } catch (error) { 
-    console.error(`Error al obtener tendencias de tickets para ${year}-${month}:`, error);
+    logger.error(`Error al obtener tendencias de tickets para ${year}-${month}:`, error);
     throw error;
   }
 };
@@ -150,7 +151,7 @@ export const getTicketsByAgentStats = async (year: number, month: number) => {
     const response = await apiClient.get('/tickets/stats/by-agent', { params: { year, month } });
     return response.data;
   } catch (error) {
-    console.error(`Error al obtener tickets por agente para ${year}-${month}:`, error);
+    logger.error(`Error al obtener tickets por agente para ${year}-${month}:`, error);
     throw error;
   }
 };
@@ -163,7 +164,7 @@ export const getTicketsByOrganizationStats = async (year: number, month: number)
     const response = await apiClient.get('/tickets/stats/by-organization', { params: { year, month } });
     return response.data;
   } catch (error) {
-    console.error(`Error al obtener tickets por organización para ${year}-${month}:`, error);
+    logger.error(`Error al obtener tickets por organización para ${year}-${month}:`, error);
     throw error;
   }
 };
@@ -181,7 +182,7 @@ export const getTickets = async (page: number = 1, limit: number = 10, search?: 
     const response = await apiClient.get('/tickets', { params });
     return response.data;
   } catch (error) {
-    console.error('Error al obtener tickets:', error);
+    logger.error('Error al obtener tickets:', error);
     throw error;
   }
 };

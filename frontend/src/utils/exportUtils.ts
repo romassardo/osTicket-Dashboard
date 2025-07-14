@@ -27,6 +27,12 @@ export const exportTicketsToCSV = (tickets: Ticket[], options: ExportOptions = {
     filters = {}
   } = options;
 
+  // Mostrar mensaje de confirmación con el número de registros
+  const confirmMessage = `Se exportarán ${tickets.length} registros a CSV. ¿Continuar?`;
+  if (!confirm(confirmMessage)) {
+    return;
+  }
+
   // CSV Headers
   const headers = [
     'Nº Ticket',
@@ -57,7 +63,7 @@ export const exportTicketsToCSV = (tickets: Ticket[], options: ExportOptions = {
   // Add metadata header if filters are included
   if (includeFilters) {
     csvContent += `# Reporte de Tickets - Exportado el ${new Date().toLocaleString('es-ES')}\n`;
-    csvContent += `# Total de registros: ${tickets.length}\n`;
+    csvContent += `# Total de registros exportados: ${tickets.length}\n`;
     
     if (Object.keys(filters).length > 0) {
       csvContent += '# Filtros aplicados:\n';
@@ -76,7 +82,7 @@ export const exportTicketsToCSV = (tickets: Ticket[], options: ExportOptions = {
         }
       });
     } else {
-      csvContent += '# Filtros aplicados: Ninguno (todos los registros)\n';
+      csvContent += '# Filtros aplicados: Ninguno (todos los registros disponibles)\n';
     }
     csvContent += '\n';
   }
@@ -92,11 +98,16 @@ export const exportTicketsToCSV = (tickets: Ticket[], options: ExportOptions = {
   // Create and download file
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   saveAs(blob, filename);
+
+  // Mostrar mensaje de éxito
+  setTimeout(() => {
+    alert(`✅ Exportación CSV completada exitosamente.\n${tickets.length} registros exportados a ${filename}`);
+  }, 500);
 };
 
 /**
  * Alternative Excel-compatible export using HTML table format
- * This creates an .xls file that Excel can open, but is much more secure than xlsx
+ * This creates an .html file that Excel can open without security warnings
  */
 export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions = {}) => {
   if (tickets.length === 0) {
@@ -105,61 +116,85 @@ export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions =
   }
 
   const {
-    filename = `tickets_analytics_${new Date().toISOString().slice(0, 10)}.xls`,
+    filename = `tickets_analytics_${new Date().toISOString().slice(0, 10)}.html`,
     includeFilters = true,
     filters = {}
   } = options;
 
-  // Create HTML table content
+  // Mostrar mensaje de confirmación con el número de registros
+  const confirmMessage = `Se exportarán ${tickets.length} registros a Excel. ¿Continuar?`;
+  if (!confirm(confirmMessage)) {
+    return;
+  }
+
+  // Create HTML table content with better Excel compatibility
   let htmlContent = `
-    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <!DOCTYPE html>
+    <html>
     <head>
       <meta charset="utf-8">
       <meta name="ProgId" content="Excel.Sheet">
+      <meta name="Generator" content="Dashboard OsTicket">
+      <title>Reporte de Tickets</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f0f0f0; font-weight: bold; }
+        .metadata { background-color: #f9f9f9; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; }
+        .metadata h3 { margin-top: 0; color: #333; }
+      </style>
     </head>
     <body>
-      <table border="1">
   `;
 
   // Add metadata if filters are included
   if (includeFilters) {
     htmlContent += `
-      <tr><td colspan="8"><strong>Reporte de Tickets - ${new Date().toLocaleString('es-ES')}</strong></td></tr>
-      <tr><td colspan="8">Total de registros: ${tickets.length}</td></tr>
+      <div class="metadata">
+        <h3>📊 Reporte de Tickets - ${new Date().toLocaleString('es-ES')}</h3>
+        <p><strong>Total de registros exportados:</strong> ${tickets.length}</p>
     `;
 
     if (Object.keys(filters).length > 0) {
-      htmlContent += '<tr><td colspan="8"><strong>Filtros aplicados:</strong></td></tr>';
+      htmlContent += '<p><strong>Filtros aplicados:</strong></p><ul>';
       Object.entries(filters).forEach(([key, value]) => {
         if (value) {
           let filterName = key;
           switch (key) {
-            case 'transporte': filterName = 'Transporte'; break;
-            case 'staff': filterName = 'Agente'; break;
-            case 'organization': filterName = 'Sector/Organización'; break;
-            case 'statuses': filterName = 'Estados'; break;
-            case 'startDate': filterName = 'Fecha desde'; break;
-            case 'endDate': filterName = 'Fecha hasta'; break;
+            case 'transporte': filterName = '🚚 Transporte'; break;
+            case 'staff': filterName = '👤 Agente'; break;
+            case 'organization': filterName = '🏢 Sector/Organización'; break;
+            case 'statuses': filterName = '📋 Estados'; break;
+            case 'startDate': filterName = '📅 Fecha desde'; break;
+            case 'endDate': filterName = '📅 Fecha hasta'; break;
           }
-          htmlContent += `<tr><td colspan="8">${filterName}: ${value}</td></tr>`;
+          htmlContent += `<li>${filterName}: ${value}</li>`;
         }
       });
+      htmlContent += '</ul>';
+    } else {
+      htmlContent += '<p><strong>Filtros aplicados:</strong> Ninguno (todos los registros disponibles)</p>';
     }
-    htmlContent += '<tr><td colspan="8"></td></tr>';
+    htmlContent += '</div>';
   }
 
-  // Add headers
+  // Add table with headers
   htmlContent += `
-    <tr>
-      <th>Nº Ticket</th>
-      <th>Asunto</th>
-      <th>Estado</th>
-      <th>Usuario</th>
-      <th>Agente</th>
-      <th>Sector/Sucursal</th>
-      <th>Transporte</th>
-      <th>Fecha Creación</th>
-    </tr>
+    <table>
+      <thead>
+        <tr>
+          <th>Nº Ticket</th>
+          <th>Asunto</th>
+          <th>Estado</th>
+          <th>Usuario</th>
+          <th>Agente</th>
+          <th>Sector/Sucursal</th>
+          <th>Transporte</th>
+          <th>Fecha Creación</th>
+        </tr>
+      </thead>
+      <tbody>
   `;
 
   // Add data rows
@@ -179,12 +214,20 @@ export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions =
   });
 
   htmlContent += `
-      </table>
+      </tbody>
+    </table>
     </body>
     </html>
   `;
 
-  // Create and download file
-  const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel' });
+  // Create and download file with proper MIME type
+  const blob = new Blob([htmlContent], { 
+    type: 'text/html;charset=utf-8' 
+  });
   saveAs(blob, filename);
+
+  // Mostrar mensaje de éxito
+  setTimeout(() => {
+    alert(`✅ Exportación Excel completada exitosamente.\n${tickets.length} registros exportados a ${filename}\n\nNota: El archivo se abrirá como HTML en Excel sin advertencias de seguridad.`);
+  }, 500);
 };

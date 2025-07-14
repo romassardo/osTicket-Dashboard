@@ -2,6 +2,7 @@ import React from 'react';
 import type { Ticket } from '../../types';
 import { formatDate } from '../../utils/formatters';
 import { DocumentTextIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
+import logger from '../../utils/logger';
 
 interface DataTableProps {
   tickets: Ticket[];
@@ -60,7 +61,7 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0 }) => {
                   key={ticket.ticket_id} 
                   className="hover:bg-[#252a35] focus-within:bg-[#252a35] transition-colors duration-150 cursor-pointer"
                   tabIndex={0}
-                  onClick={() => console.log(`Ticket seleccionado: ${ticket.ticket_id}`)}
+                  onClick={() => logger.debug(`Ticket seleccionado: ${ticket.ticket_id}`)}
                 >
                   <td className="px-6 py-4 text-sm text-[#b8c5d6] font-medium">
                     <span className="text-[#00d9ff] group-hover:text-[#00d9ff] transition-colors duration-150 inline-flex items-center">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import './datepicker-custom.css'; // Importar estilos personalizados
+import logger from '../../utils/logger';
 
 interface Status {
   id: number;
@@ -39,14 +40,14 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
 
   // DEBUG: Monitorear cambios en selectedStatuses
   useEffect(() => {
-    console.log('🔍 Modal: selectedStatuses cambió a:', selectedStatuses);
+    logger.debug('🔍 Modal: selectedStatuses cambió a:', selectedStatuses);
   }, [selectedStatuses]);
 
   // DEBUG: Monitorear cuando se abre/cierra el modal
   useEffect(() => {
-    console.log('🔍 Modal: isOpen cambió a:', isOpen);
+    logger.debug('🔍 Modal: isOpen cambió a:', isOpen);
     if (!isOpen) {
-      console.log('🔍 Modal: Cerrando modal, estados actuales:', {
+      logger.debug('🔍 Modal: Cerrando modal, estados actuales:', {
         selectedStatuses,
         startDate,
         endDate,
@@ -67,7 +68,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
           const data = await response.json();
           setter(data);
         } catch (error) {
-          console.error(error);
+          logger.error('Error fetching data:', error);
         }
       };
 
@@ -82,7 +83,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
       const newStatuses = prev.includes(statusId)
         ? prev.filter(id => id !== statusId)
         : [...prev, statusId];
-      console.log('Modal: Estado de statuses actualizado:', newStatuses);
+      logger.debug('Modal: Estado de statuses actualizado:', newStatuses);
       return newStatuses;
     });
   };
@@ -94,7 +95,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
       selectedOrganization: selectedOrg,
       selectedStaff: selectedStaff,
     };
-    console.log('Modal: Aplicando filtros:', filtersToApply);
+    logger.debug('Modal: Aplicando filtros:', filtersToApply);
     onApplyFilters(filtersToApply);
     onClose();
   };

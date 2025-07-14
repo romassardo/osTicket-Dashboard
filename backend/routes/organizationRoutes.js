@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { Organization, User, Ticket, Department, TicketStatus, Staff, TicketCdata, HelpTopic, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const logger = require('../utils/logger');
 
 // GET a simplified list of all organizations for filter controls
 router.get('/simple', async (req, res, next) => {
@@ -14,7 +15,7 @@ router.get('/simple', async (req, res, next) => {
     );
 
     if (!sectorField || sectorField.length === 0) {
-      console.log('No se encontró el campo de formulario para "sector".');
+      logger.info('No se encontró el campo de formulario para "sector".');
       return res.json([]);
     }
 
@@ -56,7 +57,7 @@ router.get('/simple', async (req, res, next) => {
 // EXPLORAR CAMPOS CUSTOM ESPECÍFICOS - Encontrar Empresa y Sector
 router.get('/custom-fields', async (req, res, next) => {
   try {
-    console.log('=== BUSCANDO CAMPOS EMPRESA Y SECTOR ===');
+    logger.info('=== BUSCANDO CAMPOS EMPRESA Y SECTOR ===');
     
     // 1. Ver datos custom de tickets (donde pueden estar Empresa y Sector)
     const ticketCustomSample = await sequelize.query(`
@@ -129,7 +130,7 @@ router.get('/custom-fields', async (req, res, next) => {
     });
     
   } catch (error) {
-    console.error('Error explorando custom fields:', error);
+    logger.error('Error explorando custom fields:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -137,7 +138,7 @@ router.get('/custom-fields', async (req, res, next) => {
 // EXPLORAR HELP TOPICS Y CUSTOM FIELDS - Segundo endpoint de exploración
 router.get('/explore-topics', async (req, res, next) => {
   try {
-    console.log('=== EXPLORANDO HELP TOPICS Y CUSTOM FIELDS ===');
+    logger.info('=== EXPLORANDO HELP TOPICS Y CUSTOM FIELDS ===');
     
     // 1. Ver todos los Help Topics disponibles (pueden contener sectores)
     const helpTopics = await sequelize.query(`
@@ -198,7 +199,7 @@ router.get('/explore-topics', async (req, res, next) => {
     });
     
   } catch (error) {
-    console.error('Error explorando topics:', error);
+    logger.error('Error explorando topics:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -206,11 +207,11 @@ router.get('/explore-topics', async (req, res, next) => {
 // BUSCAR SECTORES REALES - Endpoint completamente nuevo (DEBE IR PRIMERO)
 router.get('/find-sectors', async (req, res, next) => {
   try {
-    console.log('=== BUSCANDO SECTORES REALES ===');
+    logger.info('=== BUSCANDO SECTORES REALES ===');
     
     // 1. Ver qué tablas existen en la base de datos
     const tables = await sequelize.query('SHOW TABLES', { type: sequelize.QueryTypes.SELECT });
-    console.log('Tablas encontradas:', tables.length);
+    logger.info('Tablas encontradas:', tables.length);
     
     // 2. Buscar tablas con datos de formularios o campos custom
     const customTables = tables.filter(table => {
@@ -243,7 +244,7 @@ router.get('/find-sectors', async (req, res, next) => {
     });
     
   } catch (error) {
-    console.error('Error buscando sectores:', error);
+    logger.error('Error buscando sectores:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -343,7 +344,7 @@ router.get('/debug-location', async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Debug location error:', error);
+    logger.error('Debug location error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -405,7 +406,7 @@ router.get('/debug', async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Debug organizations error:', error);
+    logger.error('Debug organizations error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -465,7 +466,7 @@ router.get('/', async (req, res, next) => {
 
     res.json(formattedData);
   } catch (error) {
-    console.error('Error en organizaciones:', error);
+    logger.error('Error en organizaciones:', error);
     next(error);
   }
 });

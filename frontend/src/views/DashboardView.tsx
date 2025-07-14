@@ -101,8 +101,8 @@ const DashboardView: React.FC = () => {
     <div className="dashboard-container bg-[var(--bg-primary)] min-h-screen p-6 text-[var(--text-primary)]">
       {/* Header con efecto de glassmorphism */}
       <div className="dashboard-header backdrop-blur-md bg-[var(--bg-secondary)]/80 rounded-xl p-6 mb-8 shadow-lg border border-[var(--bg-accent)]/20">
-        <div className="flex flex-wrap justify-between items-center gap-4">
-          <div>
+        <div className="flex items-center w-full">
+          <div className="flex-1">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] bg-clip-text text-transparent">Dashboard Soporte IT</h1>
             <p className="text-[var(--text-secondary)] mt-1">Vista general de tickets - {fullMonthTitle}</p>
           </div>

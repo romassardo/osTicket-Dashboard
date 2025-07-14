@@ -4,11 +4,16 @@ export interface SectorName {
   value: string;
 }
 
+export interface TransporteName {
+  value: string;
+}
+
 export interface Cdata {
   subject: string;
   sector: string; // Este es el ID del sector/sucursal
   transporte?: string;
   SectorName?: SectorName; // Objeto que contiene el nombre del sector
+  TransporteName?: TransporteName; // Objeto que contiene el nombre del transporte
 }
 
 export interface User {

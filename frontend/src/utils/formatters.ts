@@ -1,3 +1,5 @@
+import logger from './logger';
+
 export const formatDate = (dateString: string): string => {
   if (!dateString) return 'N/A';
   try {
@@ -9,7 +11,7 @@ export const formatDate = (dateString: string): string => {
       minute: '2-digit',
     });
   } catch (error) {
-    console.error('Error formatting date:', error);
+    logger.error('Error formatting date:', error);
     return 'Fecha inválida';
   }
 };

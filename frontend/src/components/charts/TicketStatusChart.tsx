@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 // Colores según DESIGN_GUIDE.md - Sistema de estados
@@ -26,12 +26,8 @@ interface TicketStatusChartProps {
 
 // Función para obtener color por nombre (robusta y flexible)
 const getColorByName = (name: string): string => {
-  // DEBUG: Mostrar en consola qué nombres llegan
-  console.log('🔍 DEBUG - Nombre recibido:', name);
-  
   // Primero intentar coincidencia exacta
   if (COLORS[name as keyof typeof COLORS]) {
-    console.log('✅ Color encontrado (exacto):', COLORS[name as keyof typeof COLORS]);
     return COLORS[name as keyof typeof COLORS];
   }
   
@@ -80,8 +76,22 @@ const getColorByName = (name: string): string => {
   return '#95A5A6'; // Gris por defecto
 };
 
-const TicketStatusChart: React.FC<TicketStatusChartProps> = ({ data }) => {
-  if (!data || data.length === 0 || data.every(item => item.value === 0)) {
+/**
+ * TicketStatusChart optimizado con React.memo y useMemo
+ * Gráfico de estado de tickets optimizado para performance [[memory:2988538]]
+ */
+const TicketStatusChart: React.FC<TicketStatusChartProps> = memo(({ data }) => {
+  // Memoizar validación de datos para evitar recálculos
+  const isValidData = useMemo(() => {
+    return data && data.length > 0 && !data.every(item => item.value === 0);
+  }, [data]);
+
+  // Memoizar cálculo del total para evitar recálculos en cada render
+  const total = useMemo(() => {
+    return data?.reduce((sum, item) => sum + item.value, 0) || 0;
+  }, [data]);
+
+  if (!isValidData) {
     return (
       <div className="h-full flex items-center justify-center min-h-[350px] bg-[#1a1f29] rounded-xl border border-[#2d3441]">
         <p className="text-[#7a8394] font-inter text-sm">No hay datos de estado para mostrar.</p>
@@ -89,14 +99,8 @@ const TicketStatusChart: React.FC<TicketStatusChartProps> = ({ data }) => {
     );
   }
 
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-
   return (
     <div className="w-full h-[350px] bg-[#1a1f29] rounded-xl border border-[#2d3441] p-6">
-      {/* DEBUG: Mostrar datos recibidos */}
-      <div className="absolute top-2 left-2 text-red-500 text-xs font-bold bg-yellow-300 px-2 py-1 rounded z-50">
-        Datos: {data.map(d => d.name).join(', ')}
-      </div>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -113,7 +117,6 @@ const TicketStatusChart: React.FC<TicketStatusChartProps> = ({ data }) => {
           >
             {data.map((entry, index) => {
               const color = getColorByName(entry.name);
-              console.log(`🎨 Aplicando color ${color} a segmento ${entry.name}`);
               return (
                 <Cell 
                   key={`cell-${index}`} 
@@ -220,6 +223,9 @@ const TicketStatusChart: React.FC<TicketStatusChartProps> = ({ data }) => {
       </ResponsiveContainer>
     </div>
   );
-};
+});
+
+// Asignar displayName para debugging en React DevTools
+TicketStatusChart.displayName = 'TicketStatusChart';
 
 export default TicketStatusChart;
