@@ -14,6 +14,10 @@ export interface Cdata {
   transporte?: string;
   SectorName?: SectorName; // Objeto que contiene el nombre del sector
   TransporteName?: TransporteName; // Objeto que contiene el nombre del transporte
+  dataValues?: {
+    transporteName?: string; // Nombre del transporte agregado por post-procesamiento del backend
+    sectorName?: string; // Nombre del sector agregado por post-procesamiento del backend
+  };
 }
 
 export interface User {

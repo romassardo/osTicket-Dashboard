@@ -15,12 +15,13 @@ const logger = require('./utils/logger');
 // Importar manejadores de rutas
 const ticketRoutes = require('./routes/ticketRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
-// const userRoutes = require('./routes/userRoutes');
-// const staffRoutes = require('./routes/staffRoutes');
-// const organizationRoutes = require('./routes/organizationRoutes');
-// const statusRoutes = require('./routes/statusRoutes');
-// const priorityRoutes = require('./routes/priorityRoutes');
-// const helpTopicRoutes = require('./routes/helpTopicRoutes');
+const userRoutes = require('./routes/userRoutes');
+const staffRoutes = require('./routes/staffRoutes');
+const organizationRoutes = require('./routes/organizationRoutes');
+const statusRoutes = require('./routes/statusRoutes');
+const priorityRoutes = require('./routes/priorityRoutes');
+const helpTopicRoutes = require('./routes/helpTopicRoutes');
+const statsRoutes = require('./routes/statsRoutes'); // <-- AÑADIR NUEVA RUTA
 const errorHandler = require('./middleware/errorHandler');
 
 // Crear una instancia de la aplicación Express
@@ -72,29 +73,33 @@ logger.debug('Registrando ruta /api/departments...');
 app.use('/api/departments', departmentRoutes);
 logger.debug('✓ Ruta /api/departments registrada exitosamente');
 
-// logger.debug('Registrando ruta /api/users...');
-// app.use('/api/users', userRoutes);
-// logger.debug('✓ Ruta /api/users registrada exitosamente');
+logger.debug('Registrando ruta /api/users...');
+app.use('/api/users', userRoutes);
+logger.debug('✓ Ruta /api/users registrada exitosamente');
 
-// logger.debug('Registrando ruta /api/staff...');
-// app.use('/api/staff', staffRoutes);
-// logger.debug('✓ Ruta /api/staff registrada exitosamente');
+logger.debug('Registrando ruta /api/staff...');
+app.use('/api/staff', staffRoutes);
+logger.debug('✓ Ruta /api/staff registrada exitosamente');
 
-// logger.debug('Registrando ruta /api/organizations...');
-// app.use('/api/organizations', organizationRoutes);
-// logger.debug('✓ Ruta /api/organizations registrada exitosamente');
+logger.debug('Registrando ruta /api/organizations...');
+app.use('/api/organizations', organizationRoutes);
+logger.debug('✓ Ruta /api/organizations registrada exitosamente');
 
-// logger.debug('Registrando ruta /api/statuses...');
-// app.use('/api/statuses', statusRoutes);
-// logger.debug('✓ Ruta /api/statuses registrada exitosamente');
+logger.debug('Registrando ruta /api/statuses...');
+app.use('/api/statuses', statusRoutes);
+logger.debug('✓ Ruta /api/statuses registrada exitosamente');
 
-// logger.debug('Registrando ruta /api/priorities...');
-// app.use('/api/priorities', priorityRoutes);
-// logger.debug('✓ Ruta /api/priorities registrada exitosamente');
+logger.debug('Registrando ruta /api/priorities...');
+app.use('/api/priorities', priorityRoutes);
+logger.debug('✓ Ruta /api/priorities registrada exitosamente');
 
-// logger.debug('Registrando ruta /api/helptopics...');
-// app.use('/api/helptopics', helpTopicRoutes);
-// logger.debug('✓ Ruta /api/helptopics registrada exitosamente');
+logger.debug('Registrando ruta /api/helptopics...');
+app.use('/api/helptopics', helpTopicRoutes);
+logger.debug('✓ Ruta /api/helptopics registrada exitosamente');
+
+logger.debug('Registrando ruta /api/stats...');
+app.use('/api/stats', statsRoutes); // <-- AÑADIR USO DE LA RUTA
+logger.debug('✓ Ruta /api/stats registrada exitosamente');
 
 logger.info('✓ Todas las rutas API registradas exitosamente');
 

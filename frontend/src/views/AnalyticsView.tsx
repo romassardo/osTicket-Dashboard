@@ -228,6 +228,34 @@ const AnalyticsView: React.FC = memo(() => {
         return;
       }
 
+      // DEBUG: Log de la estructura de datos para debuggear el problema de transporte
+      logger.info('🔍 DEBUG EXPORTACIÓN: Estructura de datos recibidos:');
+      allTicketsForExport.slice(0, 3).forEach((ticket: any, index: number) => {
+        logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1}:`, {
+          ticket_id: ticket.ticket_id,
+          number: ticket.number,
+          cdata_complete: ticket.cdata,
+          cdata_details: {
+            subject: ticket.cdata?.subject,
+            sector: ticket.cdata?.sector,
+            transporte: ticket.cdata?.transporte,
+            dataValues: ticket.cdata?.dataValues,
+            TransporteName: ticket.cdata?.TransporteName,
+            SectorName: ticket.cdata?.SectorName
+          },
+          transporteStructure: {
+            'cdata.dataValues.transporteName': ticket.cdata?.dataValues?.transporteName,
+            'cdata.TransporteName.value': ticket.cdata?.TransporteName?.value,
+            'cdata.transporte': ticket.cdata?.transporte
+          },
+          sectorStructure: {
+            'cdata.dataValues.sectorName': ticket.cdata?.dataValues?.sectorName,
+            'cdata.SectorName.value': ticket.cdata?.SectorName?.value,
+            'cdata.sector': ticket.cdata?.sector
+          }
+        });
+      });
+
       // Generate filename with current date and time
       const now = new Date();
       const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.html`;

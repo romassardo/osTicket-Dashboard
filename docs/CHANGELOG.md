@@ -1,5 +1,109 @@
 # CHANGELOG - Dashboard osTicket
 
+## [0.37.0] - 2025-07-15
+
+### 🔧 **CORRECCIÓN CRÍTICA - Error 500 en Dashboard**
+- **Backend: Resolución de Error Fatal en Endpoint `/api/tickets/count`:**
+  - Corregido acceso incorrecto a resultados de consulta SQL que causaba error 500 y impedía cargar las tarjetas del dashboard.
+  - Bugfix: `totalOpenResult[0]?.[0]?.totalOpenCount` → `totalOpenResult[0]?.totalOpenCount` para acceso correcto a `QueryTypes.SELECT`.
+  - Añadido logging detallado para debugging: fechas aplicadas, conteo de resultados, stack traces completos.
+  - Verificada estructura de respuesta JSON mantiene compatibilidad con frontend (`totalInDateRange`, `openInDateRange`, `closedInDateRange`, `totalOpen`, `byStatus`).
+
+### 🎨 **OPTIMIZACIÓN VISUAL - Gráficos del Dashboard**
+- **Frontend: Gráfico "Tickets por Sector" con Scroll Inteligente:**
+  - Implementado contenedor de altura fija (800px) con scroll interno (`overflow-y: auto`) para navegación fluida.
+  - Sistema de altura dinámica: calcula automáticamente basado en número de sectores (sectores × 35px + 60px de margen).
+  - Optimizado `HorizontalBarChart`: aumentado espacio para nombres largos (110px), barras más grandes (25px), `interval={0}` para mostrar todos los nombres.
+  - Solución escalable: funciona perfectamente con 5 o 50 sectores sin romper el layout del dashboard.
+
+- **Frontend: Gráfico "Tickets por Agente" Rediseñado:**
+  - Eliminado marco blanco (componente `Card`) para diseño más limpio sin elementos visuales innecesarios.
+  - Añadidos valores numéricos sobre las barras usando `LabelList` con `position="top"` para mejor legibilidad.
+  - Actualizado `BarChart.tsx` con prop `showValues` para reutilización en otros componentes.
+  - Título simple integrado al layout sin contenedores adicionales.
+
+### 📊 **MEJORAS DE PERFORMANCE - Ordenamiento de Datos**
+- **Backend: Ordenamiento Optimizado en Endpoints de Estadísticas:**
+  - Modificados endpoints `/api/stats/tickets-by-transport` y `/api/stats/tickets-by-sector` para ordenar resultados de mayor a menor.
+  - Implementado `.sort((a, b) => b.value - a.value)` en ambos endpoints para mostrar sectores/transportes con más tickets primero.
+  - Mejora en UX: usuarios ven inmediatamente los datos más relevantes sin necesidad de buscar.
+
+### 🎯 **REORGANIZACIÓN DE LAYOUT - Dashboard Equilibrado**
+- **Frontend: Layout Inteligente con Apilamiento Optimizado:**
+  - Reorganizada segunda fila del dashboard: columna izquierda con gráficos apilados (Transporte + Agente), columna derecha con Sector extendido.
+  - Implementado `space-y-6` para separación vertical perfecta entre gráficos de la columna izquierda.
+  - Mantenido `self-start` en contenedor izquierdo para evitar expansión automática por CSS Grid.
+  - Resultado: layout equilibrado que maximiza el uso del espacio y mejora la experiencia visual.
+
+### Technical Improvements
+- **Debugging y Logging Mejorado:**
+  - Añadido logging completo en endpoint `/count` con información de fechas, consultas ejecutadas y resultados obtenidos.
+  - Implementado manejo robusto de errores con stack traces para facilitar debugging en producción.
+  - Verificación de estructura de datos para prevenir errores futuros de acceso a propiedades.
+
+- **Componentes Reutilizables:**
+  - Optimizado `HorizontalBarChart` para trabajar mejor con scroll interno y nombres largos.
+  - Mejorado `BarChart` con funcionalidad opcional de mostrar valores para mayor flexibilidad.
+  - Código más modular y mantenible siguiendo principios DRY.
+
+## [0.36.0] - 2025-07-15
+
+### 🗑️ **ELIMINADO - Gráfico "Tickets por Empresa"**
+- **Frontend: Simplificación del Dashboard:**
+  - Eliminado completamente el gráfico redundante "Tickets por Empresa" del dashboard principal.
+  - Reorganizado layout de la tercera fila para mejor distribución visual con `lg:grid-cols-2`.
+  - Limpieza de imports y referencias obsoletas en `DashboardView.tsx`.
+
+### 🔄 **REEMPLAZADO - "Tickets por Organización" → "Tickets por Sector"**
+- **Backend: Nuevo Endpoint `/api/stats/tickets-by-sector`:**
+  - Implementado endpoint robusto para estadísticas de tickets agrupados por sector.
+  - Utiliza la misma lógica de asociaciones que funciona correctamente en las tablas principales.
+  - Filtros por departamentos permitidos ('Soporte Informatico', 'Soporte IT') aplicados.
+  - Soporte para filtrado temporal por año/mes con validación de parámetros.
+
+- **Frontend: Nuevo Componente `TicketsBySectorChart`:**
+  - Creado componente React optimizado con TypeScript strict mode.
+  - Integración con TanStack Query para gestión de estado y caché.
+  - Uso de `HorizontalBarChart` reutilizable con color verde distintivo (`#10b981`).
+  - Manejo de estados de carga, error y datos vacíos con UX mejorada.
+
+- **Frontend: API Service Actualizado:**
+  - Nueva función `getTicketsBySectorStats()` en `services/api.ts` con logging profesional.
+  - Manejo robusto de errores y validación de parámetros year/month.
+  - Integración completa con sistema de logging existente.
+
+### 🧹 **LIMPIEZA DE ARCHIVOS OBSOLETOS**
+- **Eliminación de Gráficos No Utilizados:**
+  - **`TicketsByOrganizationChart.tsx`** - Reemplazado por gráfico de sectores.
+  - **`HeatMap.tsx`** - Placeholder sin implementación real eliminado.
+  - **`LineChart.tsx`** - Placeholder sin uso real eliminado.
+  - Verificación completa de referencias y limpieza de imports obsoletos.
+
+### 🔧 **CORRECCIÓN CRÍTICA - Errores de Asociaciones Sequelize**
+- **Backend: Resolución de `SequelizeEagerLoadingError`:**
+  - Corregido alias de asociación: `'dept'` → `'department'` para mantener consistencia.
+  - Reestructuradas consultas de includes para coincidir exactamente con `ticketRoutes.js` funcional.
+  - Cambiado `required: true` → `required: false` en includes anidados para evitar errores.
+  - Optimizados attributes en consultas para mejor performance (solo campos necesarios).
+
+### 📊 **RESULTADO FINAL - Dashboard Funcional Completo**
+- **Gráficos Totalmente Operativos:**
+  - ✅ **"Uso de Transporte"** - Muestra datos reales: "Remoto", "A pie", "AF630G", etc.
+  - ✅ **"Tickets por Sector"** - Sectores reales: "Novo Pacheco", "Puerto", "Madero", "Bancos", etc.
+  - ✅ **"Tickets por Agente"** - Distribución correcta por agentes del departamento.
+  - ✅ **Filtrado temporal** - Todos los gráficos respetan filtros de año/mes seleccionados.
+
+### Technical Improvements
+- **Arquitectura Simplificada:**
+  - Reducción de complejidad en dashboard con eliminación de gráfico redundante.
+  - Código más mantenible con componentes reutilizables y estructura consistente.
+  - Logging mejorado en endpoints de estadísticas para debugging y monitoreo.
+
+- **Consistencia de Código:**
+  - Unificación de patrones de asociaciones Sequelize entre diferentes endpoints.
+  - Estructura de archivos optimizada sin componentes placeholder innecesarios.
+  - TypeScript strict compliance en todos los nuevos componentes.
+
 ## [0.35.0] - 2025-01-22
 
 ### Added

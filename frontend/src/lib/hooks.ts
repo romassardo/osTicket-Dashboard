@@ -61,8 +61,7 @@ export const useDebounce = <T>(value: T, delay: number = 500): T => {
  */
 export const useDebounceCallback = (
   callback: (...args: any[]) => void,
-  delay: number = 500,
-  dependencies: React.DependencyList = []
+  delay: number = 500
 ) => {
   const [debounceTimer, setDebounceTimer] = useState<number | null>(null);
 

@@ -114,6 +114,20 @@ router.get('/', async (req, res, next) => {
         model: TicketCdata,
         as: 'cdata',
         attributes: ['subject', 'sector', 'transporte'],
+        include: [
+          {
+            model: ListItems,
+            as: 'TransporteName',
+            attributes: ['id', 'value'],
+            required: false
+          },
+          {
+            model: ListItems,
+            as: 'SectorName',
+            attributes: ['id', 'value'],
+            required: false
+          }
+        ],
         required: false
       },
       departmentInclude
@@ -122,25 +136,37 @@ router.get('/', async (req, res, next) => {
     // OPTIMIZACIÓN: Separar conteo de datos para mejor performance
     let result;
     if (!isExportRequest) {
-      // Consulta optimizada para conteo - sin includes costosos
+      // Consulta optimizada para conteo - incluir TicketCdata solo si hay filtro de transporte
+      const countInclude = [
+        {
+          model: User,
+          as: 'user',
+          attributes: [],
+          where: Object.keys(whereUserCondition).length > 0 ? whereUserCondition : null,
+          required: true
+        },
+        {
+          model: Department,
+          as: 'department',
+          where: { name: { [Op.in]: allowedDepartmentNames } },
+          attributes: [],
+          required: true
+        }
+      ];
+
+      // BUGFIX: Agregar TicketCdata si hay filtro de transporte
+      if (transporte) {
+        countInclude.push({
+          model: TicketCdata,
+          as: 'cdata',
+          attributes: [],
+          required: false
+        });
+      }
+
       const countQuery = {
         where: whereTicketCondition,
-        include: [
-          {
-            model: User,
-            as: 'user',
-            attributes: [],
-            where: Object.keys(whereUserCondition).length > 0 ? whereUserCondition : null,
-            required: true
-          },
-          {
-            model: Department,
-            as: 'department',
-            where: { name: { [Op.in]: allowedDepartmentNames } },
-            attributes: [],
-            required: true
-          }
-        ],
+        include: countInclude,
         distinct: true
       };
 
@@ -166,35 +192,77 @@ router.get('/', async (req, res, next) => {
       const sectorMap = new Map();
 
       if (ticketIds.length > 0) {
-        // Obtener todos los transportes y sectores en una sola consulta
-        const cdataWithTransportes = await TicketCdata.findAll({
-          where: { ticket_id: { [Op.in]: ticketIds } },
-          include: [
-            {
-              model: ListItems,
-              as: 'TransporteName',
-              attributes: ['id', 'value'],
-              required: false
-            },
-            {
-              model: ListItems,
-              as: 'SectorName',
-              attributes: ['id', 'value'],
-              required: false
-            }
-          ],
-          attributes: ['ticket_id', 'transporte', 'sector']
-        });
+        try {
+          // MÉTODO 1: Intentar con asociaciones Sequelize
+          const cdataWithTransportes = await TicketCdata.findAll({
+            where: { ticket_id: { [Op.in]: ticketIds } },
+            include: [
+              {
+                model: ListItems,
+                as: 'TransporteName',
+                attributes: ['id', 'value'],
+                required: false
+              },
+              {
+                model: ListItems,
+                as: 'SectorName',
+                attributes: ['id', 'value'],
+                required: false
+              }
+            ],
+            attributes: ['ticket_id', 'transporte', 'sector']
+          });
 
-        // Crear mapas para lookups eficientes
-        cdataWithTransportes.forEach(cdata => {
-          if (cdata.TransporteName) {
-            transporteMap.set(cdata.ticket_id, cdata.TransporteName.value);
+          // Crear mapas para lookups eficientes
+          cdataWithTransportes.forEach(cdata => {
+            if (cdata.TransporteName) {
+              transporteMap.set(cdata.ticket_id, cdata.TransporteName.value);
+            }
+            if (cdata.SectorName) {
+              sectorMap.set(cdata.ticket_id, cdata.SectorName.value);
+            }
+          });
+
+          logger.info(`📊 NORMAL: TransporteMap size: ${transporteMap.size}, SectorMap size: ${sectorMap.size}`);
+
+          // MÉTODO 2: Si el Método 1 falló, usar consulta SQL directa como fallback
+          if (transporteMap.size === 0 && sectorMap.size === 0) {
+            logger.warn('📊 FALLBACK: Usando consulta SQL directa para obtener nombres');
+            
+            const transporteQuery = `
+              SELECT tc.ticket_id, li.value as transporte_name
+              FROM ost_ticket__cdata tc
+              INNER JOIN ost_list_items li ON tc.transporte = li.id
+              WHERE tc.ticket_id IN (${ticketIds.join(',')}) AND tc.transporte IS NOT NULL
+            `;
+
+            const sectorQuery = `
+              SELECT tc.ticket_id, li.value as sector_name  
+              FROM ost_ticket__cdata tc
+              INNER JOIN ost_list_items li ON tc.sector = li.id
+              WHERE tc.ticket_id IN (${ticketIds.join(',')}) AND tc.sector IS NOT NULL
+            `;
+
+            const [transporteResults, sectorResults] = await Promise.all([
+              sequelize.query(transporteQuery, { type: sequelize.QueryTypes.SELECT }),
+              sequelize.query(sectorQuery, { type: sequelize.QueryTypes.SELECT })
+            ]);
+
+            // Poblar mapas desde resultados SQL directos
+            transporteResults.forEach(result => {
+              transporteMap.set(result.ticket_id, result.transporte_name);
+            });
+
+            sectorResults.forEach(result => {
+              sectorMap.set(result.ticket_id, result.sector_name);
+            });
+
+            logger.info(`📊 FALLBACK: TransporteMap size: ${transporteMap.size}, SectorMap size: ${sectorMap.size}`);
           }
-          if (cdata.SectorName) {
-            sectorMap.set(cdata.ticket_id, cdata.SectorName.value);
-          }
-        });
+
+        } catch (error) {
+          logger.error('📊 ERROR en post-procesamiento:', error);
+        }
       }
 
       // Agregar nombres de transporte y sector a los resultados
@@ -232,40 +300,94 @@ router.get('/', async (req, res, next) => {
       const transporteMap = new Map();
       const sectorMap = new Map();
 
-      if (ticketIds.length > 0) {
-        const cdataWithTransportes = await TicketCdata.findAll({
-          where: { ticket_id: { [Op.in]: ticketIds } },
-          include: [
-            {
-              model: ListItems,
-              as: 'TransporteName',
-              attributes: ['id', 'value'],
-              required: false
-            },
-            {
-              model: ListItems,
-              as: 'SectorName',
-              attributes: ['id', 'value'],
-              required: false
-            }
-          ],
-          attributes: ['ticket_id', 'transporte', 'sector']
-        });
+      logger.info(`📊 DEBUG EXPORTACIÓN: Procesando ${ticketIds.length} tickets para exportación`);
 
-        cdataWithTransportes.forEach(cdata => {
-          if (cdata.TransporteName) {
-            transporteMap.set(cdata.ticket_id, cdata.TransporteName.value);
+      if (ticketIds.length > 0) {
+        try {
+          // MÉTODO 1: Intentar con asociaciones Sequelize
+          const cdataWithTransportes = await TicketCdata.findAll({
+            where: { ticket_id: { [Op.in]: ticketIds } },
+            include: [
+              {
+                model: ListItems,
+                as: 'TransporteName',
+                attributes: ['id', 'value'],
+                required: false
+              },
+              {
+                model: ListItems,
+                as: 'SectorName',
+                attributes: ['id', 'value'],
+                required: false
+              }
+            ],
+            attributes: ['ticket_id', 'transporte', 'sector']
+          });
+
+          logger.info(`📊 DEBUG EXPORTACIÓN: Encontrados ${cdataWithTransportes.length} registros de cdata`);
+
+          cdataWithTransportes.forEach(cdata => {
+            logger.info(`📊 DEBUG EXPORTACIÓN: Ticket ${cdata.ticket_id} - transporte: ${cdata.transporte}, TransporteName: ${cdata.TransporteName?.value || 'null'}`);
+            
+            if (cdata.TransporteName) {
+              transporteMap.set(cdata.ticket_id, cdata.TransporteName.value);
+            }
+            if (cdata.SectorName) {
+              sectorMap.set(cdata.ticket_id, cdata.SectorName.value);
+            }
+          });
+
+          logger.info(`📊 DEBUG EXPORTACIÓN: TransporteMap size: ${transporteMap.size}`);
+
+          // MÉTODO 2: Si el Método 1 falló, usar consulta SQL directa como fallback
+          if (transporteMap.size === 0 && sectorMap.size === 0) {
+            logger.warn('📊 EXPORTACIÓN FALLBACK: Usando consulta SQL directa para obtener nombres');
+            
+            const transporteQuery = `
+              SELECT tc.ticket_id, li.value as transporte_name
+              FROM ost_ticket__cdata tc
+              INNER JOIN ost_list_items li ON tc.transporte = li.id
+              WHERE tc.ticket_id IN (${ticketIds.join(',')}) AND tc.transporte IS NOT NULL
+            `;
+
+            const sectorQuery = `
+              SELECT tc.ticket_id, li.value as sector_name  
+              FROM ost_ticket__cdata tc
+              INNER JOIN ost_list_items li ON tc.sector = li.id
+              WHERE tc.ticket_id IN (${ticketIds.join(',')}) AND tc.sector IS NOT NULL
+            `;
+
+            const [transporteResults, sectorResults] = await Promise.all([
+              sequelize.query(transporteQuery, { type: sequelize.QueryTypes.SELECT }),
+              sequelize.query(sectorQuery, { type: sequelize.QueryTypes.SELECT })
+            ]);
+
+            // Poblar mapas desde resultados SQL directos
+            transporteResults.forEach(result => {
+              transporteMap.set(result.ticket_id, result.transporte_name);
+            });
+
+            sectorResults.forEach(result => {
+              sectorMap.set(result.ticket_id, result.sector_name);
+            });
+
+            logger.info(`📊 EXPORTACIÓN FALLBACK: TransporteMap size: ${transporteMap.size}, SectorMap size: ${sectorMap.size}`);
           }
-          if (cdata.SectorName) {
-            sectorMap.set(cdata.ticket_id, cdata.SectorName.value);
-          }
-        });
+
+        } catch (error) {
+          logger.error('📊 ERROR en post-procesamiento de exportación:', error);
+        }
       }
 
       rows.forEach(ticket => {
         if (ticket.cdata) {
-          ticket.cdata.dataValues.transporteName = transporteMap.get(ticket.ticket_id) || null;
-          ticket.cdata.dataValues.sectorName = sectorMap.get(ticket.ticket_id) || null;
+          const transporteName = transporteMap.get(ticket.ticket_id) || null;
+          const sectorName = sectorMap.get(ticket.ticket_id) || null;
+          
+          ticket.cdata.dataValues.transporteName = transporteName;
+          ticket.cdata.dataValues.sectorName = sectorName;
+          
+          logger.info(`📊 DEBUG EXPORTACIÓN: Ticket ${ticket.ticket_id} - Final transporteName: ${transporteName}`);
         }
       });
       
@@ -291,145 +413,101 @@ router.get('/count', async (req, res, next) => {
     const { startDate, endDate } = req.query;
     const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
 
-    const departmentInclude = {
-      model: Department,
-      as: 'department',
-      where: { name: { [Op.in]: allowedDepartmentNames } },
-      attributes: [],
-      required: true,
-    };
+    logger.info(`Count endpoint called with dates: ${startDate} - ${endDate}`);
 
-    let whereDateRange = {};
+    const replacements = {};
+    let whereDateClause = "";
+
     if (startDate && endDate) {
       const start = new Date(startDate);
-      const end = new Date(endDate);
       start.setUTCHours(0, 0, 0, 0);
+      const end = new Date(endDate);
       end.setUTCHours(23, 59, 59, 999);
-      whereDateRange.created = { [Op.between]: [start, end] };
-    }
 
-    // OPTIMIZACIÓN: Una sola consulta SQL agregada en lugar de 5 queries separadas
-    let dateFilter = '';
-    let replacements = {};
-    
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      start.setUTCHours(0, 0, 0, 0);
-      end.setUTCHours(23, 59, 59, 999);
-      dateFilter = 'AND t.created BETWEEN :startDate AND :endDate';
+      whereDateClause = "AND t.created BETWEEN :startDate AND :endDate";
       replacements.startDate = start;
       replacements.endDate = end;
+      
+      logger.info(`Date filter applied: ${start.toISOString()} - ${end.toISOString()}`);
     }
 
-    // Raw SQL optimizada para obtener todas las estadísticas en una sola query
-    const statsQuery = `
-      SELECT 
-        COUNT(CASE WHEN ${dateFilter ? 't.created BETWEEN :startDate AND :endDate' : '1=1'} THEN 1 END) as totalInDateRange,
-        COUNT(CASE WHEN ${dateFilter ? 't.created BETWEEN :startDate AND :endDate AND' : ''} ts.state = 'open' THEN 1 END) as openInDateRange,
-        COUNT(CASE WHEN ${dateFilter ? 't.created BETWEEN :startDate AND :endDate AND' : ''} ts.state = 'closed' THEN 1 END) as closedInDateRange,
-        COUNT(CASE WHEN ts.state = 'open' THEN 1 END) as totalOpen,
-        ts.name as statusName,
-        COUNT(CASE WHEN ${dateFilter ? 't.created BETWEEN :startDate AND :endDate' : '1=1'} THEN 1 END) as statusCount
-      FROM ost_ticket t
-      JOIN ost_department d ON t.dept_id = d.id
-      JOIN ost_ticket_status ts ON t.status_id = ts.id
-      WHERE d.name IN ('Soporte Informatico', 'Soporte IT')
-      ${dateFilter}
-      GROUP BY ts.name, ts.state
-      ORDER BY ts.name
+    // Query 1: Obtener estadísticas por estado para el rango de fechas (o todos los tiempos si no hay fecha)
+    const dateStatsQuery = `
+        SELECT
+            ts.state,
+            ts.name AS statusName,
+            COUNT(t.ticket_id) AS statusCount
+        FROM ost_ticket t
+        JOIN ost_department d ON t.dept_id = d.id
+        JOIN ost_ticket_status ts ON t.status_id = ts.id
+        WHERE
+            d.name IN ('Soporte Informatico', 'Soporte IT')
+            ${whereDateClause}
+        GROUP BY ts.name, ts.state
+        ORDER BY ts.name;
     `;
 
-    const [results] = await sequelize.query(statsQuery, {
-      replacements,
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    // Procesar resultados de la query optimizada
+    // Query 2: Obtener el conteo total de tickets abiertos de todos los tiempos
+    const totalOpenQuery = `
+        SELECT COUNT(*) as totalOpenCount
+        FROM ost_ticket t
+        JOIN ost_department d ON t.dept_id = d.id
+        JOIN ost_ticket_status ts ON t.status_id = ts.id
+        WHERE
+            d.name IN ('Soporte Informatico', 'Soporte IT')
+            AND ts.state = 'open';
+    `;
+    
+    logger.info('Executing count queries...');
+    
+    const [dateStatsResults, totalOpenResult] = await Promise.all([
+      sequelize.query(dateStatsQuery, {
+        replacements,
+        type: sequelize.QueryTypes.SELECT
+      }),
+      sequelize.query(totalOpenQuery, {
+        type: sequelize.QueryTypes.SELECT
+      })
+    ]);
+    
+    logger.info(`Date stats results count: ${dateStatsResults?.length || 0}`);
+    logger.info(`Total open result: ${JSON.stringify(totalOpenResult)}`);
+    
+    // BUGFIX: Corregir acceso a resultado de la consulta SQL
+    const totalOpenCount = totalOpenResult[0]?.totalOpenCount || 0;
+    
     let totalInDateRange = 0;
     let openInDateRange = 0;
     let closedInDateRange = 0;
-    let totalOpen = 0;
     const byStatus = {};
 
-    // Si no hay filtro de fecha, usar una consulta más simple
-    if (!dateFilter) {
-      const simpleStatsQuery = `
-        SELECT 
-          COUNT(*) as total,
-          COUNT(CASE WHEN ts.state = 'open' THEN 1 END) as totalOpen,
-          ts.name as statusName,
-          COUNT(*) as statusCount
-        FROM ost_ticket t
-        JOIN ost_department d ON t.dept_id = d.id
-        JOIN ost_ticket_status ts ON t.status_id = ts.id
-        WHERE d.name IN ('Soporte Informatico', 'Soporte IT')
-        GROUP BY ts.name, ts.state
-        ORDER BY ts.name
-      `;
-
-      const [simpleResults] = await sequelize.query(simpleStatsQuery, {
-        type: sequelize.QueryTypes.SELECT
-      });
-
-      simpleResults.forEach(row => {
-        totalInDateRange += parseInt(row.statusCount, 10);
-        openInDateRange += parseInt(row.statusCount, 10);
-        closedInDateRange += parseInt(row.statusCount, 10);
-        totalOpen = parseInt(row.totalOpen, 10);
-        byStatus[row.statusName] = parseInt(row.statusCount, 10);
-      });
-    } else {
-      // Consulta con filtro de fecha - necesitamos una estrategia diferente
-      const dateStatsQuery = `
-        SELECT 
-          SUM(CASE WHEN t.created BETWEEN :startDate AND :endDate THEN 1 ELSE 0 END) as totalInDateRange,
-          SUM(CASE WHEN t.created BETWEEN :startDate AND :endDate AND ts.state = 'open' THEN 1 ELSE 0 END) as openInDateRange,
-          SUM(CASE WHEN t.created BETWEEN :startDate AND :endDate AND ts.state = 'closed' THEN 1 ELSE 0 END) as closedInDateRange,
-          SUM(CASE WHEN ts.state = 'open' THEN 1 ELSE 0 END) as totalOpen
-        FROM ost_ticket t
-        JOIN ost_department d ON t.dept_id = d.id
-        JOIN ost_ticket_status ts ON t.status_id = ts.id
-        WHERE d.name IN ('Soporte Informatico', 'Soporte IT')
-      `;
-
-      const statusStatsQuery = `
-        SELECT 
-          ts.name as statusName,
-          COUNT(*) as count
-        FROM ost_ticket t
-        JOIN ost_department d ON t.dept_id = d.id
-        JOIN ost_ticket_status ts ON t.status_id = ts.id
-        WHERE d.name IN ('Soporte Informatico', 'Soporte IT')
-        AND t.created BETWEEN :startDate AND :endDate
-        GROUP BY ts.name
-        ORDER BY ts.name
-      `;
-
-      const [[mainStats], statusStats] = await Promise.all([
-        sequelize.query(dateStatsQuery, { replacements, type: sequelize.QueryTypes.SELECT }),
-        sequelize.query(statusStatsQuery, { replacements, type: sequelize.QueryTypes.SELECT })
-      ]);
-
-      totalInDateRange = parseInt(mainStats.totalInDateRange, 10);
-      openInDateRange = parseInt(mainStats.openInDateRange, 10);
-      closedInDateRange = parseInt(mainStats.closedInDateRange, 10);
-      totalOpen = parseInt(mainStats.totalOpen, 10);
-
-      statusStats.forEach(row => {
-        byStatus[row.statusName] = parseInt(row.count, 10);
+    if (dateStatsResults && Array.isArray(dateStatsResults)) {
+      dateStatsResults.forEach(row => {
+          const count = parseInt(row.statusCount, 10);
+          totalInDateRange += count;
+          if (row.state === 'open') {
+              openInDateRange += count;
+          } else if (row.state === 'closed') {
+              closedInDateRange += count;
+          }
+          byStatus[row.statusName] = (byStatus[row.statusName] || 0) + count;
       });
     }
 
-    res.json({
-      totalInDateRange,
-      openInDateRange,
-      closedInDateRange,
-      totalOpen,
+    const result = {
+      totalInDateRange: totalInDateRange,
+      openInDateRange: openInDateRange,
+      closedInDateRange: closedInDateRange,
       byStatus,
-    });
+      totalOpen: parseInt(totalOpenCount, 10),
+    };
+
+    logger.info(`Count result: ${JSON.stringify(result)}`);
+    res.json(result);
+
   } catch (error) {
-    logger.error('Error fetching ticket counts:', error);
+    logger.error('Error in GET /api/tickets/count:', error);
+    logger.error('Error stack:', error.stack);
     next(error);
   }
 });

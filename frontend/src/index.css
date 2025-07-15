@@ -128,6 +128,331 @@
 }
 
 @layer components {
+  /* ======================================
+   * DASHBOARD GRID SYSTEM - 12 COLUMNAS
+   * Según DESIGN_GUIDE.md especificaciones
+   * ====================================== */
+  
+  /* Grid Principal de Dashboard */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  /* Contenedor Principal de Dashboard */
+  .dashboard-container {
+    background-color: var(--bg-primary);
+    min-height: 100vh;
+    padding: var(--space-6);
+    color: var(--text-primary);
+  }
+
+  /* Grid para KPIs - Hero Metrics */
+  .kpi-grid {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-6);
+    margin-bottom: var(--space-8);
+  }
+
+  /* Clases de utilidad para grid */
+  .col-span-12 {
+    grid-column: span 12 / span 12;
+  }
+
+  /* Grid para Analytics - Primera fila */
+  .analytics-grid-row-1 {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-6);
+    margin-bottom: var(--space-8);
+  }
+
+  /* Grid para Analytics - Segunda fila */
+  .analytics-grid-row-2 {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 5fr 7fr;
+    gap: var(--space-6);
+    margin-bottom: var(--space-8);
+  }
+
+  /* Columna izquierda apilada */
+  .analytics-left-column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  /* Chart Cards - Definición movida a sección de animaciones */
+
+  /* Chart Headers */
+  .chart-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: var(--space-6);
+  }
+
+  .chart-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 24px;
+    border-radius: var(--radius-sm);
+    margin-right: var(--space-3);
+  }
+
+  .chart-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  /* Responsive Grid Breakpoints según DESIGN_GUIDE.md */
+  @media (max-width: 1024px) {
+    .dashboard-grid {
+      padding: 0 var(--space-4);
+      gap: var(--space-4);
+    }
+
+    .analytics-grid-row-1,
+    .analytics-grid-row-2 {
+      grid-template-columns: 1fr;
+    }
+
+    .kpi-grid {
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--space-4);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .dashboard-grid {
+      padding: 0 var(--space-3);
+      gap: var(--space-3);
+    }
+
+    .kpi-grid {
+      grid-template-columns: 1fr;
+      gap: var(--space-4);
+    }
+
+    .chart-card {
+      padding: var(--space-4);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .dashboard-container {
+      padding: var(--space-4);
+    }
+
+    .dashboard-grid {
+      padding: 0;
+      gap: var(--space-3);
+    }
+  }
+
+  /* ====================================== */
+
+  /* ======================================
+   * ANIMACIONES Y MICROINTERACCIONES
+   * Según DESIGN_GUIDE.md especificaciones
+   * ====================================== */
+
+  /* Animaciones de entrada escalonadas para KPI Cards */
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Aplicar animaciones escalonadas */
+  .kpi-grid > *:nth-child(1) {
+    animation: slideInUp 0.6s ease-out 0s both;
+  }
+
+  .kpi-grid > *:nth-child(2) {
+    animation: slideInUp 0.6s ease-out 0.1s both;
+  }
+
+  .kpi-grid > *:nth-child(3) {
+    animation: slideInUp 0.6s ease-out 0.2s both;
+  }
+
+  .kpi-grid > *:nth-child(4) {
+    animation: slideInUp 0.6s ease-out 0.3s both;
+  }
+
+  /* Animaciones para gráficos */
+  .analytics-grid-row-1 > *:nth-child(1) {
+    animation: fadeInScale 0.8s ease-out 0.4s both;
+  }
+
+  .analytics-grid-row-1 > *:nth-child(2) {
+    animation: fadeInScale 0.8s ease-out 0.5s both;
+  }
+
+  .analytics-grid-row-2 {
+    animation: fadeInScale 0.8s ease-out 0.6s both;
+  }
+
+  /* Hover effects para chart cards */
+  .chart-card {
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    transition: all var(--duration-normal) ease;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chart-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    opacity: 0;
+    transition: opacity var(--duration-normal) ease;
+  }
+
+  .chart-card:hover {
+    border-color: rgba(0, 217, 255, 0.2);
+    box-shadow: var(--shadow-xl);
+    transform: translateY(-2px);
+    background: var(--bg-accent);
+  }
+
+  .chart-card:hover::before {
+    opacity: 1;
+  }
+
+  /* Animaciones para chart indicators */
+  .chart-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 24px;
+    border-radius: var(--radius-sm);
+    margin-right: var(--space-3);
+    transition: all var(--duration-normal) ease;
+  }
+
+  .chart-card:hover .chart-indicator {
+    transform: scale(1.1);
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  /* Efecto de pulso para status indicators */
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Hover effect específico para StatCards */
+  .kpi-grid > * {
+    transition: all var(--duration-normal) ease;
+  }
+
+  .kpi-grid > *:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: var(--shadow-xl);
+  }
+
+  /* Animaciones para el header del dashboard */
+  .dashboard-header {
+    animation: fadeInScale 0.8s ease-out 0s both;
+  }
+
+  /* Efecto de typing para el título */
+  @keyframes gradientShift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .dashboard-header h1 {
+    background: linear-gradient(-45deg, var(--accent-primary), var(--accent-secondary), var(--accent-primary));
+    background-size: 400% 400%;
+    animation: gradientShift 3s ease infinite;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Transiciones suaves para elementos interactivos */
+  select, button, input {
+    transition: all var(--duration-fast) ease;
+  }
+
+  select:focus, button:focus, input:focus {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.1);
+  }
+
+  /* Animación de carga mejorada */
+  @keyframes shimmer {
+    0% {
+      background-position: -200px 0;
+    }
+    100% {
+      background-position: calc(200px + 100%) 0;
+    }
+  }
+
+  .loading-shimmer {
+    background: linear-gradient(90deg, 
+      var(--bg-tertiary) 0%, 
+      rgba(0, 217, 255, 0.1) 50%, 
+      var(--bg-tertiary) 100%
+    );
+    background-size: 200px 100%;
+    background-repeat: no-repeat;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  /* ====================================== */
+
   /* Scroll personalizado */
   .dashboard-main::-webkit-scrollbar {
     width: 6px;
@@ -633,39 +958,6 @@
     align-items: start;
   }
 
-  .chart-card {
-    background: var(--bg-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: var(--radius-xl);
-    padding: var(--space-6);
-    transition: all var(--duration-normal) ease;
-  }
-
-  .chart-card:hover {
-    border-color: rgba(0, 217, 255, 0.2);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .chart-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: var(--space-6);
-  }
-
-  .chart-indicator {
-    width: 8px;
-    height: 24px;
-    border-radius: var(--radius-sm);
-    margin-right: var(--space-3);
-  }
-
-  .chart-title {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
-  }
-
   /* Loading states */
   .loading-skeleton {
     background: linear-gradient(90deg, 
@@ -898,3 +1190,329 @@
     height: fit-content;
   }
 }
+
+/* ======================================
+ * RESPONSIVE DESIGN AVANZADO
+ * Según DESIGN_GUIDE.md especificaciones
+ * ====================================== */
+
+/* Breakpoints específicos según DESIGN_GUIDE.md */
+/* Mobile First Strategy */
+
+/* BASE - Mobile (320px+) */
+.dashboard-grid {
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+}
+
+.kpi-grid {
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+.analytics-grid-row-1,
+.analytics-grid-row-2 {
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+/* TABLET (768px+) */
+@media (min-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(12, 1fr);
+    gap: var(--space-4);
+    padding: 0 var(--space-4);
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-6);
+  }
+
+  .analytics-grid-row-1 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .analytics-grid-row-2 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Navegación colapsable para tablet */
+  .dashboard-sidebar {
+    transform: translateX(-100%);
+    position: fixed;
+    height: 100vh;
+    z-index: 50;
+    width: 280px;
+  }
+
+  .dashboard-sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Overlay para sidebar en tablet */
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-normal) ease;
+  }
+
+  .sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  /* Ajustar main content cuando sidebar está cerrado en tablet */
+  .dashboard-main {
+    margin-left: 0;
+  }
+}
+
+/* DESKTOP (1024px+) */
+@media (min-width: 1024px) {
+  .dashboard-grid {
+    gap: 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .analytics-grid-row-2 {
+    grid-template-columns: 5fr 7fr;
+  }
+
+  /* Restaurar sidebar normal en desktop */
+  .dashboard-sidebar {
+    transform: translateX(0);
+    position: relative;
+    height: auto;
+    z-index: 10;
+  }
+
+  .dashboard-main {
+    margin-left: 0;
+  }
+
+  /* Breadcrumbs para desktop */
+  .breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  .breadcrumb-separator {
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+
+  .breadcrumb-link {
+    color: var(--accent-primary);
+    text-decoration: none;
+    transition: color var(--duration-fast) ease;
+  }
+
+  .breadcrumb-link:hover {
+    color: var(--text-primary);
+  }
+
+  .breadcrumb-current {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+}
+
+/* LARGE DESKTOP (1440px+) */
+@media (min-width: 1440px) {
+  .chart-card {
+    min-height: 400px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(4, minmax(300px, 1fr));
+  }
+}
+
+/* Mobile Specific Adjustments */
+@media (max-width: 767px) {
+  .dashboard-container {
+    padding: var(--space-3);
+  }
+
+  .chart-card {
+    padding: var(--space-4);
+    min-height: 250px;
+  }
+
+  .chart-header {
+    margin-bottom: var(--space-4);
+  }
+
+  .chart-title {
+    font-size: 1rem;
+  }
+
+  /* Optimizaciones móviles para formularios */
+  select, input, button {
+    min-height: 44px; /* Touch target size */
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+
+  /* Header responsive */
+  .dashboard-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .dashboard-header p {
+    font-size: 0.75rem;
+  }
+
+  /* Ocultar elementos no críticos en móvil */
+  .hide-mobile {
+    display: none !important;
+  }
+
+  /* Stack elementos horizontales */
+  .dashboard-header > div {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+}
+
+/* Bottom Navigation para Mobile */
+@media (max-width: 767px) {
+  .bottom-navigation {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: var(--space-2) var(--space-4);
+    z-index: 100;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+  }
+
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color var(--duration-fast) ease;
+    min-width: 60px;
+  }
+
+  .bottom-nav-item.active,
+  .bottom-nav-item:hover {
+    color: var(--accent-primary);
+  }
+
+  .bottom-nav-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .bottom-nav-label {
+    font-size: 0.6875rem;
+    font-weight: 500;
+  }
+
+  /* Ajustar padding del contenido para el bottom nav */
+  .dashboard-content {
+    padding-bottom: calc(var(--space-6) + 70px);
+  }
+}
+
+/* Tablet Specific */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Menu toggle button para tablet */
+  .menu-toggle {
+    position: fixed;
+    top: var(--space-4);
+    left: var(--space-4);
+    z-index: 60;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-md);
+    padding: var(--space-2);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all var(--duration-fast) ease;
+  }
+
+  .menu-toggle:hover {
+    background: var(--bg-accent);
+    transform: scale(1.05);
+  }
+
+  .menu-toggle-icon {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* Animaciones específicas responsive */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --bg-primary: #000000;
+    --bg-secondary: #1a1a1a;
+    --text-primary: #ffffff;
+    --accent-primary: #00ffff;
+  }
+}
+
+/* Dark mode específico (aunque ya es default) */
+@media (prefers-color-scheme: dark) {
+  /* Ya implementado como default */
+}
+
+/* Print styles */
+@media print {
+  .dashboard-sidebar,
+  .bottom-navigation,
+  .menu-toggle {
+    display: none !important;
+  }
+
+  .dashboard-main {
+    margin-left: 0 !important;
+  }
+
+  .chart-card {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}
+
+/* ====================================== */

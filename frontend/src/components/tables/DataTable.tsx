@@ -14,6 +14,7 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0 }) => {
     'Número',
     'Asunto',
     'Sector',
+    'Transporte',
     'Usuario',
     'Agente',
     'Fecha Creación',
@@ -74,7 +75,12 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0 }) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2.5 py-1 text-xs font-medium bg-[#252a35] text-[#b8c5d6] rounded-lg border border-[#2d3441] shadow-sm transition-colors duration-200 hover:bg-[#2d3441] hover:text-[#ffffff]">
-                      {ticket.cdata?.SectorName?.value ?? ticket.cdata?.sector ?? '-'}
+                      {ticket.cdata?.dataValues?.sectorName ?? ticket.cdata?.SectorName?.value ?? `ID: ${ticket.cdata?.sector}` ?? '-'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2.5 py-1 text-xs font-medium bg-[#252a35] text-[#b8c5d6] rounded-lg border border-[#2d3441] shadow-sm transition-colors duration-200 hover:bg-[#2d3441] hover:text-[#ffffff]">
+                      {ticket.cdata?.dataValues?.transporteName ?? ticket.cdata?.TransporteName?.value ?? `ID: ${ticket.cdata?.transporte}` ?? '-'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

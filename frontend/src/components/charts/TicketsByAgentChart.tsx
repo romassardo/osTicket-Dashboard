@@ -2,7 +2,6 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getTicketsByAgentStats } from '../../services/api';
 import BarChart from './BarChart';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 
 interface TicketsByAgentChartProps {
   year: number;
@@ -24,31 +23,17 @@ const TicketsByAgentChart: React.FC<TicketsByAgentChartProps> = ({ year, month }
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Tickets por Agente</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-96 flex items-center justify-center">
-            <p>Cargando datos...</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="h-96 flex items-center justify-center">
+        <p>Cargando datos...</p>
+      </div>
     );
   }
 
   if (isError) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Tickets por Agente</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-96 flex items-center justify-center">
-            <p className="text-red-500">Error al cargar los datos.</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="h-96 flex items-center justify-center">
+        <p className="text-red-500">Error al cargar los datos.</p>
+      </div>
     );
   }
 
@@ -64,20 +49,16 @@ const TicketsByAgentChart: React.FC<TicketsByAgentChartProps> = ({ year, month }
   const dynamicTitle = `Tickets por Agente (${monthName} ${year})`;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{dynamicTitle}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {chartData.length > 0 ? (
-          <BarChart data={chartData} height={400} />
-        ) : (
-          <div className="h-96 flex items-center justify-center">
-            <p>No hay datos de tickets para este período.</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div>
+      <h3 className="text-base font-medium text-[var(--text-primary)] mb-4">{dynamicTitle}</h3>
+      {chartData.length > 0 ? (
+        <BarChart data={chartData} height={400} showValues={true} />
+      ) : (
+        <div className="h-96 flex items-center justify-center">
+          <p>No hay datos de tickets para este período.</p>
+        </div>
+      )}
+    </div>
   );
 };
 

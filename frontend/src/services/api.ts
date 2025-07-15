@@ -157,14 +157,33 @@ export const getTicketsByAgentStats = async (year: number, month: number) => {
 };
 
 /**
- * Obtiene estadísticas de tickets agrupados por organización para un mes y año específicos.
+ * Obtiene las estadísticas de tickets por organización para un mes y año específicos.
+ * @param {number} year - El año para el filtro.
+ * @param {number} month - El mes para el filtro.
+ * @returns Una promesa que resuelve a un array de datos para el gráfico.
  */
-export const getTicketsByOrganizationStats = async (year: number, month: number) => {
+export const getTicketsByOrganizationStats = async ({ year, month }: { year: number; month: number }) => {
   try {
-    const response = await apiClient.get('/tickets/stats/by-organization', { params: { year, month } });
+    const response = await apiClient.get('/stats/tickets-by-organization', { params: { year, month } });
     return response.data;
   } catch (error) {
     logger.error(`Error al obtener tickets por organización para ${year}-${month}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene las estadísticas de tickets por sector para un mes y año específicos.
+ * @param {number} year - El año para el filtro.
+ * @param {number} month - El mes para el filtro.
+ * @returns Una promesa que resuelve a un array de datos para el gráfico.
+ */
+export const getTicketsBySectorStats = async ({ year, month }: { year: number; month: number }) => {
+  try {
+    const response = await apiClient.get('/stats/tickets-by-sector', { params: { year, month } });
+    return response.data;
+  } catch (error) {
+    logger.error(`Error al obtener tickets por sector para ${year}-${month}:`, error);
     throw error;
   }
 };
@@ -183,6 +202,20 @@ export const getTickets = async (page: number = 1, limit: number = 10, search?: 
     return response.data;
   } catch (error) {
     logger.error('Error al obtener tickets:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene las estadísticas de uso de transporte desde el backend.
+ * @returns Una promesa que resuelve a un array de datos para el gráfico.
+ */
+export const getTicketsByTransport = async ({ year, month }: { year: number; month: number }) => {
+  try {
+    const response = await apiClient.get('/stats/tickets-by-transport', { params: { year, month } });
+    return response.data;
+  } catch (error) {
+    logger.error('Error al obtener estadísticas de transporte:', error);
     throw error;
   }
 };

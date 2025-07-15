@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 
 interface BarChartProps {
   data: Array<{
@@ -8,12 +8,14 @@ interface BarChartProps {
   }>;
   title?: string;
   height?: number;
+  showValues?: boolean;
 }
 
 const BarChart: React.FC<BarChartProps> = ({ 
   data,
   title = "Gráfico de Barras",
-  height = 300
+  height = 300,
+  showValues = false
 }) => {
   return (
     <div className="chart-container">
@@ -74,7 +76,17 @@ const BarChart: React.FC<BarChartProps> = ({
             radius={[4, 4, 0, 0]}
             stroke="var(--accent-primary)"
             strokeWidth={1}
-          />
+          >
+            {showValues && (
+              <LabelList 
+                dataKey="value" 
+                position="top" 
+                fill="var(--text-primary)"
+                fontSize={12}
+                fontWeight={600}
+              />
+            )}
+          </Bar>
         </RechartsBarChart>
       </ResponsiveContainer>
     </div>

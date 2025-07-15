@@ -1,231 +1,207 @@
 import React, { memo, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { pieChartConfig, chartColors, tooltipConfig, legendConfig, getResponsiveConfig } from '../../lib/chartConfig';
 
 // Colores según DESIGN_GUIDE.md - Sistema de estados
 const COLORS = {
-  'Abiertos': '#06b6d4',     // info - Tickets en estado inicial
-  'Abierto': '#06b6d4',      // Alias para compatibilidad
-  'En Progreso': '#f59e0b',  // warning - Tickets siendo trabajados
-  'Resueltos': '#10b981',    // success - Tickets completados
-  'Resuelto': '#10b981',     // Alias para compatibilidad
-  'Cerrados': '#6b7280',     // muted - Tickets finalizados
-  'Cerrado': '#6b7280',      // Alias para compatibilidad
-  'Vencidos': '#ef4444',     // error - Tickets críticos
-  'Vencido': '#ef4444',      // Alias para compatibilidad
-  'Pendientes': '#f59e0b',   // warning - Tickets esperando acción
-  'Pendiente': '#f59e0b'     // Alias para compatibilidad
+  'Abiertos': chartColors.ticketStatus.open,
+  'Abierto': chartColors.ticketStatus.open,
+  'En Progreso': chartColors.warning,
+  'Resueltos': chartColors.ticketStatus.resolved,
+  'Resuelto': chartColors.ticketStatus.resolved,
+  'Cerrados': chartColors.ticketStatus.closed,
+  'Cerrado': chartColors.ticketStatus.closed,
+  'Vencidos': chartColors.error,
+  'Vencido': chartColors.error,
+  'Pendientes': chartColors.ticketStatus.pending,
+  'Pendiente': chartColors.ticketStatus.pending
 };
 
 interface TicketStatusChartProps {
   data: Array<{
     name: string;
     value: number;
-    color?: string; // Opcional porque usaremos colores fijos
+    color?: string;
   }>;
 }
 
 // Función para obtener color por nombre (robusta y flexible)
 const getColorByName = (name: string): string => {
-  // Primero intentar coincidencia exacta
   if (COLORS[name as keyof typeof COLORS]) {
     return COLORS[name as keyof typeof COLORS];
   }
   
-  // Normalizar el nombre (minúsculas, sin espacios extra)
   const normalizedName = name.toLowerCase().trim();
   
-  // Mapeo flexible de nombres comunes
   const nameMapping: { [key: string]: string } = {
-    'abierto': '#06b6d4',      // info - azul
-    'abiertos': '#06b6d4',     
-    'open': '#06b6d4',
-    'nuevo': '#06b6d4',
-    'nuevos': '#06b6d4',
+    'abierto': chartColors.ticketStatus.open,
+    'abiertos': chartColors.ticketStatus.open,
+    'open': chartColors.ticketStatus.open,
+    'nuevo': chartColors.ticketStatus.open,
+    'nuevos': chartColors.ticketStatus.open,
     
-    'cerrado': '#6b7280',      // muted - gris
-    'cerrados': '#6b7280',
-    'closed': '#6b7280',
+    'cerrado': chartColors.ticketStatus.closed,
+    'cerrados': chartColors.ticketStatus.closed,
+    'closed': chartColors.ticketStatus.closed,
     
-    'resuelto': '#10b981',     // success - verde
-    'resueltos': '#10b981',
-    'resolved': '#10b981',
-    'solucionado': '#10b981',
+    'resuelto': chartColors.ticketStatus.resolved,
+    'resueltos': chartColors.ticketStatus.resolved,
+    'resolved': chartColors.ticketStatus.resolved,
+    'solucionado': chartColors.ticketStatus.resolved,
+    'solucionados': chartColors.ticketStatus.resolved,
     
-    'en proceso': '#f59e0b',   // warning - naranja
-    'enproceso': '#f59e0b',
-    'en_proceso': '#f59e0b',
-    'progreso': '#f59e0b',
-    'in progress': '#f59e0b',
+    'pendiente': chartColors.ticketStatus.pending,
+    'pendientes': chartColors.ticketStatus.pending,
+    'pending': chartColors.ticketStatus.pending,
+    'esperando': chartColors.ticketStatus.pending,
     
-    'vencido': '#ef4444',      // error - rojo
-    'vencidos': '#ef4444',
-    'overdue': '#ef4444',
-    'atrasado': '#ef4444',
+    'vencido': chartColors.error,
+    'vencidos': chartColors.error,
+    'overdue': chartColors.error,
+    'atrasado': chartColors.error,
+    'atrasados': chartColors.error,
     
-    'pendiente': '#f59e0b',    // warning - naranja
-    'pendientes': '#f59e0b',
-    'pending': '#f59e0b'
+    'en progreso': chartColors.warning,
+    'en_progreso': chartColors.warning,
+    'in_progress': chartColors.warning,
+    'working': chartColors.warning,
+    'trabajando': chartColors.warning
   };
-  
-  const color = nameMapping[normalizedName];
-  if (color) {
-    return color;
-  }
-  
-  // Si no se encuentra, usar color por defecto
-  return '#95A5A6'; // Gris por defecto
+
+  return nameMapping[normalizedName] || chartColors.muted;
 };
 
-/**
- * TicketStatusChart optimizado con React.memo y useMemo
- * Gráfico de estado de tickets optimizado para performance [[memory:2988538]]
- */
-const TicketStatusChart: React.FC<TicketStatusChartProps> = memo(({ data }) => {
-  // Memoizar validación de datos para evitar recálculos
-  const isValidData = useMemo(() => {
-    return data && data.length > 0 && !data.every(item => item.value === 0);
-  }, [data]);
-
-  // Memoizar cálculo del total para evitar recálculos en cada render
-  const total = useMemo(() => {
-    return data?.reduce((sum, item) => sum + item.value, 0) || 0;
-  }, [data]);
-
-  if (!isValidData) {
+// Componente de tooltip personalizado
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0];
     return (
-      <div className="h-full flex items-center justify-center min-h-[350px] bg-[#1a1f29] rounded-xl border border-[#2d3441]">
-        <p className="text-[#7a8394] font-inter text-sm">No hay datos de estado para mostrar.</p>
+      <div 
+        style={tooltipConfig.contentStyle}
+        className="shadow-xl"
+      >
+        <p style={tooltipConfig.labelStyle}>
+          {data.name}
+        </p>
+        <p style={tooltipConfig.itemStyle}>
+          <span style={{ color: data.color }}>●</span>
+          {` ${data.value} tickets`}
+        </p>
+        <p style={{ ...tooltipConfig.itemStyle, fontSize: '0.75rem', opacity: 0.8 }}>
+          {((data.value / payload[0].payload.total) * 100).toFixed(1)}%
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+// Etiqueta personalizada para mostrar el total en el centro
+const CenterLabel = ({ viewBox, data }: any) => {
+  const { cx, cy } = viewBox;
+  const total = data.reduce((sum: number, entry: any) => sum + entry.value, 0);
+  
+  return (
+    <g>
+      <text 
+        x={cx} 
+        y={cy - 10} 
+        textAnchor="middle" 
+        dominantBaseline="central"
+        className="text-2xl font-bold"
+        fill="var(--text-primary)"
+      >
+        {total.toLocaleString()}
+      </text>
+      <text 
+        x={cx} 
+        y={cy + 15} 
+        textAnchor="middle" 
+        dominantBaseline="central"
+        className="text-xs"
+        fill="var(--text-muted)"
+      >
+        tickets
+      </text>
+    </g>
+  );
+};
+
+const TicketStatusChart: React.FC<TicketStatusChartProps> = memo(({ data }) => {
+  const responsiveConfig = getResponsiveConfig();
+  
+  // Procesar datos y aplicar colores
+  const processedData = useMemo(() => {
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    
+    return data.map(item => ({
+      ...item,
+      color: item.color || getColorByName(item.name),
+      total, // Añadir total para el tooltip
+    }));
+  }, [data]);
+
+  // Configuración del gráfico responsive
+  const chartConfig = useMemo(() => ({
+    ...pieChartConfig,
+    innerRadius: responsiveConfig.innerRadius,
+    outerRadius: responsiveConfig.outerRadius,
+  }), [responsiveConfig]);
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-[var(--text-muted)]">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-[var(--bg-tertiary)] mx-auto mb-4 flex items-center justify-center">
+            📊
+          </div>
+          <p>No hay datos disponibles</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-[350px] bg-[#1a1f29] rounded-xl border border-[#2d3441] p-6">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
+    <div className="relative">
+      <ResponsiveContainer width="100%" height={280}>
+        <PieChart margin={responsiveConfig.margin}>
           <Pie
-            data={data}
+            data={processedData}
             cx="50%"
             cy="50%"
-            labelLine={false}
-            outerRadius={120}
-            innerRadius={80}
+            innerRadius={chartConfig.innerRadius}
+            outerRadius={chartConfig.outerRadius}
+            paddingAngle={chartConfig.paddingAngle}
+            cornerRadius={chartConfig.cornerRadius}
             dataKey="value"
-            stroke="#ffffff"
-            strokeWidth={2}
-            paddingAngle={2}
+            animationBegin={chartConfig.animationBegin}
+            animationDuration={chartConfig.animationDuration}
+            label={<CenterLabel data={processedData} />}
           >
-            {data.map((entry, index) => {
-              const color = getColorByName(entry.name);
-              return (
-                <Cell 
-                  key={`cell-${index}`} 
-                  fill={color}
-                  stroke="none"
-                  style={{ fill: color }} // Forzar color via style también
-                />
-              );
-            })}
+            {processedData.map((entry, index) => (
+              <Cell 
+                key={`cell-${index}`} 
+                fill={entry.color}
+                stroke="var(--bg-primary)"
+                strokeWidth={2}
+              />
+            ))}
           </Pie>
-          
-          <Tooltip 
-            formatter={(value: any, name: any) => [
-              `${value.toLocaleString()} tickets (${((value / total) * 100).toFixed(1)}%)`, 
-              name
-            ]}
-            contentStyle={{
-              backgroundColor: '#252a35',
-              border: '1px solid #2d3441',
-              borderRadius: '8px',
-              color: '#ffffff',
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '0.875rem',
-              padding: '12px',
-              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)'
-            }}
-            labelStyle={{ color: '#b8c5d6', marginBottom: '4px' }}
+          <Tooltip content={<CustomTooltip />} />
+          <Legend 
+            {...legendConfig}
+            formatter={(value, entry) => (
+              <span style={{ color: entry.color }}>
+                {value} ({entry.payload?.value || 0})
+              </span>
+            )}
           />
-          
-          <Legend
-            iconType="circle"
-            layout="vertical"
-            verticalAlign="middle"
-            align="right"
-            iconSize={12}
-            wrapperStyle={{ 
-              right: -10, 
-              top: '50%', 
-              transform: 'translateY(-50%)',
-              fontFamily: 'Inter, sans-serif'
-            }}
-            formatter={(value: any) => {
-              const item = data.find(d => d.name === value);
-              const percentage = total > 0 ? ((item?.value ?? 0) / total) * 100 : 0;
-              return (
-                <span 
-                  className="text-sm font-medium ml-3" 
-                  style={{ 
-                    color: '#b8c5d6',
-                    fontFamily: 'Inter, sans-serif',
-                    fontSize: '0.875rem'
-                  }}
-                >
-                  {value} ({percentage.toFixed(0)}%)
-                </span>
-              );
-            }}
-          />
-          
-          {/* Centro del donut según DESIGN_GUIDE.md - Centrado perfecto */}
-          <text 
-            x="50%" 
-            y="45%" 
-            textAnchor="middle" 
-            dominantBaseline="central" 
-            style={{
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '0.75rem',
-              fontWeight: '500',
-              fill: '#7a8394'
-            }}
-          >
-            Total
-          </text>
-          <text 
-            x="50%" 
-            y="50%" 
-            textAnchor="middle" 
-            dominantBaseline="central" 
-            style={{
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '2rem',
-              fontWeight: '700',
-              fill: '#ffffff'
-            }}
-          >
-            {total.toLocaleString()}
-          </text>
-          <text 
-            x="50%" 
-            y="55%" 
-            textAnchor="middle" 
-            dominantBaseline="central" 
-            style={{
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '0.75rem',
-              fontWeight: '400',
-              fill: '#7a8394'
-            }}
-          >
-            tickets
-          </text>
         </PieChart>
       </ResponsiveContainer>
     </div>
   );
 });
 
-// Asignar displayName para debugging en React DevTools
 TicketStatusChart.displayName = 'TicketStatusChart';
 
 export default TicketStatusChart;

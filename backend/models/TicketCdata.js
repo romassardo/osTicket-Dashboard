@@ -17,11 +17,11 @@ const TicketCdata = sequelize.define('TicketCdata', {
     allowNull: true // O false si el asunto siempre es requerido
   },
   sector: { // Corresponde al campo personalizado con field_id=36, name='sector'
-    type: DataTypes.STRING(255), // Ajustar el tipo y longitud si es necesario
+    type: DataTypes.INTEGER, // CORRECCIÓN: Es un ID que referencia ost_list_items
     allowNull: true // Los campos personalizados pueden no estar llenos
   },
   transporte: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.INTEGER, // CORRECCIÓN: Es un ID que referencia ost_list_items  
     allowNull: true
   }
   // Aquí se podrían añadir otros campos de la tabla ost_ticket__cdata si son necesarios

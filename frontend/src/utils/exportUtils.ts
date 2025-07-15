@@ -46,16 +46,41 @@ export const exportTicketsToCSV = (tickets: Ticket[], options: ExportOptions = {
   ];
 
   // Convert tickets to CSV rows
-  const csvRows = tickets.map(ticket => [
-    ticket.number,
-    (ticket.cdata?.subject || '-').replace(/"/g, '""'), // Escape quotes
-    (ticket.status?.name || '-').replace(/"/g, '""'),
-    ticket.user ? `${ticket.user.name}`.replace(/"/g, '""') : '-',
-    ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}`.replace(/"/g, '""') : '-',
-    (ticket.cdata?.SectorName?.value || ticket.cdata?.sector || '-').replace(/"/g, '""'),
-    ((ticket.cdata as any)?.TransporteName?.value || '-').replace(/"/g, '""'),
-    ticket.created ? new Date(ticket.created).toLocaleDateString('es-ES') : '-'
-  ]);
+  const csvRows = tickets.map(ticket => {
+    // Función helper para obtener transporte de forma robusta
+    const getTransporteValue = (ticket: any): string => {
+      // Intentar múltiples formas de acceder al transporte
+      const transporteValue = 
+        ticket.cdata?.dataValues?.transporteName ||  // Estructura optimizada
+        ticket.cdata?.TransporteName?.value ||        // Estructura original
+        ticket.cdata?.transporte ||                   // Campo directo
+        null;
+      
+      return transporteValue ? String(transporteValue) : '-';
+    };
+
+    // Función helper para obtener sector de forma robusta
+    const getSectorValue = (ticket: any): string => {
+      const sectorValue = 
+        ticket.cdata?.dataValues?.sectorName ||       // Estructura optimizada
+        ticket.cdata?.SectorName?.value ||            // Estructura original
+        ticket.cdata?.sector ||                       // Campo directo
+        null;
+      
+      return sectorValue ? String(sectorValue) : '-';
+    };
+
+    return [
+      ticket.number || '-',
+      (ticket.cdata?.subject || '-').replace(/"/g, '""'), // Escape quotes
+      (ticket.status?.name || '-').replace(/"/g, '""'),
+      ticket.user ? `${ticket.user.name}`.replace(/"/g, '""') : '-',
+      ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}`.replace(/"/g, '""') : '-',
+      getSectorValue(ticket).replace(/"/g, '""'),
+      getTransporteValue(ticket).replace(/"/g, '""'),
+      ticket.created ? new Date(ticket.created).toLocaleDateString('es-ES') : '-'
+    ];
+  });
 
   // Build CSV content
   let csvContent = '';
@@ -199,15 +224,37 @@ export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions =
 
   // Add data rows
   tickets.forEach(ticket => {
+    // Función helper para obtener transporte de forma robusta
+    const getTransporteValue = (ticket: any): string => {
+      const transporteValue = 
+        ticket.cdata?.dataValues?.transporteName ||  // Estructura optimizada
+        ticket.cdata?.TransporteName?.value ||        // Estructura original
+        ticket.cdata?.transporte ||                   // Campo directo
+        null;
+      
+      return transporteValue ? String(transporteValue) : '-';
+    };
+
+    // Función helper para obtener sector de forma robusta
+    const getSectorValue = (ticket: any): string => {
+      const sectorValue = 
+        ticket.cdata?.dataValues?.sectorName ||       // Estructura optimizada
+        ticket.cdata?.SectorName?.value ||            // Estructura original
+        ticket.cdata?.sector ||                       // Campo directo
+        null;
+      
+      return sectorValue ? String(sectorValue) : '-';
+    };
+
     htmlContent += `
       <tr>
-        <td>${ticket.number}</td>
+        <td>${ticket.number || '-'}</td>
         <td>${ticket.cdata?.subject || '-'}</td>
         <td>${ticket.status?.name || '-'}</td>
         <td>${ticket.user ? ticket.user.name : '-'}</td>
         <td>${ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}` : '-'}</td>
-        <td>${ticket.cdata?.SectorName?.value || ticket.cdata?.sector || '-'}</td>
-        <td>${(ticket.cdata as any)?.TransporteName?.value || '-'}</td>
+        <td>${getSectorValue(ticket)}</td>
+        <td>${getTransporteValue(ticket)}</td>
         <td>${ticket.created ? new Date(ticket.created).toLocaleDateString('es-ES') : '-'}</td>
       </tr>
     `;

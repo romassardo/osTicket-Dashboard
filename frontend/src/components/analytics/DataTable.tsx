@@ -26,6 +26,40 @@ const DataTable: React.FC<DataTableProps> = memo(({ tickets }) => {
     });
   }, []);
 
+  // Helper function para obtener el nombre del transporte de forma robusta
+  const getTransporteName = useCallback((ticket: Ticket): string => {
+    // Prioridad 1: dataValues.transporteName (agregado por backend post-procesamiento)
+    if (ticket.cdata?.dataValues?.transporteName) {
+      return ticket.cdata.dataValues.transporteName;
+    }
+    // Prioridad 2: TransporteName.value (estructura de asociación Sequelize)
+    if (ticket.cdata?.TransporteName?.value) {
+      return ticket.cdata.TransporteName.value;
+    }
+    // Fallback: ID como string
+    if (ticket.cdata?.transporte) {
+      return `ID: ${ticket.cdata.transporte}`;
+    }
+    return '-';
+  }, []);
+
+  // Helper function para obtener el nombre del sector de forma robusta
+  const getSectorName = useCallback((ticket: Ticket): string => {
+    // Prioridad 1: dataValues.sectorName (agregado por backend post-procesamiento)
+    if (ticket.cdata?.dataValues?.sectorName) {
+      return ticket.cdata.dataValues.sectorName;
+    }
+    // Prioridad 2: SectorName.value (estructura de asociación Sequelize)
+    if (ticket.cdata?.SectorName?.value) {
+      return ticket.cdata.SectorName.value;
+    }
+    // Fallback: ID como string
+    if (ticket.cdata?.sector) {
+      return `ID: ${ticket.cdata.sector}`;
+    }
+    return '-';
+  }, []);
+
   // Early return memoizado - evita re-render si tickets está vacío y no cambia
   if (tickets.length === 0) {
     return (
@@ -58,10 +92,13 @@ const DataTable: React.FC<DataTableProps> = memo(({ tickets }) => {
               Agente
             </th>
             <th scope="col" className="px-6 py-4 text-[0.7rem]">
-              Fecha Creación
+              Sector/Sucursal
             </th>
             <th scope="col" className="px-6 py-4 text-[0.7rem]">
               Transporte
+            </th>
+            <th scope="col" className="px-6 py-4 text-[0.7rem]">
+              Fecha Creación
             </th>
           </tr>
         </thead>
@@ -72,17 +109,20 @@ const DataTable: React.FC<DataTableProps> = memo(({ tickets }) => {
                 {ticket.number}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6] max-w-[250px] truncate">
-                {ticket.cdata.subject}
+                {ticket.cdata?.subject ?? '-'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6]">
                 {ticket.AssignedStaff != null ? 
                   `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}` : '-'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6]">
-                {formatDate(ticket.created)}
+                {getSectorName(ticket)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6]">
-                {ticket.cdata.TransporteName?.value ?? '-'}
+                {getTransporteName(ticket)}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6]">
+                {formatDate(ticket.created)}
               </td>
             </tr>
           ))}
