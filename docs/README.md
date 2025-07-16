@@ -34,9 +34,9 @@ Este proyecto tiene como objetivo desarrollar un dashboard web personalizado, so
  sql/                    # Consultas SQL de referencia
  .env.example            # Ejemplo de variables de entorno necesarias
  README.md               # Este archivo
- PLAN_DE_PROYECTO.md     # Plan detallado de tareas
+ CHANGELOGTO.md     # Plan detallado de tareas
 ```
 
 ## Próximos Pasos
 
-Consultar `PLAN_DE_PROYECTO.md` para el seguimiento detallado de las tareas.
+Consultar `CHANGELOG.md` para el seguimiento detallado de las tareas.

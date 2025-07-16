@@ -1,5 +1,6 @@
 import React from 'react';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
+import { useTheme } from '../../contexts/ThemeContext';
 
 /**
  * Header del Dashboard siguiendo DESIGN_GUIDE.md
@@ -9,6 +10,7 @@ const Header: React.FC = () => {
   const [lastUpdate, setLastUpdate] = React.useState(new Date());
   const [currentTime, setCurrentTime] = React.useState(new Date());
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const { resolvedTheme, toggleTheme } = useTheme();
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -79,6 +81,21 @@ const Header: React.FC = () => {
             className={`header-button-icon ${isRefreshing ? 'spinning' : ''}`}
           />
           <span>{isRefreshing ? 'Actualizando...' : 'Refrescar'}</span>
+        </button>
+
+        {/* Theme Toggle Button */}
+        <button 
+          onClick={toggleTheme}
+          className="header-button"
+          title={`Cambiar a modo ${resolvedTheme === 'dark' ? 'claro' : 'oscuro'}`}
+          aria-label={`Cambiar a modo ${resolvedTheme === 'dark' ? 'claro' : 'oscuro'}`}
+        >
+          {resolvedTheme === 'dark' ? (
+            <SunIcon className="header-button-icon" />
+          ) : (
+            <MoonIcon className="header-button-icon" />
+          )}
+          <span>{resolvedTheme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}</span>
         </button>
 
         {/* Sistema Status Indicator */}

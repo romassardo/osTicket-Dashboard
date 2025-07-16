@@ -102,12 +102,12 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
 
   return (
     <div className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex justify-center items-center transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-      <div className={`bg-[#1a1f29] rounded-xl shadow-2xl border border-[#2d3441] p-6 w-full max-w-2xl transform transition-all duration-300 ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}>
-        <div className="flex items-center justify-between mb-6 border-b border-[#2d3441] pb-4">
-          <h2 className="text-xl font-bold text-[#ffffff]">Filtros avanzados</h2>
+      <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-600 p-6 w-full max-w-2xl transform transition-all duration-300 ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}>
+        <div className="flex items-center justify-between mb-6 border-b border-gray-200 dark:border-slate-600 pb-4">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Filtros avanzados</h2>
           <button 
             onClick={onClose}
-            className="text-[#7a8394] hover:text-[#ffffff] transition-colors duration-200 rounded-full h-8 w-8 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#00d9ff] focus:ring-opacity-50"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors duration-200 rounded-full h-8 w-8 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-400 focus:ring-opacity-50"
             aria-label="Cerrar modal"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -119,7 +119,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
         <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
           {/* Estados */}
           <div>
-            <label className="block text-sm font-medium text-[#b8c5d6] mb-3">Estado del Ticket</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Estado del Ticket</label>
             <div className="flex flex-wrap gap-2">
               {statuses.map(status => (
                 <button
@@ -128,8 +128,8 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
                   onClick={() => handleStatusChange(status.id)}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
                     selectedStatuses.includes(status.id)
-                      ? 'bg-[#00d9ff] text-[#0a0e14] shadow-lg shadow-[#00d9ff]/20'
-                      : 'bg-[#252a35] hover:bg-[#2d3441] text-[#b8c5d6] hover:text-[#ffffff] ring-1 ring-[#2d3441]'
+                      ? 'bg-blue-500 dark:bg-cyan-500 text-white shadow-lg shadow-blue-500/20 dark:shadow-cyan-500/20'
+                      : 'bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white ring-1 ring-gray-200 dark:ring-slate-600'
                   }`}
                 >
                   {status.name}
@@ -140,7 +140,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
 
           {/* Rango de Fechas */}
           <div>
-            <label className="block text-sm font-medium text-[#b8c5d6] mb-3">Rango de Fechas</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Rango de Fechas</label>
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <DatePicker
@@ -221,16 +221,16 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
 
         </form>
 
-        <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-[#2d3441]">
+        <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-200 dark:border-slate-600">
           <button 
             onClick={onClose} 
-            className="px-4 py-2 rounded-lg bg-[#252a35] text-[#b8c5d6] hover:bg-[#2d3441] hover:text-[#ffffff] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#2d3441] focus:ring-opacity-50 font-medium"
+            className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-slate-600 focus:ring-opacity-50 font-medium"
           >
             Cancelar
           </button>
           <button 
             onClick={handleApply} 
-            className="px-4 py-2 rounded-lg bg-[#00d9ff] text-[#0a0e14] hover:bg-[#33e1ff] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#00d9ff] focus:ring-opacity-50 font-medium shadow-lg shadow-[#00d9ff]/20"
+            className="px-4 py-2 rounded-lg bg-blue-500 dark:bg-cyan-500 text-white hover:bg-blue-600 dark:hover:bg-cyan-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500 focus:ring-opacity-50 font-medium shadow-lg shadow-blue-500/20 dark:shadow-cyan-500/20"
           >
             Aplicar Filtros
           </button>

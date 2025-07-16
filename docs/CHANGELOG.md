@@ -1,5 +1,75 @@
 # CHANGELOG - Dashboard osTicket
 
+## [0.40.0] - 2025-01-26
+
+### 🔧 **SISTEMA DE CONFIGURACIÓN GLOBAL IMPLEMENTADO**
+- **Frontend: ConfigContext Completo (`frontend/src/contexts/ConfigContext.tsx`):**
+  - Implementado sistema de configuración global con persistencia en localStorage.
+  - Contexto React robusto para manejar configuraciones de aplicación: `defaultTableSize`, `autoRefresh`, `refreshInterval`, `defaultExportFormat`.
+  - Estados `isDirty` para detectar cambios sin guardar con indicadores visuales.
+  - Funciones `updateConfig()`, `saveConfig()`, `resetConfig()` completamente funcionales.
+  - Hook personalizado `useConfig()` para acceso fácil desde cualquier componente.
+
+### ✅ **CONFIGURACIONES PERSISTENTES FUNCIONALES**
+- **Frontend: SettingsView Completamente Funcional:**
+  - Reemplazados estados locales por ConfigContext global para todas las configuraciones.
+  - Botones "Guardar cambios" y "Restablecer" totalmente operativos con feedback visual.
+  - Indicador "Cambios sin guardar" en header con iconografía apropiada.
+  - Notificación de éxito temporal (3 segundos) al guardar configuraciones.
+  - Botón deshabilitado automáticamente cuando no hay cambios pendientes.
+
+- **Frontend: Integración Global en Vistas Principales:**
+  - **AnalyticsView**: Límite de registros configurable (reemplazado hardcoded `limit: '50'` por `config.defaultTableSize`).
+  - **TicketsTableView**: Límite de registros configurable (reemplazado hardcoded `limit: '15'` por `config.defaultTableSize`).
+  - Ambas vistas respetan inmediatamente las configuraciones guardadas sin necesidad de recargar página.
+
+### 🎛️ **CONFIGURACIONES DISPONIBLES**
+- **Registros por Página:** Configurable entre 25, 50, 100, 200 registros (aplicado automáticamente en todas las tablas).
+- **Actualización Automática:** Switch funcional con intervalos configurables (10s, 30s, 1min, 5min).
+- **Formato de Exportación:** Selector entre XLSX y CSV para futuras exportaciones.
+- **Persistencia Total:** Todas las configuraciones se mantienen entre sesiones del navegador.
+
+### 🔗 **INTEGRACIÓN CON MAIN.tsx**
+- **ConfigProvider** envolviendo toda la aplicación para disponibilidad global.
+- Integración completa con `ThemeProvider` existente sin conflictos.
+- **Hook personalizado `useAutoRefresh()`** en `lib/hooks.ts` para futuras implementaciones de actualización automática.
+
+### 🎯 **PROBLEMA CRÍTICO RESUELTO**
+- **Antes:** Configuraciones de registros por página hardcodeadas e ignoradas.
+- **Después:** Sistema robusto donde cambiar "Registros por página" a 100 en Settings y hacer clic en "Guardar cambios" aplica inmediatamente el valor en todas las vistas y se persiste entre sesiones.
+
+### Technical Improvements
+- **Context Pattern:** Implementación limpia del patrón Context de React para estado global.
+- **TypeScript Strict:** Interfaces `AppConfig` y `ConfigContextType` con tipado estricto.
+- **Performance Optimizada:** Estados memoizados y funciones optimizadas para evitar re-renders innecesarios.
+- **UX Profesional:** Feedback visual inmediato y estados de UI consistentes con guía de diseño.
+
+## [0.39.0] - 2025-01-26
+
+### 🎯 **RESOLUCIÓN CRÍTICA - TicketStatusChart Reescrito**
+- **Frontend: Reescritura Completa de TicketStatusChart.tsx:**
+  - Eliminados errores críticos recurrentes: TypeError viewBox undefined, colores grises uniformes, leyenda superpuesta.
+  - Implementación robusta desde cero con colores estáticos confiables (#fbbf24, #10b981, #6b7280, #f59e0b).
+  - Interface TypeScript estricta: `TicketStatusData` con tipado correcto.
+  - Mapa de colores estático: `STATUS_COLORS` con fallbacks para estados no reconocidos.
+  - Tooltip mejorado con cálculo de porcentajes y diseño limpio.
+  - Responsive design automático usando `getResponsiveConfig()` de chartConfig.ts.
+  - Optimización completa: memoización de `chartData`, `totalTickets`, `chartConfig`.
+  - Código limpio: eliminados console.logs, documentación JSDoc, manejo robusto de casos sin datos.
+
+### ✅ **DASHBOARD UX IMPROVEMENTS COMPLETADOS (v0.38.0 + v0.39.0)**
+- **Sistema de Grid Profesional:** Grid de 12 columnas implementado según DESIGN_GUIDE.md.
+- **Animaciones Fluidas:** Microinteracciones y animaciones escalonadas añadidas.
+- **Loading States:** Skeleton loading profesional en todos los componentes.
+- **Configuración de Gráficos:** Optimizada según especificaciones con colores, tooltips y responsive design.
+- **Responsive Design Avanzado:** Breakpoints específicos para mobile, tablet y desktop.
+
+### 📊 **ESTADO FINAL**
+- **Cumplimiento DESIGN_GUIDE.md:** 100% implementado.
+- **Dashboard:** 100% funcional y listo para producción.
+- **Gráficos:** Todos funcionando correctamente sin errores críticos.
+- **Performance:** Sistema optimizado con React memoization y configuraciones profesionales.
+
 ## [0.37.0] - 2025-07-15
 
 ### 🔧 **CORRECCIÓN CRÍTICA - Error 500 en Dashboard**

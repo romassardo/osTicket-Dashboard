@@ -63,7 +63,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ onSearch, loading = false }) => {
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
           <MagnifyingGlassIcon 
             className={`h-5 w-5 transition-colors duration-200 ${
-              showLoader ? 'text-violet-500' : 'text-slate-400'
+              showLoader ? 'text-blue-500 dark:text-violet-500' : 'text-gray-400 dark:text-slate-400'
             }`} 
             aria-hidden="true" 
           />
@@ -77,14 +77,14 @@ const FilterBar: React.FC<FilterBarProps> = ({ onSearch, loading = false }) => {
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           className={`
-            block w-full rounded-lg border-0 bg-slate-700/50 py-3 pl-11 pr-12 
-            text-slate-300 ring-1 ring-inset transition-all duration-200
-            placeholder:text-slate-400 sm:text-sm sm:leading-6
+            block w-full rounded-lg border-0 bg-white dark:bg-slate-700/50 py-3 pl-11 pr-12 
+            text-gray-900 dark:text-slate-300 ring-1 ring-inset transition-all duration-200
+            placeholder:text-gray-500 dark:placeholder:text-slate-400 sm:text-sm sm:leading-6
             ${showLoader 
-              ? 'ring-violet-500/50 bg-slate-700/70' 
-              : 'ring-slate-600 hover:ring-slate-500'
+              ? 'ring-blue-500 dark:ring-violet-500/50 bg-gray-50 dark:bg-slate-700/70' 
+              : 'ring-gray-300 dark:ring-slate-600 hover:ring-gray-400 dark:hover:ring-slate-500'
             }
-            focus:ring-2 focus:ring-inset focus:ring-violet-500 focus:bg-slate-700/70
+            focus:ring-2 focus:ring-inset focus:ring-blue-500 dark:focus:ring-violet-500 focus:bg-gray-50 dark:focus:bg-slate-700/70
             focus:outline-none
           `}
         />
@@ -92,12 +92,12 @@ const FilterBar: React.FC<FilterBarProps> = ({ onSearch, loading = false }) => {
         {/* Loading Spinner or Clear Button */}
         <div className="absolute inset-y-0 right-0 flex items-center pr-4">
           {showLoader ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-violet-500 border-t-transparent" />
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 dark:border-violet-500 border-t-transparent" />
           ) : searchTerm ? (
             <button
               type="button"
               onClick={handleClear}
-              className="text-slate-400 hover:text-slate-300 focus:text-slate-300 transition-colors duration-200"
+              className="text-gray-400 dark:text-slate-400 hover:text-gray-600 dark:hover:text-slate-300 focus:text-gray-600 dark:focus:text-slate-300 transition-colors duration-200"
               aria-label="Limpiar búsqueda"
             >
               <XMarkIcon className="h-5 w-5" />

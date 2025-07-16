@@ -1,9 +1,10 @@
 import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
 import type { Ticket } from '../types';
 
 /**
- * Secure export utility to replace the vulnerable xlsx library
- * Exports data as CSV which is more secure and lighter
+ * Export utilities usando SheetJS para generar archivos Excel reales
+ * Reemplaza la implementación anterior que generaba HTML
  */
 
 interface ExportOptions {
@@ -131,8 +132,8 @@ export const exportTicketsToCSV = (tickets: Ticket[], options: ExportOptions = {
 };
 
 /**
- * Alternative Excel-compatible export using HTML table format
- * This creates an .html file that Excel can open without security warnings
+ * Exporta tickets a Excel usando SheetJS - genera archivos .xlsx reales
+ * Reemplaza la implementación anterior que generaba HTML
  */
 export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions = {}) => {
   if (tickets.length === 0) {
@@ -141,7 +142,7 @@ export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions =
   }
 
   const {
-    filename = `tickets_analytics_${new Date().toISOString().slice(0, 10)}.html`,
+    filename = `tickets_analytics_${new Date().toISOString().slice(0, 10)}.xlsx`,
     includeFilters = true,
     filters = {}
   } = options;
@@ -152,78 +153,7 @@ export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions =
     return;
   }
 
-  // Create HTML table content with better Excel compatibility
-  let htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="ProgId" content="Excel.Sheet">
-      <meta name="Generator" content="Dashboard OsTicket">
-      <title>Reporte de Tickets</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background-color: #f0f0f0; font-weight: bold; }
-        .metadata { background-color: #f9f9f9; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; }
-        .metadata h3 { margin-top: 0; color: #333; }
-      </style>
-    </head>
-    <body>
-  `;
-
-  // Add metadata if filters are included
-  if (includeFilters) {
-    htmlContent += `
-      <div class="metadata">
-        <h3>📊 Reporte de Tickets - ${new Date().toLocaleString('es-ES')}</h3>
-        <p><strong>Total de registros exportados:</strong> ${tickets.length}</p>
-    `;
-
-    if (Object.keys(filters).length > 0) {
-      htmlContent += '<p><strong>Filtros aplicados:</strong></p><ul>';
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) {
-          let filterName = key;
-          switch (key) {
-            case 'transporte': filterName = '🚚 Transporte'; break;
-            case 'staff': filterName = '👤 Agente'; break;
-            case 'organization': filterName = '🏢 Sector/Organización'; break;
-            case 'statuses': filterName = '📋 Estados'; break;
-            case 'startDate': filterName = '📅 Fecha desde'; break;
-            case 'endDate': filterName = '📅 Fecha hasta'; break;
-          }
-          htmlContent += `<li>${filterName}: ${value}</li>`;
-        }
-      });
-      htmlContent += '</ul>';
-    } else {
-      htmlContent += '<p><strong>Filtros aplicados:</strong> Ninguno (todos los registros disponibles)</p>';
-    }
-    htmlContent += '</div>';
-  }
-
-  // Add table with headers
-  htmlContent += `
-    <table>
-      <thead>
-        <tr>
-          <th>Nº Ticket</th>
-          <th>Asunto</th>
-          <th>Estado</th>
-          <th>Usuario</th>
-          <th>Agente</th>
-          <th>Sector/Sucursal</th>
-          <th>Transporte</th>
-          <th>Fecha Creación</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-
-  // Add data rows
-  tickets.forEach(ticket => {
+  try {
     // Función helper para obtener transporte de forma robusta
     const getTransporteValue = (ticket: any): string => {
       const transporteValue = 
@@ -246,35 +176,82 @@ export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions =
       return sectorValue ? String(sectorValue) : '-';
     };
 
-    htmlContent += `
-      <tr>
-        <td>${ticket.number || '-'}</td>
-        <td>${ticket.cdata?.subject || '-'}</td>
-        <td>${ticket.status?.name || '-'}</td>
-        <td>${ticket.user ? ticket.user.name : '-'}</td>
-        <td>${ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}` : '-'}</td>
-        <td>${getSectorValue(ticket)}</td>
-        <td>${getTransporteValue(ticket)}</td>
-        <td>${ticket.created ? new Date(ticket.created).toLocaleDateString('es-ES') : '-'}</td>
-      </tr>
-    `;
-  });
+    // Convertir tickets a array de objetos para SheetJS
+    const ticketsData = tickets.map(ticket => ({
+      'Nº Ticket': ticket.number || '-',
+      'Asunto': ticket.cdata?.subject || '-',
+      'Estado': ticket.status?.name || '-',
+      'Usuario': ticket.user ? ticket.user.name : '-',
+      'Agente': ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}` : '-',
+      'Sector/Sucursal': getSectorValue(ticket),
+      'Transporte': getTransporteValue(ticket),
+      'Fecha Creación': ticket.created ? new Date(ticket.created).toLocaleDateString('es-ES') : '-'
+    }));
 
-  htmlContent += `
-      </tbody>
-    </table>
-    </body>
-    </html>
-  `;
+    // Crear worksheet principal con los datos según Context7
+    const worksheet = XLSX.utils.json_to_sheet(ticketsData);
 
-  // Create and download file with proper MIME type
-  const blob = new Blob([htmlContent], { 
-    type: 'text/html;charset=utf-8' 
-  });
-  saveAs(blob, filename);
+    // Crear workbook y añadir worksheet
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets");
 
-  // Mostrar mensaje de éxito
-  setTimeout(() => {
-    alert(`✅ Exportación Excel completada exitosamente.\n${tickets.length} registros exportados a ${filename}\n\nNota: El archivo se abrirá como HTML en Excel sin advertencias de seguridad.`);
-  }, 500);
+    // Si incluye filtros, crear una hoja adicional con metadatos
+    if (includeFilters) {
+      const metadataData = [
+        ['Reporte de Tickets'],
+        ['Fecha de exportación', new Date().toLocaleString('es-ES')],
+        ['Total de registros', tickets.length.toString()],
+        [''], // Línea vacía
+        ['Filtros aplicados:']
+      ];
+
+      if (Object.keys(filters).length > 0) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value) {
+            let filterName = key;
+            switch (key) {
+              case 'transporte': filterName = 'Transporte'; break;
+              case 'staff': filterName = 'Agente'; break;
+              case 'organization': filterName = 'Sector/Organización'; break;
+              case 'statuses': filterName = 'Estados'; break;
+              case 'startDate': filterName = 'Fecha desde'; break;
+              case 'endDate': filterName = 'Fecha hasta'; break;
+            }
+            metadataData.push([filterName, String(value)]);
+          }
+        });
+      } else {
+        metadataData.push(['Sin filtros', 'Todos los registros disponibles']);
+      }
+
+      // Crear worksheet de metadatos
+      const metadataWorksheet = XLSX.utils.aoa_to_sheet(metadataData);
+      XLSX.utils.book_append_sheet(workbook, metadataWorksheet, "Información");
+    }
+
+    // Calcular ancho de columnas automáticamente
+    const colWidths = [
+      { wch: 12 },  // Nº Ticket
+      { wch: 50 },  // Asunto
+      { wch: 12 },  // Estado
+      { wch: 25 },  // Usuario
+      { wch: 25 },  // Agente
+      { wch: 20 },  // Sector/Sucursal
+      { wch: 15 },  // Transporte
+      { wch: 15 }   // Fecha Creación
+    ];
+    worksheet["!cols"] = colWidths;
+
+    // Generar archivo Excel con compresión según Context7
+    XLSX.writeFile(workbook, filename, { compression: true });
+
+    // Mostrar mensaje de éxito
+    setTimeout(() => {
+      alert(`✅ Exportación Excel completada exitosamente.\n${tickets.length} registros exportados a ${filename}\n\nArchivo Excel real (.xlsx) generado correctamente.`);
+    }, 500);
+
+  } catch (error) {
+    console.error('Error durante la exportación a Excel:', error);
+    alert('❌ Error al generar el archivo Excel. Por favor, inténtelo de nuevo.');
+  }
 };

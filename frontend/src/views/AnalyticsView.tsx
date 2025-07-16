@@ -8,6 +8,7 @@ import Pagination from '../components/tables/Pagination.tsx'; // Importar el com
 import { ArrowPathIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
 // Importar utilidades de exportación seguras
 import { exportTicketsToExcel, exportTicketsToCSV } from '../utils/exportUtils';
+import { useConfig } from '../contexts/ConfigContext';
 import logger from '../utils/logger';
 
 // Definir interfaces para las opciones de filtro
@@ -21,6 +22,7 @@ interface TransporteOption {
  * Vista principal de analytics - useEffect optimization needed según memorias del proyecto [[memory:2988538]]
  */
 const AnalyticsView: React.FC = memo(() => {
+  const { config } = useConfig();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -85,18 +87,12 @@ const AnalyticsView: React.FC = memo(() => {
         try {
           const sectorData = await sectorRes.json();
           logger.info('Sector data:', sectorData);
-          if (Array.isArray(sectorData) && sectorData.length > 0) {
-            setSectorOptions(sectorData);
-          } else {
-            logger.warn('Sector data is empty');
-            setSectorOptions([]);
-          }
+          setSectorOptions(Array.isArray(sectorData) ? sectorData : []);
         } catch (e) {
           logger.error('Error parsing sector data:', e);
           setSectorOptions([]);
         }
       } else {
-        logger.warn('Sector response not OK');
         setSectorOptions([]);
       }
       
@@ -115,7 +111,6 @@ const AnalyticsView: React.FC = memo(() => {
       }
     } catch (error) {
       logger.error('Error fetching filter options:', error);
-      // Inicializar con arreglos vacíos en caso de error
       setTransporteOptions([]);
       setStaffOptions([]);
       setSectorOptions([]);
@@ -129,7 +124,7 @@ const AnalyticsView: React.FC = memo(() => {
     try {
       const params = new URLSearchParams();
       params.append('page', page.toString());
-      params.append('limit', '50'); // Mostrar 50 registros por página
+      params.append('limit', config.defaultTableSize.toString()); // Usar límite configurable
 
       // Añadir parámetros de filtro si existen
       if (currentFilters.transporte) params.append('transporte', currentFilters.transporte);
@@ -158,7 +153,7 @@ const AnalyticsView: React.FC = memo(() => {
     } finally {
       setIsLoading(false);
     }
-  }, []); // Sin dependencias externas ya que usa parámetros
+  }, []);
 
   // Memoizar función fetchAllTicketsForExport para evitar recreaciones  
   const fetchAllTicketsForExport = useCallback(async (currentFilters: any = {}) => {
@@ -230,37 +225,26 @@ const AnalyticsView: React.FC = memo(() => {
 
       // DEBUG: Log de la estructura de datos para debuggear el problema de transporte
       logger.info('🔍 DEBUG EXPORTACIÓN: Estructura de datos recibidos:');
+      logger.info('🔍 DEBUG EXPORTACIÓN: Primer ticket completo:', JSON.stringify(allTicketsForExport[0], null, 2));
+      logger.info('🔍 DEBUG EXPORTACIÓN: Cantidad total de tickets:', allTicketsForExport.length);
+
+      // Verificar la estructura de cdata para transporte en los primeros 3 tickets
       allTicketsForExport.slice(0, 3).forEach((ticket: any, index: number) => {
-        logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1}:`, {
-          ticket_id: ticket.ticket_id,
-          number: ticket.number,
-          cdata_complete: ticket.cdata,
-          cdata_details: {
-            subject: ticket.cdata?.subject,
-            sector: ticket.cdata?.sector,
-            transporte: ticket.cdata?.transporte,
-            dataValues: ticket.cdata?.dataValues,
-            TransporteName: ticket.cdata?.TransporteName,
-            SectorName: ticket.cdata?.SectorName
-          },
-          transporteStructure: {
-            'cdata.dataValues.transporteName': ticket.cdata?.dataValues?.transporteName,
-            'cdata.TransporteName.value': ticket.cdata?.TransporteName?.value,
-            'cdata.transporte': ticket.cdata?.transporte
-          },
-          sectorStructure: {
-            'cdata.dataValues.sectorName': ticket.cdata?.dataValues?.sectorName,
-            'cdata.SectorName.value': ticket.cdata?.SectorName?.value,
-            'cdata.sector': ticket.cdata?.sector
-          }
-        });
+        logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1} cdata:`, JSON.stringify(ticket.cdata, null, 2));
+        logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1} transporte value:`, ticket.cdata?.transporte);
+        if (ticket.cdata?.TransporteName) {
+          logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1} TransporteName:`, JSON.stringify(ticket.cdata.TransporteName, null, 2));
+        }
+        if (ticket.cdata?.dataValues) {
+          logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1} dataValues:`, JSON.stringify(ticket.cdata.dataValues, null, 2));
+        }
       });
 
       // Generate filename with current date and time
       const now = new Date();
-      const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.html`;
+      const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.xlsx`;
       
-      // Use the secure export function with ALL filtered data
+      // Use the secure Excel export function with ALL filtered data
       exportTicketsToExcel(allTicketsForExport, {
         filename: fileName,
         includeFilters: true,
@@ -309,12 +293,12 @@ const AnalyticsView: React.FC = memo(() => {
   }, [fetchAllTicketsForExport, filters]);
 
   return (
-    <div className="max-w-1400 mx-auto px-8 py-12 bg-[#0a0e14] text-[#ffffff]">
+    <div className="max-w-1400 mx-auto px-8 py-12 bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-white">
       {/* Header Dashboard según guía de diseño */}
       <div className="dashboard-header flex justify-between items-center mb-8">
         <div className="header-left">
-          <h1 className="text-h1 text-[1.875rem] leading-[1.3] font-semibold text-[#ffffff] mb-1">Análisis Avanzado de Tickets</h1>
-          <span className="text-small text-[0.75rem] leading-[1.4] text-[#7a8394]">Última actualización: {new Date().toLocaleTimeString()}</span>
+          <h1 className="text-h1 text-[1.875rem] leading-[1.3] font-semibold text-gray-900 dark:text-white mb-1">Análisis Avanzado de Tickets</h1>
+          <span className="text-small text-[0.75rem] leading-[1.4] text-gray-600 dark:text-gray-300">Última actualización: {new Date().toLocaleTimeString()}</span>
         </div>
         <div className="header-right flex space-x-4">
           <div className="flex space-x-2">
@@ -323,10 +307,10 @@ const AnalyticsView: React.FC = memo(() => {
               disabled={isExporting || isLoading}
               className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200 ${
                 isExporting || isLoading 
-                  ? 'bg-[#1a1f29] text-[#7a8394] cursor-not-allowed' 
-                  : 'bg-[#252a35] hover:bg-[#2d3441] text-[#b8c5d6]'
+                  ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                  : 'bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300'
               }`}
-              title="Exportar como Excel (.html - compatible con Excel)"
+              title="Exportar como Excel (.xlsx - archivo Excel nativo)"
             >
               <DocumentChartBarIcon className="w-5 h-5 mr-2" />
               <span>{isExporting ? 'Exportando...' : 'Excel'}</span>
@@ -336,8 +320,8 @@ const AnalyticsView: React.FC = memo(() => {
               disabled={isExporting || isLoading}
               className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200 ${
                 isExporting || isLoading 
-                  ? 'bg-[#1a1f29] text-[#7a8394] cursor-not-allowed' 
-                  : 'bg-[#252a35] hover:bg-[#2d3441] text-[#b8c5d6]'
+                  ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                  : 'bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300'
               }`}
               title="Exportar como CSV (.csv)"
             >
@@ -345,10 +329,11 @@ const AnalyticsView: React.FC = memo(() => {
               <span>{isExporting ? 'Exportando...' : 'CSV'}</span>
             </button>
           </div>
-          <button 
+          
+          <button
             onClick={() => fetchTickets(filters, currentPage)}
             disabled={isLoading}
-            className="flex items-center px-4 py-2 bg-[#252a35] hover:bg-[#2d3441] rounded-lg transition-all duration-200 text-[#b8c5d6] disabled:opacity-50"
+            className="flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-all duration-200 text-gray-700 dark:text-gray-300 disabled:opacity-50"
           >
             <ArrowPathIcon className="w-5 h-5 mr-2" />
             <span>Actualizar</span>
@@ -367,9 +352,9 @@ const AnalyticsView: React.FC = memo(() => {
       
       {/* Estado de carga con animación mejorada según guía */}
       {isLoading ? (
-        <div className="flex flex-col justify-center items-center h-64 bg-[#1a1f29] rounded-xl shadow-lg border border-[#2d3441] p-8 animate-fadeIn">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#00d9ff] mb-4"></div>
-          <p className="text-[#b8c5d6] text-base">Cargando datos...</p>
+        <div className="flex flex-col justify-center items-center h-64 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-600 p-8 animate-fadeIn">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 dark:border-cyan-400 mb-4"></div>
+          <p className="text-gray-700 dark:text-gray-300 text-base">Cargando datos...</p>
         </div>
       ) : (
         <>
@@ -385,10 +370,10 @@ const AnalyticsView: React.FC = memo(() => {
       {/* Indicador de exportación */}
       {isExporting && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-[#1a1f29] rounded-xl p-8 border border-[#2d3441] flex flex-col items-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#00d9ff] mb-4"></div>
-            <p className="text-[#b8c5d6] text-lg">Procesando exportación...</p>
-            <p className="text-[#7a8394] text-sm mt-2">Obteniendo todos los registros filtrados</p>
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-8 border border-gray-200 dark:border-slate-600 flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 dark:border-cyan-400 mb-4"></div>
+            <p className="text-gray-700 dark:text-gray-300 text-lg">Procesando exportación...</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">Obteniendo todos los registros filtrados</p>
           </div>
         </div>
       )}

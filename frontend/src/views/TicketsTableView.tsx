@@ -4,6 +4,7 @@ import SearchBar from '../components/tables/SearchBar.tsx';
 import Pagination from '../components/tables/Pagination.tsx';
 import type { Ticket, PaginationInfo, AdvancedFilters } from '../types';
 import { useDebounce } from '../lib/hooks';
+import { useConfig } from '../contexts/ConfigContext';
 import logger from '../utils/logger';
 
 /**
@@ -11,6 +12,7 @@ import logger from '../utils/logger';
  * Optimización de dependency arrays y uso de custom hooks [[memory:2988538]]
  */
 const TicketsTableView: React.FC = memo(() => {
+  const { config } = useConfig();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -46,7 +48,7 @@ const TicketsTableView: React.FC = memo(() => {
     try {
       const params = new URLSearchParams();
       params.append('page', currentPage.toString());
-      params.append('limit', '15');
+      params.append('limit', config.defaultTableSize.toString());
 
       if (debouncedSearchTerm) {
         params.append('search', debouncedSearchTerm);
@@ -131,12 +133,12 @@ const TicketsTableView: React.FC = memo(() => {
   }, [searchTerm, selectedStatuses, dateRange, selectedOrganization, selectedStaff]);
 
   return (
-    <div className="p-6 lg:p-8 bg-[#0a0e14] min-h-screen">
+    <div className="p-6 lg:p-8 bg-gray-50 dark:bg-slate-900 min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-[#ffffff]">Tickets</h1>
-          <p className="mt-2 text-sm text-[#7a8394]">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Tickets</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
             Gestión de tickets de soporte para el departamento de Soporte IT
           </p>
         </div>
@@ -153,36 +155,36 @@ const TicketsTableView: React.FC = memo(() => {
       {/* Table Container */}
       <div className="mt-6">
         {loading ? (
-          <div className="bg-[#1a1f29] rounded-xl p-10 text-center border border-[#2d3441] shadow-lg">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-10 text-center border border-gray-200 dark:border-slate-600 shadow-lg">
             <div className="flex flex-col items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff] mb-4"></div>
-              <p className="text-[#b8c5d6] font-medium">Cargando tickets...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-cyan-400 mb-4"></div>
+              <p className="text-gray-700 dark:text-gray-300 font-medium">Cargando tickets...</p>
             </div>
           </div>
         ) : error ? (
-          <div className="bg-[#1a1f29] rounded-xl p-10 text-center border border-[#2d3441] shadow-lg">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-10 text-center border border-gray-200 dark:border-slate-600 shadow-lg">
             <div className="flex flex-col items-center justify-center">
-              <svg className="w-12 h-12 text-[#ef4444] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-12 h-12 text-red-500 dark:text-red-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
-              <p className="text-[#b8c5d6] font-medium mb-2">Error al cargar tickets</p>
-              <p className="text-[#7a8394] text-sm">{error}</p>
+              <p className="text-gray-700 dark:text-gray-300 font-medium mb-2">Error al cargar tickets</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">{error}</p>
               <button 
                 onClick={handleRetry}
-                className="mt-4 px-4 py-2 bg-[#252a35] hover:bg-[#2d3441] text-[#b8c5d6] rounded-lg transition-colors"
+                className="mt-4 px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
               >
                 Reintentar
               </button>
             </div>
           </div>
         ) : tickets.length === 0 ? (
-          <div className="bg-[#1a1f29] rounded-xl p-10 text-center border border-[#2d3441] shadow-lg">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-10 text-center border border-gray-200 dark:border-slate-600 shadow-lg">
             <div className="flex flex-col items-center justify-center">
-              <svg className="w-12 h-12 text-[#7a8394] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
               </svg>
-              <p className="text-[#b8c5d6] font-medium">No se encontraron tickets</p>
-              <p className="text-[#7a8394] text-sm mt-2">Intenta con otros filtros de búsqueda</p>
+              <p className="text-gray-700 dark:text-gray-300 font-medium">No se encontraron tickets</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">Intenta con otros filtros de búsqueda</p>
             </div>
           </div>
         ) : (

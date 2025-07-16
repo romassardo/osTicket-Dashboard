@@ -63,25 +63,25 @@ const DataTable: React.FC<DataTableProps> = memo(({ tickets }) => {
   // Early return memoizado - evita re-render si tickets está vacío y no cambia
   if (tickets.length === 0) {
     return (
-      <div className="bg-[#1a1f29] p-6 rounded-xl shadow-lg border border-[#2d3441] text-center animate-fadeIn transition-all duration-300">
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-slate-600 text-center animate-fadeIn transition-all duration-300">
         <div className="flex flex-col items-center justify-center py-8">
-          <DocumentTextIcon className="h-16 w-16 text-[#2d3441] mb-4" />
-          <p className="text-[#b8c5d6] text-lg font-medium mb-2">No se encontraron tickets</p>
-          <p className="text-[#6b7280] text-sm">Intenta ajustar los filtros para ver más resultados</p>
+          <DocumentTextIcon className="h-16 w-16 text-gray-300 dark:text-slate-600 mb-4" />
+          <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-2">No se encontraron tickets</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Intenta ajustar los filtros para ver más resultados</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#2d3441] shadow-lg transition-all duration-300 hover:shadow-xl bg-[#1a1f29]">
-      <div className="p-4 border-b border-[#2d3441] flex items-center">
-        <DocumentTextIcon className="h-5 w-5 text-[#00d9ff] mr-2" />
-        <h3 className="text-[1rem] font-semibold text-[#ffffff]">Resultados ({tickets.length})</h3>
+    <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-600 shadow-lg transition-all duration-300 hover:shadow-xl bg-white dark:bg-slate-800">
+      <div className="p-4 border-b border-gray-200 dark:border-slate-600 flex items-center">
+        <DocumentTextIcon className="h-5 w-5 text-blue-500 dark:text-cyan-400 mr-2" />
+        <h3 className="text-[1rem] font-semibold text-gray-900 dark:text-white">Resultados ({tickets.length})</h3>
       </div>
-      <table className="min-w-full divide-y divide-[#2d3441]">
-        <thead className="bg-[#252a35]">
-          <tr className="text-left text-[0.75rem] font-medium text-[#b8c5d6] uppercase tracking-wider">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-600">
+        <thead className="bg-gray-50 dark:bg-slate-700">
+          <tr className="text-left text-[0.75rem] font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
             <th scope="col" className="px-6 py-4 text-[0.7rem]">
               Nº Ticket
             </th>
@@ -102,26 +102,26 @@ const DataTable: React.FC<DataTableProps> = memo(({ tickets }) => {
             </th>
           </tr>
         </thead>
-        <tbody className="bg-[#1a1f29] divide-y divide-[#2d3441]">
+        <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-600">
           {tickets.map((ticket) => (
-            <tr key={ticket.ticket_id} className="hover:bg-[#252a35] transition-colors duration-200">
-              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] font-medium text-[#ffffff]">
+            <tr key={ticket.ticket_id} className="hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors duration-200">
+              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] font-medium text-gray-900 dark:text-white">
                 {ticket.number}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6] max-w-[250px] truncate">
+              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-gray-700 dark:text-gray-300 max-w-[250px] truncate">
                 {ticket.cdata?.subject ?? '-'}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6]">
+              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-gray-700 dark:text-gray-300">
                 {ticket.AssignedStaff != null ? 
                   `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}` : '-'}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6]">
+              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-gray-700 dark:text-gray-300">
                 {getSectorName(ticket)}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6]">
+              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-gray-700 dark:text-gray-300">
                 {getTransporteName(ticket)}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-[#b8c5d6]">
+              <td className="px-6 py-4 whitespace-nowrap text-[0.875rem] text-gray-700 dark:text-gray-300">
                 {formatDate(ticket.created)}
               </td>
             </tr>

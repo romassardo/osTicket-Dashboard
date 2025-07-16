@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useConfig } from '../contexts/ConfigContext';
 
 /**
  * Hook useDebounce para optimizar búsquedas y evitar llamadas excesivas a APIs
@@ -90,3 +91,19 @@ export const useDebounceCallback = (
 
   return debouncedCallback;
 }; 
+
+/**
+ * Hook personalizado para actualización automática de datos
+ * Utiliza la configuración global del usuario
+ */
+export function useAutoRefresh(callback: () => void, dependencies: any[] = []) {
+  const { config } = useConfig();
+  
+  useEffect(() => {
+    if (!config.autoRefresh) return;
+    
+    const interval = setInterval(callback, config.refreshInterval * 1000);
+    
+    return () => clearInterval(interval);
+  }, [callback, config.autoRefresh, config.refreshInterval, ...dependencies]);
+} 
