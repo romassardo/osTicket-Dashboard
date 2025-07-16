@@ -9,6 +9,7 @@ import TicketTrendsChart from '../components/charts/TicketTrendsChart';
 import TicketsBySectorChart from '../components/charts/TicketsBySectorChart';
 import TicketsByAgentChart from '../components/charts/TicketsByAgentChart';
 import { TicketsByTransportChart } from '../components/charts/TicketsByTransportChart'; // <-- IMPORTAR NUEVO GRÁFICO
+import MonthlyComparisonChart from '../components/charts/MonthlyComparisonChart';
 import { SkeletonDashboard } from '../components/ui/Loading';
 
 /**
@@ -220,6 +221,23 @@ const DashboardView: React.FC = () => {
               <h2 className="chart-title">Tickets por Sector</h2>
             </div>
             <TicketsBySectorChart year={selectedYear} month={selectedMonth + 1} />
+          </div>
+        </div>
+
+        {/* Analytics Grid - Tercera fila: Comparación Mensual */}
+        <div className="col-span-12">
+          <div className="chart-card">
+            <div className="chart-header">
+              <span className="chart-indicator bg-[var(--success)]"></span>
+              <h2 className="chart-title">Análisis de Flujo Mensual</h2>
+              <p className="text-sm text-[var(--text-muted)] mt-1">
+                Analiza creados, cerrados y pendientes entre meses, incluye flujo de tickets
+              </p>
+            </div>
+            <MonthlyComparisonChart 
+              currentYear={selectedYear} 
+              currentMonth={selectedMonth + 1} 
+            />
           </div>
         </div>
 

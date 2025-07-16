@@ -129,7 +129,7 @@ const AnalyticsView: React.FC = memo(() => {
       // Añadir parámetros de filtro si existen
       if (currentFilters.transporte) params.append('transporte', currentFilters.transporte);
       if (currentFilters.staff) params.append('staff', currentFilters.staff);
-      if (currentFilters.organization) params.append('organization', currentFilters.organization);
+      if (currentFilters.sector) params.append('sector', currentFilters.sector);
       if (currentFilters.statuses) params.append('statuses', currentFilters.statuses);
       if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
       if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
@@ -165,7 +165,7 @@ const AnalyticsView: React.FC = memo(() => {
       // Añadir parámetros de filtro si existen
       if (currentFilters.transporte) params.append('transporte', currentFilters.transporte);
       if (currentFilters.staff) params.append('staff', currentFilters.staff);
-      if (currentFilters.organization) params.append('organization', currentFilters.organization);
+      if (currentFilters.sector) params.append('sector', currentFilters.sector);
       if (currentFilters.statuses) params.append('statuses', currentFilters.statuses);
       if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
       if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);

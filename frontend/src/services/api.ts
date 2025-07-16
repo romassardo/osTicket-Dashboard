@@ -220,4 +220,25 @@ export const getTicketsByTransport = async ({ year, month }: { year: number; mon
   }
 };
 
+/**
+ * Obtiene el análisis de flujo de tickets entre dos meses específicos.
+ * Analiza tickets creados, cerrados y pendientes, incluye flujo entre meses.
+ * @param month1 - Mes del primer período (1-12)
+ * @param year1 - Año del primer período  
+ * @param month2 - Mes del segundo período (1-12)
+ * @param year2 - Año del segundo período
+ * @returns Objeto con datos de comparación y flujo de tickets entre meses
+ */
+export const getMonthlyComparison = async (month1: number, year1: number, month2: number, year2: number) => {
+  try {
+    const response = await apiClient.get('/stats/monthly-comparison', {
+      params: { month1, year1, month2, year2 }
+    });
+    return response.data;
+  } catch (error) {
+    logger.error(`Error al obtener comparación mensual ${month1}/${year1} vs ${month2}/${year2}:`, error);
+    throw error;
+  }
+};
+
 export default apiClient;

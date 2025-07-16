@@ -29,7 +29,7 @@ interface TransporteOption {
 interface AppliedFilters {
   transporte?: number;
   staff?: number;
-  organization?: number;
+  sector?: number;
   statuses?: number;
   startDate?: string;
   endDate?: string;
@@ -68,7 +68,7 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
     const filters: AppliedFilters = {};
     if (selectedTransporte !== '') filters.transporte = parseInt(selectedTransporte, 10);
     if (selectedStaff !== '') filters.staff = parseInt(selectedStaff, 10);
-    if (selectedSector !== '') filters.organization = parseInt(selectedSector, 10); // El backend espera 'organization'
+    if (selectedSector !== '') filters.sector = parseInt(selectedSector, 10); // El backend espera 'sector'
     if (selectedStatus !== '') filters.statuses = parseInt(selectedStatus, 10); // El backend espera 'statuses'
     if (startDate !== '') filters.startDate = startDate;
     if (endDate !== '') filters.endDate = endDate;

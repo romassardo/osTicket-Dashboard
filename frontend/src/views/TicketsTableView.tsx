@@ -26,7 +26,7 @@ const TicketsTableView: React.FC = memo(() => {
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
-  const [selectedOrganization, setSelectedOrganization] = useState<string>('');
+  const [selectedSector, setSelectedSector] = useState<string>('');
   const [selectedStaff, setSelectedStaff] = useState<string>('');
 
   // Comentamos este objeto memoizado ya que no se está utilizando actualmente
@@ -69,9 +69,9 @@ const TicketsTableView: React.FC = memo(() => {
         params.append('endDate', endDateStr);
         logger.debug('Frontend: enviando endDate:', endDateStr);
       }
-      if (selectedOrganization) {
-        params.append('organization', selectedOrganization.toString());
-        logger.debug('Frontend: enviando organization:', selectedOrganization);
+      if (selectedSector) {
+        params.append('sector', selectedSector.toString());
+        logger.debug('Frontend: enviando sector:', selectedSector);
       }
       if (selectedStaff) {
         params.append('staff', selectedStaff.toString());
@@ -93,7 +93,7 @@ const TicketsTableView: React.FC = memo(() => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearchTerm, selectedStatuses, dateRange, selectedOrganization, selectedStaff]);
+  }, [currentPage, debouncedSearchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff]);
 
   useEffect(() => {
     fetchTickets();
@@ -108,7 +108,7 @@ const TicketsTableView: React.FC = memo(() => {
     setCurrentPage(1); // Reset to first page when filters change
     setSelectedStatuses(appliedFilters.selectedStatuses || []);
     setDateRange(appliedFilters.dateRange || [null, null]);
-    setSelectedOrganization(appliedFilters.selectedOrganization || '');
+    setSelectedSector(appliedFilters.selectedSector || '');
     setSelectedStaff(appliedFilters.selectedStaff || '');
   }, []);
 
@@ -127,10 +127,10 @@ const TicketsTableView: React.FC = memo(() => {
     if (searchTerm) count++; // Usar searchTerm inmediato para UX responsive
     if (selectedStatuses && selectedStatuses.length > 0) count++;
     if (dateRange && (dateRange[0] || dateRange[1])) count++;
-    if (selectedOrganization) count++;
+    if (selectedSector) count++;
     if (selectedStaff) count++;
     return count;
-  }, [searchTerm, selectedStatuses, dateRange, selectedOrganization, selectedStaff]);
+  }, [searchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff]);
 
   return (
     <div className="p-6 lg:p-8 bg-gray-50 dark:bg-slate-900 min-h-screen">

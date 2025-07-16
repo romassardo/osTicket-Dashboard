@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
 router.get('/', async (req, res, next) => {
   try {
     // Filtros dinámicos, búsqueda y paginación
-    const { statuses, priority_id, startDate, endDate, search, page, limit, organization, staff, transporte } = req.query;
+    const { statuses, priority_id, startDate, endDate, search, page, limit, organization, staff, transporte, sector } = req.query;
 
     const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
 
@@ -62,6 +62,13 @@ router.get('/', async (req, res, next) => {
       const transporteId = parseInt(transporte, 10);
       if (!isNaN(transporteId)) {
         whereTicketCondition['$cdata.transporte$'] = transporteId;
+      }
+    }
+
+    if (sector) {
+      const sectorId = parseInt(sector, 10);
+      if (!isNaN(sectorId)) {
+        whereTicketCondition['$cdata.sector$'] = sectorId;
       }
     }
 
@@ -154,8 +161,8 @@ router.get('/', async (req, res, next) => {
         }
       ];
 
-      // BUGFIX: Agregar TicketCdata si hay filtro de transporte
-      if (transporte) {
+      // BUGFIX: Agregar TicketCdata si hay filtro de transporte o sector
+      if (transporte || sector) {
         countInclude.push({
           model: TicketCdata,
           as: 'cdata',

@@ -525,4 +525,164 @@ router.get('/debug-fields', async (req, res, next) => {
   }
 });
 
+/**
+ * GET /api/stats/monthly-comparison
+ * Compara flujo de tickets entre dos meses: creados, cerrados y pendientes que pasaron de un mes a otro
+ * Query params: month1, year1, month2, year2
+ */
+router.get('/monthly-comparison', async (req, res, next) => {
+  try {
+    const { month1, year1, month2, year2 } = req.query;
+    
+    if (!month1 || !year1 || !month2 || !year2) {
+      return res.status(400).json({ 
+        error: 'Se requieren month1, year1, month2, year2' 
+      });
+    }
+
+    const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
+
+    // Función para obtener análisis de flujo de un mes
+    const getMonthFlowData = async (year, month) => {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59);
+
+      // 1. Tickets CREADOS en el mes
+      const createdInMonth = await sequelize.query(`
+        SELECT COUNT(*) as count
+        FROM ost_ticket t
+        INNER JOIN ost_department d ON t.dept_id = d.id
+        WHERE d.name IN (:allowedDepts)
+          AND t.created BETWEEN :startDate AND :endDate
+      `, {
+        replacements: { 
+          allowedDepts: allowedDepartmentNames,
+          startDate: startDate,
+          endDate: endDate
+        },
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      // 2. Tickets CERRADOS en el mes (resueltos + cerrados)
+      const closedInMonth = await sequelize.query(`
+        SELECT COUNT(*) as count
+        FROM ost_ticket t
+        INNER JOIN ost_department d ON t.dept_id = d.id
+        INNER JOIN ost_ticket_status s ON t.status_id = s.id
+        WHERE d.name IN (:allowedDepts)
+          AND t.closed BETWEEN :startDate AND :endDate
+          AND s.state IN ('closed', 'resolved')
+      `, {
+        replacements: { 
+          allowedDepts: allowedDepartmentNames,
+          startDate: startDate,
+          endDate: endDate
+        },
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      // 3. Tickets PENDIENTES al final del mes (creados antes o durante el mes, pero no cerrados)
+      const pendingAtEndOfMonth = await sequelize.query(`
+        SELECT COUNT(*) as count
+        FROM ost_ticket t
+        INNER JOIN ost_department d ON t.dept_id = d.id
+        INNER JOIN ost_ticket_status s ON t.status_id = s.id
+        WHERE d.name IN (:allowedDepts)
+          AND t.created <= :endDate
+          AND (t.closed IS NULL OR t.closed > :endDate)
+          AND s.state = 'open'
+      `, {
+        replacements: { 
+          allowedDepts: allowedDepartmentNames,
+          endDate: endDate
+        },
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      return {
+        created: parseInt(createdInMonth[0].count, 10),
+        closed: parseInt(closedInMonth[0].count, 10),
+        pending: parseInt(pendingAtEndOfMonth[0].count, 10)
+      };
+    };
+
+    // Obtener datos para ambos meses
+    const month1Data = await getMonthFlowData(year1, month1);
+    const month2Data = await getMonthFlowData(year2, month2);
+
+    // Calcular tickets pendientes que pasaron entre meses
+    // Para esto necesitamos los tickets que estaban pendientes al final del mes1 
+    // y siguen pendientes al inicio del mes2
+    const month1EndDate = new Date(year1, month1, 0, 23, 59, 59);
+    const month2StartDate = new Date(year2, month2 - 1, 1);
+    
+    let ticketFlow = 0;
+    if (month2StartDate > month1EndDate) {
+      // Tickets que estaban abiertos al final del mes1 y siguen abiertos al inicio del mes2
+      const flowQuery = await sequelize.query(`
+        SELECT COUNT(*) as count
+        FROM ost_ticket t
+        INNER JOIN ost_department d ON t.dept_id = d.id
+        INNER JOIN ost_ticket_status s ON t.status_id = s.id
+        WHERE d.name IN (:allowedDepts)
+          AND t.created <= :month1End
+          AND (t.closed IS NULL OR t.closed >= :month2Start)
+          AND s.state = 'open'
+      `, {
+        replacements: { 
+          allowedDepts: allowedDepartmentNames,
+          month1End: month1EndDate,
+          month2Start: month2StartDate
+        },
+        type: sequelize.QueryTypes.SELECT
+      });
+      ticketFlow = parseInt(flowQuery[0].count, 10);
+    }
+
+    // Formatear respuesta para el gráfico
+    const comparisonData = [
+      {
+        category: 'Creados',
+        [`${getMonthName(month1)} ${year1}`]: month1Data.created,
+        [`${getMonthName(month2)} ${year2}`]: month2Data.created
+      },
+      {
+        category: 'Cerrados',
+        [`${getMonthName(month1)} ${year1}`]: month1Data.closed,
+        [`${getMonthName(month2)} ${year2}`]: month2Data.closed
+      },
+      {
+        category: 'Pendientes al Final',
+        [`${getMonthName(month1)} ${year1}`]: month1Data.pending,
+        [`${getMonthName(month2)} ${year2}`]: month2Data.pending
+      }
+    ];
+
+    // Agregar información del flujo si aplica
+    const responseData = {
+      comparison: comparisonData,
+      flow: {
+        ticketsCarriedOver: ticketFlow,
+        description: `Tickets que pasaron de ${getMonthName(month1)} ${year1} a ${getMonthName(month2)} ${year2}`
+      }
+    };
+
+    logger.info(`📊 Análisis de flujo mensual generado: ${month1}/${year1} vs ${month2}/${year2}`);
+    res.json(responseData);
+
+  } catch (error) {
+    logger.error('❌ Error en análisis de flujo mensual:', error);
+    next(error);
+  }
+});
+
+// Helper function para nombres de meses en español
+function getMonthName(monthNumber) {
+  const months = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  return months[monthNumber - 1];
+}
+
 module.exports = router; 

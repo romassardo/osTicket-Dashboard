@@ -84,6 +84,6 @@ export interface PaginationInfo {
 export interface AdvancedFilters {
   selectedStatuses?: string[];
   dateRange?: [Date | null, Date | null];
-  selectedOrganization?: string;
+  selectedSector?: string;
   selectedStaff?: string;
 }

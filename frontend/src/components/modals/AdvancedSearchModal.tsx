@@ -73,7 +73,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
       };
 
       fetchData('/api/statuses/simple', setStatuses);
-      fetchData('/api/organizations/simple', setOrganizations);
+      fetchData('/api/tickets/options/sector', setOrganizations);
       fetchData('/api/staff/simple', setStaff);
     }
   }, [isOpen]);
@@ -92,12 +92,21 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
     const filtersToApply = {
       selectedStatuses: selectedStatuses,
       dateRange: [startDate, endDate],
-      selectedOrganization: selectedOrg,
+      selectedSector: selectedOrg,
       selectedStaff: selectedStaff,
     };
     logger.debug('Modal: Aplicando filtros:', filtersToApply);
     onApplyFilters(filtersToApply);
     onClose();
+  };
+
+  const handleClear = () => {
+    setSelectedStatuses([]);
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setSelectedOrg('');
+    setSelectedStaff('');
+    logger.debug('Modal: Filtros limpiados');
   };
 
   return (
@@ -150,6 +159,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
                   startDate={startDate}
                   endDate={endDate}
                   placeholderText="Fecha inicial"
+                  dateFormat="dd/MM/yyyy"
                   className="w-full bg-[#252a35] border border-[#2d3441] rounded-lg p-2.5 text-[#b8c5d6] shadow-inner focus:ring-2 focus:ring-[#00d9ff] focus:border-transparent focus:outline-none transition-all duration-200"
                   calendarClassName="bg-[#1a1f29] border-[#2d3441] shadow-xl"
                 />
@@ -164,6 +174,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
                   endDate={endDate}
                   minDate={startDate}
                   placeholderText="Fecha final"
+                  dateFormat="dd/MM/yyyy"
                   className="w-full bg-[#252a35] border border-[#2d3441] rounded-lg p-2.5 text-[#b8c5d6] shadow-inner focus:ring-2 focus:ring-[#00d9ff] focus:border-transparent focus:outline-none transition-all duration-200"
                 />
               </div>
@@ -221,19 +232,27 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
 
         </form>
 
-        <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-200 dark:border-slate-600">
+        <div className="flex justify-between mt-8 pt-4 border-t border-gray-200 dark:border-slate-600">
           <button 
-            onClick={onClose} 
-            className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-slate-600 focus:ring-opacity-50 font-medium"
+            onClick={handleClear} 
+            className="px-4 py-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 hover:text-red-900 dark:hover:text-red-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-300 dark:focus:ring-red-600 focus:ring-opacity-50 font-medium"
           >
-            Cancelar
+            Limpiar Filtros
           </button>
-          <button 
-            onClick={handleApply} 
-            className="px-4 py-2 rounded-lg bg-blue-500 dark:bg-cyan-500 text-white hover:bg-blue-600 dark:hover:bg-cyan-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500 focus:ring-opacity-50 font-medium shadow-lg shadow-blue-500/20 dark:shadow-cyan-500/20"
-          >
-            Aplicar Filtros
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={onClose} 
+              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-slate-600 focus:ring-opacity-50 font-medium"
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={handleApply} 
+              className="px-4 py-2 rounded-lg bg-blue-500 dark:bg-cyan-500 text-white hover:bg-blue-600 dark:hover:bg-cyan-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500 focus:ring-opacity-50 font-medium shadow-lg shadow-blue-500/20 dark:shadow-cyan-500/20"
+            >
+              Aplicar Filtros
+            </button>
+          </div>
         </div>
       </div>
     </div>

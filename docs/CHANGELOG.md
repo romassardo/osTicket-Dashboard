@@ -1,5 +1,91 @@
 # CHANGELOG - Dashboard osTicket
 
+## [0.41.0] - 2025-01-16
+
+### 🚀 **MEJORAS UX Y NUEVO ANÁLISIS DE FLUJO MENSUAL**
+
+### ✅ **CORRECCIONES CRÍTICAS DE FILTROS**
+- **Frontend: Formato de Fechas Corregido:**
+  - **AdvancedSearchModal.tsx**: Cambiado formato de fechas de `mm/dd/yyyy` a `dd/MM/yyyy` en ambos DatePicker components.
+  - Solucionado problema de confusión con formato americano en filtros de tickets.
+
+- **Frontend: Filtro de Sectores Completamente Reparado:**
+  - **Backend (`ticketRoutes.js`)**: Agregado soporte para parámetro 'sector' en endpoint `/api/tickets`.
+  - **AnalyticsView.tsx**: Corregido parámetro de 'organization' a 'sector' en todas las llamadas API.
+  - **FilterPanel.tsx**: Sincronizado para enviar 'sector' en lugar de 'organization'.
+  - **TicketsTableView.tsx**: Actualizado `selectedOrganization` → `selectedSector` en toda la lógica.
+  - **AdvancedSearchModal.tsx**: Cambiado endpoint de `/api/organizations/simple` a `/api/tickets/options/sector`.
+  - **types/index.ts**: Interface AdvancedFilters actualizada con `selectedSector`.
+
+- **Frontend: Botón "Limpiar Filtros" Agregado:**
+  - **AdvancedSearchModal.tsx**: Nuevo botón rojo "Limpiar Filtros" que resetea todos los campos.
+  - Layout reorganizado: botón de limpiar (izquierda) | Cancelar + Aplicar (derecha).
+  - Función `handleClear()` resetea statuses, fechas, sector y staff.
+
+### 🆕 **NUEVO GRÁFICO: ANÁLISIS DE FLUJO MENSUAL**
+- **Backend: Nuevo Endpoint (`backend/routes/statsRoutes.js`):**
+  - **`/api/stats/monthly-comparison`**: Endpoint completamente nuevo para análisis de flujo.
+  - **3 Métricas Principales**: Tickets creados, cerrados (resueltos+cerrados), pendientes al final del mes.
+  - **Análisis de Flujo**: Calcula tickets que pasaron pendientes de un mes a otro.
+  - **Respuesta Estructurada**: `{ comparison: [...], flow: { ticketsCarriedOver, description } }`.
+
+- **Frontend: Componente MonthlyComparisonChart.tsx:**
+  - **Gráfico de Barras Interactivo**: 3 categorías por mes con colores diferenciados.
+  - **Selectores Dinámicos**: Permite elegir cualquier mes/año para comparar.
+  - **Información de Flujo**: Caja destacada mostrando tickets que continuaron pendientes.
+  - **Estados Optimizados**: Loading, error y memoización con React.memo.
+  - **Tooltips Personalizados**: Información detallada en hover.
+
+- **Frontend: Integración en DashboardView.tsx:**
+  - **Nueva Sección**: "Análisis de Flujo Mensual" como tercera fila del dashboard.
+  - **Ocupa Todo el Ancho**: Grid col-span-12 para máxima visibilidad.
+  - **Descripción Clara**: "Analiza creados, cerrados y pendientes entre meses, incluye flujo de tickets".
+
+- **Frontend: API Service (`services/api.ts`):**
+  - **Nueva función `getMonthlyComparison()`**: Con documentación TypeScript completa.
+  - **Manejo de Errores**: Logging profesional para debugging.
+
+### 📊 **FUNCIONALIDADES DEL NUEVO GRÁFICO**
+- **Comparación Inteligente**: Por defecto compara mes actual vs mes anterior.
+- **Métricas Clave**:
+  - Tickets **Creados** en cada mes
+  - Tickets **Cerrados** en cada mes (resueltos + cerrados combinados)
+  - Tickets **Pendientes al Final** de cada mes
+- **Flujo de Tickets**: Muestra cuántos tickets pendientes pasaron de un mes al siguiente.
+- **Casos de Uso**:
+  - Identificar tendencias de acumulación de trabajo
+  - Medir eficiencia en resolución mes a mes
+  - Rastrear tickets que se arrastran entre períodos
+  - Detectar patrones estacionales
+
+### 🔧 **MEJORAS TÉCNICAS**
+- **TypeScript Interfaces**: `MonthlyComparisonResponse`, `FlowData`, `ComparisonData`.
+- **Queries SQL Optimizadas**: Separadas por funcionalidad para mejor performance.
+- **Helper Functions**: `getMonthName()` para nombres en español.
+- **Error Handling**: Manejo robusto de errores en backend y frontend.
+
+### 🎯 **BUGS CRÍTICOS RESUELTOS**
+1. **Filtro de Fechas**: Ya no causa confusión con formato americano.
+2. **Filtro de Sectores**: Funciona correctamente tanto en Analytics como en Tickets.
+3. **Experiencia UX**: Botón "Limpiar Filtros" mejora significativamente la usabilidad.
+
+### 📋 **ARCHIVOS MODIFICADOS**
+**Backend:**
+- `backend/routes/statsRoutes.js` (nuevo endpoint completo)
+- `backend/routes/ticketRoutes.js` (soporte para filtro sector)
+
+**Frontend:**
+- `frontend/src/components/charts/MonthlyComparisonChart.tsx` (NUEVO)
+- `frontend/src/components/modals/AdvancedSearchModal.tsx` (fechas + sectores + limpiar)
+- `frontend/src/components/analytics/FilterPanel.tsx` (sector corregido)
+- `frontend/src/views/AnalyticsView.tsx` (sector corregido)
+- `frontend/src/views/TicketsTableView.tsx` (sector corregido)
+- `frontend/src/views/DashboardView.tsx` (nuevo gráfico integrado)
+- `frontend/src/services/api.ts` (nueva función)
+- `frontend/src/types/index.ts` (interface actualizada)
+
+---
+
 ## [0.40.0] - 2025-01-26
 
 ### 🔧 **SISTEMA DE CONFIGURACIÓN GLOBAL IMPLEMENTADO**
