@@ -103,6 +103,10 @@ logger.debug('✓ Ruta /api/stats registrada exitosamente');
 
 logger.info('✓ Todas las rutas API registradas exitosamente');
 
+// Middleware de manejo de errores centralizado
+// Debe registrarse DESPUÉS de las rutas de la API pero ANTES de servir el frontend.
+app.use(errorHandler);
+
 // --- Servir Frontend Estático ---
 
 // Construir la ruta a la carpeta 'dist' del frontend
@@ -118,10 +122,6 @@ app.use(express.static(frontendDistPath));
 app.get(/^(?!\/api).*/, (req, res) => {
   res.sendFile(path.join(frontendDistPath, 'index.html'));
 });
-
-// Middleware de manejo de errores centralizado
-// Debe ser el último middleware que se añade
-app.use(errorHandler);
 
 // Función para iniciar el servidor
 async function startServer() {

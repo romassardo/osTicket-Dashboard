@@ -53,7 +53,6 @@ const AnalyticsView: React.FC = memo(() => {
           const transporteData = await transporteRes.json();
           logger.info('Transporte data:', transporteData);
           if (Array.isArray(transporteData) && transporteData.length > 0) {
-            // Guardar los objetos completos {id, value}
             setTransporteOptions(transporteData);
           } else {
             logger.warn('Transporte data is empty');
@@ -118,6 +117,11 @@ const AnalyticsView: React.FC = memo(() => {
     }
   }, []); // Sin dependencias ya que solo configura estados internos
 
+  // useEffect para cargar las opciones de filtro al montar el componente
+  useEffect(() => {
+    fetchFilterOptions();
+  }, [fetchFilterOptions]);
+
   // Memoizar función fetchTickets para evitar recreaciones
   const fetchTickets = useCallback(async (currentFilters: any = {}, page: number = 1) => {
     setIsLoading(true);
@@ -130,21 +134,20 @@ const AnalyticsView: React.FC = memo(() => {
       if (currentFilters.transporte) params.append('transporte', currentFilters.transporte);
       if (currentFilters.staff) params.append('staff', currentFilters.staff);
       if (currentFilters.sector) params.append('sector', currentFilters.sector);
-      if (currentFilters.statuses) params.append('statuses', currentFilters.statuses);
+      if (currentFilters.status) params.append('status', currentFilters.status);
       if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
       if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
 
-      const url = `/api/tickets?${params.toString()}`;
-      
+      const url = `/api/tickets/reports?${params.toString()}`;
       logger.info('Fetching tickets with URL:', url);
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Error: ${response.status}`);
       }
       const data = await response.json();
-      // El endpoint /api/tickets devuelve {data: [...], pagination: {...}}
-      logger.info('Tickets recibidos:', data.data?.length || 0);
-      setTickets(data.data || []);
+      // El endpoint /api/tickets/reports devuelve {tickets: [...], pagination: {...}}
+      logger.info('Tickets recibidos:', data.tickets?.length || 0);
+      setTickets(data.tickets || []);
       setPagination(data.pagination || null);
     } catch (error) {
       logger.error('Error fetching tickets:', error);
@@ -153,7 +156,7 @@ const AnalyticsView: React.FC = memo(() => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [config.defaultTableSize]);
 
   // Memoizar función fetchAllTicketsForExport para evitar recreaciones  
   const fetchAllTicketsForExport = useCallback(async (currentFilters: any = {}) => {
@@ -166,21 +169,20 @@ const AnalyticsView: React.FC = memo(() => {
       if (currentFilters.transporte) params.append('transporte', currentFilters.transporte);
       if (currentFilters.staff) params.append('staff', currentFilters.staff);
       if (currentFilters.sector) params.append('sector', currentFilters.sector);
-      if (currentFilters.statuses) params.append('statuses', currentFilters.statuses);
+      if (currentFilters.status) params.append('status', currentFilters.status);
       if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
       if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
 
-      const url = `/api/tickets?${params.toString()}`;
-      
+      const url = `/api/tickets/reports?${params.toString()}`;
       logger.info('Fetching ALL tickets for export with URL:', url);
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Error: ${response.status}`);
       }
       const data = await response.json();
-      logger.info('Total tickets para exportación:', data.data?.length || 0);
+      logger.info('Total tickets para exportación:', data.tickets?.length || 0);
       logger.info('Pagination info:', data.pagination);
-      return data.data || [];
+      return data.tickets || [];
     } catch (error) {
       logger.error('Error fetching all tickets for export:', error);
       throw error;
@@ -192,8 +194,7 @@ const AnalyticsView: React.FC = memo(() => {
     logger.info('Aplicando filtros:', newFilters);
     setFilters(newFilters);
     setCurrentPage(1); // Resetear a la primera página al aplicar filtros
-    fetchTickets(newFilters, 1);
-  }, [fetchTickets]);
+  }, []);
 
   // Memoizar handlePageChange para evitar recreaciones
   const handlePageChange = useCallback((page: number) => {

@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
+import { useSound } from '../context/SoundContext'; // Importar el hook de sonido global
+import { requestNotificationPermission, showNewTicketNotification } from '../utils/notifications';
 import { DataTable } from '../components/tables/DataTable.tsx';
 import SearchBar from '../components/tables/SearchBar.tsx';
 import Pagination from '../components/tables/Pagination.tsx';
+import TicketDetailModal from '../components/modals/TicketDetailModal';
 import type { Ticket, PaginationInfo, AdvancedFilters } from '../types';
 import { useDebounce } from '../lib/hooks';
 import { useConfig } from '../contexts/ConfigContext';
@@ -18,6 +21,15 @@ const TicketsTableView: React.FC = memo(() => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalTickets, setTotalTickets] = useState<number | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
+  const { isSoundEnabled, playNotificationSound } = useSound();
+  const previousTicketCountRef = useRef<number | null>(null);
+
+  // Solicitar permiso para notificaciones al montar el componente
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []); // Usar el contexto global
   
   // Separar los filtros en estados individuales para mejor control
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -26,8 +38,26 @@ const TicketsTableView: React.FC = memo(() => {
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+  // NUEVO: tipo de fecha
   const [selectedSector, setSelectedSector] = useState<string>('');
   const [selectedStaff, setSelectedStaff] = useState<string>('');
+  
+  // Estado para el modal de detalle de ticket
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+
+  // Función para manejar clic en ticket
+  const handleTicketClick = useCallback((ticketId: number) => {
+    logger.info(`Abriendo detalle del ticket: ${ticketId}`);
+    setSelectedTicketId(ticketId);
+    setIsModalOpen(true);
+  }, []);
+
+  // Función para cerrar el modal
+  const handleCloseModal = useCallback(() => {
+    setIsModalOpen(false);
+    setSelectedTicketId(null);
+  }, []);
 
   // Comentamos este objeto memoizado ya que no se está utilizando actualmente
   // Si se necesita en el futuro, se puede descomentar
@@ -42,8 +72,11 @@ const TicketsTableView: React.FC = memo(() => {
   */
 
   // Memorizar la función fetchTickets para evitar recreaciones
-  const fetchTickets = useCallback(async () => {
-    setLoading(true);
+  const fetchTickets = useCallback(async (isAutoRefreshParam: boolean = false) => {
+    const isAutoRefresh = isAutoRefreshParam;
+    if (!isAutoRefresh) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const params = new URLSearchParams();
@@ -54,7 +87,7 @@ const TicketsTableView: React.FC = memo(() => {
         params.append('search', debouncedSearchTerm);
       }
       if (selectedStatuses && selectedStatuses.length > 0) {
-        // Convertir a strings si son números
+        // Enviar todos los estados seleccionados como array
         const statusesStr = selectedStatuses.map(s => s.toString()).join(',');
         params.append('statuses', statusesStr);
         logger.debug('Frontend: enviando statuses:', statusesStr);
@@ -67,6 +100,7 @@ const TicketsTableView: React.FC = memo(() => {
       if (dateRange && dateRange[1]) {
         const endDateStr = dateRange[1].toISOString().split('T')[0];
         params.append('endDate', endDateStr);
+
         logger.debug('Frontend: enviando endDate:', endDateStr);
       }
       if (selectedSector) {
@@ -86,8 +120,62 @@ const TicketsTableView: React.FC = memo(() => {
         throw new Error(errorData.message || 'Error al cargar los tickets');
       }
       const data = await response.json();
-      setTickets(data.data);
+
+      // Debug: Verificar condiciones para notificación
+      logger.debug('🔍 Verificando condiciones para notificación:', {
+        isSoundEnabled,
+        isAutoRefresh,
+        hasPagination: !!data.pagination,
+        totalTickets,
+        newTotalItems: data.pagination?.total_items,
+        ticketsLength: data.tickets?.length,
+        previousTicketsLength: tickets.length
+      });
+
+      // Condición simplificada: solo verificar si es auto-refresh y hay sonido habilitado
+      if (isSoundEnabled && isAutoRefresh) {
+        logger.info('🔊 Condiciones básicas cumplidas para notificación');
+        
+        // Verificar si hay nuevos tickets comparando con el conteo anterior
+        const currentCount = data.pagination?.total_items || 0;
+        const previousCount = previousTicketCountRef.current;
+        
+        logger.debug(`📊 Comparando conteos - Anterior: ${previousCount}, Actual: ${currentCount}`);
+        
+        if (previousCount !== null && currentCount > previousCount) {
+          logger.info('🎵 ¡Nuevo ticket detectado por conteo! Reproduciendo sonido...');
+          logger.info(`📊 Total anterior: ${previousCount}, Total nuevo: ${currentCount}`);
+          
+          playNotificationSound().catch(error => logger.error('Error al reproducir el sonido:', error));
+          
+          // Mostrar notificación visual
+          const prevTickets = tickets;
+          const newTicket = data.tickets.find(t => !prevTickets.some(pt => pt.id === t.id));
+          if (newTicket) {
+            logger.info('📱 Mostrando notificación visual para ticket:', newTicket.number);
+            showNewTicketNotification(newTicket.number);
+          } else {
+            logger.warn('⚠️ No se pudo identificar el ticket específico, pero hay más tickets');
+            showNewTicketNotification('nuevo');
+          }
+        } else if (previousCount === null) {
+          logger.debug('🔍 Primera carga - guardando conteo inicial');
+        } else {
+          logger.debug('🔍 No hay nuevos tickets detectados');
+        }
+        
+        // Actualizar la referencia del conteo anterior
+        previousTicketCountRef.current = currentCount;
+      } else {
+        logger.debug('🔇 Condiciones no cumplidas:', { isSoundEnabled, isAutoRefresh });
+      }
+
+      setTickets(data.tickets || []);
       setPagination(data.pagination);
+      if (data.pagination) {
+        setTotalTickets(data.pagination.total_items);
+      }
+      setLastFetchTime(new Date());
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -99,6 +187,19 @@ const TicketsTableView: React.FC = memo(() => {
     fetchTickets();
   }, [fetchTickets]);
 
+  const handleRefresh = useCallback(() => {
+    fetchTickets();
+  }, [fetchTickets]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      logger.info('Auto-refreshing tickets...');
+      fetchTickets(true);
+    }, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [fetchTickets, totalTickets]);
+
   const handleSearch = useCallback((newSearchTerm: string) => {
     setCurrentPage(1); // Reset to first page on new search
     setSearchTerm(newSearchTerm);
@@ -108,6 +209,7 @@ const TicketsTableView: React.FC = memo(() => {
     setCurrentPage(1); // Reset to first page when filters change
     setSelectedStatuses(appliedFilters.selectedStatuses || []);
     setDateRange(appliedFilters.dateRange || [null, null]);
+
     setSelectedSector(appliedFilters.selectedSector || '');
     setSelectedStaff(appliedFilters.selectedStaff || '');
   }, []);
@@ -120,7 +222,7 @@ const TicketsTableView: React.FC = memo(() => {
     // Simplemente llamar fetchTickets directamente
     fetchTickets();
   }, [fetchTickets]);
-  
+
   // Memoizar contador de filtros activos para optimización
   const getActiveFilterCount = useMemo(() => {
     let count = 0;
@@ -134,13 +236,16 @@ const TicketsTableView: React.FC = memo(() => {
 
   return (
     <div className="p-6 lg:p-8 bg-gray-50 dark:bg-slate-900 min-h-screen">
+
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Tickets</h1>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-            Gestión de tickets de soporte para el departamento de Soporte IT
-          </p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Tickets</h1>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              Gestión de tickets de soporte para el departamento de Soporte IT
+            </p>
+          </div>
         </div>
       </div>
 
@@ -188,7 +293,11 @@ const TicketsTableView: React.FC = memo(() => {
             </div>
           </div>
         ) : (
-          <DataTable tickets={tickets} totalCount={pagination?.total_items || tickets.length} />
+          <DataTable 
+            tickets={tickets} 
+            totalCount={pagination?.total_items || tickets.length}
+            onTicketClick={handleTicketClick}
+          />
         )}
       </div>
 
@@ -197,6 +306,15 @@ const TicketsTableView: React.FC = memo(() => {
         <div className="mt-6 flex justify-end">
           <Pagination pagination={pagination} onPageChange={handlePageChange} />
         </div>
+      )}
+
+      {/* Modal de detalle de ticket */}
+      {isModalOpen && selectedTicketId && (
+        <TicketDetailModal
+          ticketId={selectedTicketId}
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+        />
       )}
     </div>
   );

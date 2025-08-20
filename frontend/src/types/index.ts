@@ -46,6 +46,7 @@ export interface Staff {
 }
 
 export interface Ticket {
+  id: number;
   ticket_id: number;
   number: string;
   user_id: number;
@@ -74,6 +75,48 @@ export interface Ticket {
   cdata: Cdata; // Estructura anidada para el asunto y sector
 }
 
+export interface TicketDetail extends Ticket {
+  // Campos adicionales que devuelve el endpoint de detalle
+  subject?: string; // Campo directo del ticket
+  status?: Status;
+  priority?: Priority;
+  AssignedStaff?: Staff;
+  user?: User;
+  department?: {
+    id: number;
+    name: string;
+  };
+  topic?: {
+    topic_id: number;
+    topic: string;
+  };
+  customFields?: Array<{
+    field_name: string;
+    field_value: string;
+    field_type: string;
+  }>;
+  threads?: Array<{
+    entry_id: number;
+        thread_id: number;
+    pid: number;
+    staff_id?: number;
+    user_id?: number;
+    poster: string;
+    title: string;
+    body: string;
+    format: string;
+    created: string;
+    updated: string;
+    staff_firstname?: string;
+    staff_lastname?: string;
+    user_name?: string;
+  }>;
+  stats?: {
+    totalThreads: number;
+    lastActivity: string;
+  };
+}
+
 export interface PaginationInfo {
   total_items: number;
   total_pages: number;
@@ -84,6 +127,7 @@ export interface PaginationInfo {
 export interface AdvancedFilters {
   selectedStatuses?: string[];
   dateRange?: [Date | null, Date | null];
+
   selectedSector?: string;
   selectedStaff?: string;
 }

@@ -142,28 +142,28 @@ const DashboardView: React.FC = () => {
         <div className="kpi-grid">
           <StatCard 
             title="Total Tickets" 
-            value={ticketCounts?.totalInDateRange ?? 0} 
+            value={ticketCounts?.total ?? 0} 
             subtitle={fullMonthTitle}
             icon="total"
             trend="+5%"
           />
           <StatCard 
             title="Tickets Abiertos" 
-            value={ticketCounts?.openInDateRange ?? 0} 
+            value={ticketCounts?.open ?? 0} 
             subtitle={fullMonthTitle}
             icon="open"
             trend="-2%"
           />
           <StatCard 
             title="Total Pendientes" 
-            value={ticketCounts?.totalOpen ?? 0}
+            value={ticketCounts?.totalPendingAccumulated ?? 0}
             subtitle="Acumulado"
             icon="pending"
             trend="+8%"
           />
           <StatCard 
             title="Tickets Cerrados" 
-            value={ticketCounts?.closedInDateRange ?? 0} 
+            value={ticketCounts?.closed ?? 0} 
             subtitle={fullMonthTitle}
             icon="closed"
             trend="+12%"

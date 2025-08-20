@@ -1,756 +1,638 @@
-// backend/routes/ticketRoutes.js
 const express = require('express');
-const router = express.Router();
-const { Ticket, User, TicketStatus, Department, Staff, TicketCdata, List, ListItems, HelpTopic, Organization, sequelize } = require('../models'); // Import sequelize for Op
-const { Op } = require('sequelize'); // Assuming models are exported from ../models/index.js
+const { Op, fn, col } = require('sequelize');
+const { Ticket, User, Department, Staff, Organization, TicketStatus, TicketPriority, HelpTopic } = require('../models');
 const logger = require('../utils/logger');
 
-// GET all tickets
-router.get('/', async (req, res, next) => {
-  try {
-    // Filtros dinámicos, búsqueda y paginación
-    const { statuses, priority_id, startDate, endDate, search, page, limit, organization, staff, transporte, sector } = req.query;
+const router = express.Router();
 
-    const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
+// Middleware para manejo de errores asíncrono
+const asyncHandler = fn => (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+};
 
-    // Paginación - simplificada para manejar límites altos
-    const currentPage = parseInt(page) || 1;
-    const itemsPerPage = parseInt(limit) || 10;
-    const offset = (currentPage - 1) * itemsPerPage;
+// GET /api/tickets - Ruta principal para la tabla de tickets
+router.get('/', asyncHandler(async (req, res) => {
+    const { page = 1, limit = 50, search, status, statuses, staff, sector, transporte, startDate, endDate } = req.query;
+    const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
     
-    // Para exportación, si el límite es muy alto (>1000), consideramos que quiere todos los registros
-    const isExportRequest = itemsPerPage > 1000;
-
-    const whereTicketCondition = {};
-    const whereUserCondition = {};
-
-    // Búsqueda general
-    if (search) {
-      whereTicketCondition[Op.or] = [
-        { number: { [Op.like]: `%${search}%` } },
-        { '$cdata.subject$': { [Op.like]: `%${search}%` } },
-        { '$user.name$': { [Op.like]: `%${search}%` } },
-        { '$AssignedStaff.firstname$': { [Op.like]: `%${search}%` } },
-        { '$AssignedStaff.lastname$': { [Op.like]: `%${search}%` } },
-        { '$cdata.sector$': { [Op.like]: `%${search}%` } }
-      ];
+    let where = {};
+    
+    // Filtros específicos - manejar tanto estado único como múltiples estados
+    if (statuses && statuses !== 'all') {
+        const statusArray = statuses.split(',').map(s => s.trim()).filter(s => s !== '');
+        console.log(`[DEBUG] Filtro por estados múltiples - statuses recibidos: ${statusArray.join(', ')}`);
+        where.status_id = { [Op.in]: statusArray };
+    } else if (status && status !== 'all') {
+        console.log(`[DEBUG] Filtro por estado único - status recibido: ${status}`);
+        where.status_id = status;
     }
-
-    // Filtros avanzados
-    if (statuses) {
-      const statusIds = statuses.split(',').map(id => parseInt(id, 10)).filter(id => !isNaN(id));
-      if (statusIds.length > 0) {
-        whereTicketCondition.status_id = { [Op.in]: statusIds };
-      }
+    if (staff && staff !== 'all') {
+        console.log(`[DEBUG] Filtro por staff - staff recibido: ${staff}`);
+        where.staff_id = staff;
     }
-
-    if (staff) {
-      const staffId = parseInt(staff, 10);
-      if (!isNaN(staffId)) {
-        whereTicketCondition.staff_id = staffId;
-      }
+    if (sector && sector !== 'all') {
+        console.log(`[DEBUG] Filtro por sector - sector recibido: ${sector}`);
+        where['$cdata.sector$'] = sector;
     }
-
-    if (organization) {
-      const orgId = parseInt(organization, 10);
-      if (!isNaN(orgId)) {
-        whereUserCondition.org_id = orgId;
-      }
+    if (transporte && transporte !== 'all') {
+        console.log(`[DEBUG] Filtro por transporte - transporte recibido: ${transporte}`);
+        where['$cdata.transporte$'] = transporte;
     }
-
-    if (transporte) {
-      const transporteId = parseInt(transporte, 10);
-      if (!isNaN(transporteId)) {
-        whereTicketCondition['$cdata.transporte$'] = transporteId;
-      }
-    }
-
-    if (sector) {
-      const sectorId = parseInt(sector, 10);
-      if (!isNaN(sectorId)) {
-        whereTicketCondition['$cdata.sector$'] = sectorId;
-      }
-    }
-
-    // priority_id se ha eliminado ya que no existe en el modelo Ticket
-    // if (priority_id) {
-    //   whereTicketCondition.priority_id = priority_id;
-    // }
-
+    
+    // Filtro por rango de fechas (manejando zona horaria Argentina GMT-3)
+    // NUEVO: Lógica automática inteligente según estado seleccionado
     if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      start.setUTCHours(0, 0, 0, 0);
-      end.setUTCHours(23, 59, 59, 999);
-      whereTicketCondition.created = {
-        [Op.between]: [start, end]
-      };
+        // Crear fechas en la zona horaria local
+        const start = new Date(startDate + 'T00:00:00.000-03:00');
+        const end = new Date(endDate + 'T23:59:59.999-03:00');
+        
+        // Lógica automática: usar 'closed' para estados Cerrado/Resuelto, 'created' para Abierto
+        let dateField = 'created'; // Por defecto
+        if (statuses) {
+            const statusArray = statuses.split(',').map(s => s.trim());
+            // Si incluye estados Cerrado (3) o Resuelto (2), usar fecha de cierre
+            if (statusArray.includes('2') || statusArray.includes('3')) {
+                dateField = 'closed';
+            }
+        } else if (status && (status === '2' || status === '3')) {
+            dateField = 'closed';
+        }
+        
+        console.log(`[DEBUG] Filtro automático de fechas - Campo: ${dateField} (basado en estados), Start: ${start.toISOString()}, End: ${end.toISOString()}`);
+        where[dateField] = { [Op.between]: [start, end] };
+    } else if (startDate) {
+        const start = new Date(startDate + 'T00:00:00.000-03:00');
+        
+        // Lógica automática: usar 'closed' para estados Cerrado/Resuelto, 'created' para Abierto
+        let dateField = 'created'; // Por defecto
+        if (statuses) {
+            const statusArray = statuses.split(',').map(s => s.trim());
+            if (statusArray.includes('2') || statusArray.includes('3')) {
+                dateField = 'closed';
+            }
+        } else if (status && (status === '2' || status === '3')) {
+            dateField = 'closed';
+        }
+        
+        console.log(`[DEBUG] Filtro automático desde fecha - Campo: ${dateField} (basado en estados), Start: ${start.toISOString()}`);
+        where[dateField] = { [Op.gte]: start };
+    } else if (endDate) {
+        const end = new Date(endDate + 'T23:59:59.999-03:00');
+        
+        // Lógica automática: usar 'closed' para estados Cerrado/Resuelto, 'created' para Abierto
+        let dateField = 'created'; // Por defecto
+        if (statuses) {
+            const statusArray = statuses.split(',').map(s => s.trim());
+            if (statusArray.includes('2') || statusArray.includes('3')) {
+                dateField = 'closed';
+            }
+        } else if (status && (status === '2' || status === '3')) {
+            dateField = 'closed';
+        }
+        
+        console.log(`[DEBUG] Filtro automático hasta fecha - Campo: ${dateField} (basado en estados), End: ${end.toISOString()}`);
+        where[dateField] = { [Op.lte]: end };
     }
-
-    // Condición para filtrar por departamento
-    const departmentInclude = {
-      model: Department,
-      as: 'department',
-      where: { name: { [Op.in]: allowedDepartmentNames } },
-      attributes: [],
-      required: true
-    };
-
-    // OPTIMIZACIÓN: Configuración de consulta optimizada para eliminar queries N+1
-    const baseInclude = [
-      {
-        model: User,
-        as: 'user',
-        attributes: ['id', 'name', 'org_id'],
-        where: Object.keys(whereUserCondition).length > 0 ? whereUserCondition : null,
-        required: true
-      },
-      {
-        model: TicketStatus,
-        as: 'status',
-        attributes: ['id', 'name', 'state'],
-        required: false
-      },
-      {
-        model: Staff,
-        as: 'AssignedStaff',
-        attributes: ['staff_id', 'firstname', 'lastname'],
-        required: false
-      },
-      {
-        model: TicketCdata,
-        as: 'cdata',
-        attributes: ['subject', 'sector', 'transporte'],
+    if (search && search.trim() !== '') {
+        const searchTerm = `%${search.trim()}%`;
+        where[Op.or] = [
+            { number: { [Op.like]: searchTerm } },
+            { '$user.name$': { [Op.like]: searchTerm } },
+            { '$AssignedStaff.firstname$': { [Op.like]: searchTerm } },
+            { '$AssignedStaff.lastname$': { [Op.like]: searchTerm } },
+            { '$cdata.subject$': { [Op.like]: searchTerm } },
+            { '$cdata.SectorName.value$': { [Op.like]: searchTerm } },
+            { '$cdata.TransporteName.value$': { [Op.like]: searchTerm } }
+        ];
+    }
+    
+    const { count, rows } = await Ticket.findAndCountAll({
+        where,
         include: [
-          {
-            model: ListItems,
-            as: 'TransporteName',
-            attributes: ['id', 'value'],
-            required: false
-          },
-          {
-            model: ListItems,
-            as: 'SectorName',
-            attributes: ['id', 'value'],
-            required: false
-          }
+            { model: TicketStatus, as: 'status', attributes: ['name'] },
+            { 
+                model: Department, 
+                as: 'department', 
+                attributes: ['name'],
+                where: {
+                    name: { [Op.in]: ['Soporte Informatico', 'Soporte IT'] }
+                }
+            },
+            { model: Staff, as: 'AssignedStaff', attributes: ['firstname', 'lastname'], required: false },
+            { model: User, as: 'user', attributes: ['name'], required: false },
+            { model: HelpTopic, attributes: ['topic'], required: false },
+            {
+                model: require('../models').TicketCdata,
+                as: 'cdata',
+                attributes: ['subject', 'sector', 'transporte'],
+                required: false,
+                include: [
+                    {
+                        model: require('../models').ListItems,
+                        as: 'SectorName',
+                        attributes: ['id', 'value'],
+                        required: false
+                    },
+                    {
+                        model: require('../models').ListItems,
+                        as: 'TransporteName',
+                        attributes: ['id', 'value'],
+                        required: false
+                    }
+                ]
+            }
         ],
-        required: false
-      },
-      departmentInclude
-    ];
+        limit: parseInt(limit, 10),
+        offset,
+        order: [['created', 'DESC']]
+    });
+    
+    console.log(`[DEBUG] Consulta completada - Total encontrados: ${count}, Devolviendo: ${rows.length}`);
+    if (rows.length > 0) {
+        console.log(`[DEBUG] Primer ticket encontrado:`, {
+            id: rows[0].ticket_id,
+            number: rows[0].number,
+            status: rows[0].status?.name,
+            status_id: rows[0].status_id,
+            created: rows[0].created
+        });
+    }
+    
+    // LOG TEMPORAL: Si estamos filtrando por fechas pero no por estado, mostrar todos los status_id de hoy
+    if ((startDate || endDate) && !status && !statuses) {
+        console.log(`[DEBUG TEMPORAL] Tickets de hoy por status_id (campo 'created'):`);
+        const statusCounts = {};
+        rows.forEach(ticket => {
+            const statusId = ticket.status_id;
+            const statusName = ticket.status?.name || 'Sin nombre';
+            const key = `${statusId} (${statusName})`;
+            statusCounts[key] = (statusCounts[key] || 0) + 1;
+        });
+        console.log(statusCounts);
+        
+        // INVESTIGACIÓN ADICIONAL: Buscar tickets cerrados hoy usando el campo 'closed'
+        if (startDate && endDate && startDate === endDate) {
+            console.log(`[DEBUG TEMPORAL] Investigando tickets cerrados hoy usando campo 'closed'...`);
+            const closedStart = new Date(startDate + 'T00:00:00.000-03:00');
+            const closedEnd = new Date(endDate + 'T23:59:59.999-03:00');
+            
+            Ticket.findAll({
+                where: {
+                    closed: { [Op.between]: [closedStart, closedEnd] }
+                },
+                include: [{ model: TicketStatus, as: 'status', attributes: ['name'] }],
+                attributes: ['ticket_id', 'number', 'status_id', 'created', 'closed']
+            }).then(closedTickets => {
+                console.log(`[DEBUG TEMPORAL] Tickets cerrados hoy (campo 'closed'): ${closedTickets.length}`);
+                const closedStatusCounts = {};
+                closedTickets.forEach(ticket => {
+                    const statusId = ticket.status_id;
+                    const statusName = ticket.status?.name || 'Sin nombre';
+                    const key = `${statusId} (${statusName})`;
+                    closedStatusCounts[key] = (closedStatusCounts[key] || 0) + 1;
+                });
+                console.log('[DEBUG TEMPORAL] Distribución por status_id (cerrados hoy):', closedStatusCounts);
+            }).catch(err => {
+                console.log('[DEBUG TEMPORAL] Error investigando tickets cerrados:', err.message);
+            });
+        }
+    }
+    
+    res.json({
+        tickets: rows,
+        pagination: {
+            total_items: count,
+            total_pages: Math.ceil(count / parseInt(limit, 10)),
+            current_page: parseInt(page, 10),
+            per_page: parseInt(limit, 10)
+        }
+    });
+}));
 
-    // OPTIMIZACIÓN: Separar conteo de datos para mejor performance
-    let result;
-    if (!isExportRequest) {
-      // Consulta optimizada para conteo - incluir TicketCdata solo si hay filtro de transporte
-      const countInclude = [
+// GET /api/tickets/reports - Obtener tickets para reportes con filtros y paginación
+router.get('/reports', async (req, res) => {
+  console.log('✅✅✅ /api/tickets/reports endpoint hit! ✅✅✅');
+    logger.info('--- INICIO PETICIÓN GET /api/tickets ---');
+    logger.info(`Query recibido: ${JSON.stringify(req.query)}`);
+
+    const { page = 1, limit = 10, search, month, year, status, priority, department, sla, team, topic, location, staff, sector, transporte, startDate, endDate } = req.query;
+    logger.info('Paso 1: Parámetros extraídos.');
+
+    const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    logger.info(`Paso 2: Offset calculado: ${offset}`);
+
+    let where = {};
+    // Incluir asociaciones para obtener nombres legibles
+    let include = [
         {
-          model: User,
-          as: 'user',
-          attributes: [],
-          where: Object.keys(whereUserCondition).length > 0 ? whereUserCondition : null,
-          required: true
+            model: TicketStatus,
+            as: 'status',
+            attributes: ['id', 'name']
         },
         {
-          model: Department,
-          as: 'department',
-          where: { name: { [Op.in]: allowedDepartmentNames } },
-          attributes: [],
-          required: true
-        }
-      ];
-
-      // BUGFIX: Agregar TicketCdata si hay filtro de transporte o sector
-      if (transporte || sector) {
-        countInclude.push({
-          model: TicketCdata,
-          as: 'cdata',
-          attributes: [],
-          required: false
-        });
-      }
-
-      const countQuery = {
-        where: whereTicketCondition,
-        include: countInclude,
-        distinct: true
-      };
-
-      // Consulta optimizada para datos
-      const dataQuery = {
-        where: whereTicketCondition,
-        include: baseInclude,
-        order: [['created', 'DESC']],
-        limit: itemsPerPage,
-        offset: offset,
-        subQuery: false
-      };
-
-      // Ejecutar ambas consultas en paralelo
-      const [totalCount, rows] = await Promise.all([
-        Ticket.count(countQuery),
-        Ticket.findAll(dataQuery)
-      ]);
-
-      // Post-procesamiento: Obtener nombres de transporte y sector de forma eficiente
-      const ticketIds = rows.map(ticket => ticket.ticket_id);
-      const transporteMap = new Map();
-      const sectorMap = new Map();
-
-      if (ticketIds.length > 0) {
-        try {
-          // MÉTODO 1: Intentar con asociaciones Sequelize
-          const cdataWithTransportes = await TicketCdata.findAll({
-            where: { ticket_id: { [Op.in]: ticketIds } },
-            include: [
-              {
-                model: ListItems,
-                as: 'TransporteName',
-                attributes: ['id', 'value'],
-                required: false
-              },
-              {
-                model: ListItems,
-                as: 'SectorName',
-                attributes: ['id', 'value'],
-                required: false
-              }
-            ],
-            attributes: ['ticket_id', 'transporte', 'sector']
-          });
-
-          // Crear mapas para lookups eficientes
-          cdataWithTransportes.forEach(cdata => {
-            if (cdata.TransporteName) {
-              transporteMap.set(cdata.ticket_id, cdata.TransporteName.value);
-            }
-            if (cdata.SectorName) {
-              sectorMap.set(cdata.ticket_id, cdata.SectorName.value);
-            }
-          });
-
-          logger.info(`📊 NORMAL: TransporteMap size: ${transporteMap.size}, SectorMap size: ${sectorMap.size}`);
-
-          // MÉTODO 2: Si el Método 1 falló, usar consulta SQL directa como fallback
-          if (transporteMap.size === 0 && sectorMap.size === 0) {
-            logger.warn('📊 FALLBACK: Usando consulta SQL directa para obtener nombres');
-            
-            const transporteQuery = `
-              SELECT tc.ticket_id, li.value as transporte_name
-              FROM ost_ticket__cdata tc
-              INNER JOIN ost_list_items li ON tc.transporte = li.id
-              WHERE tc.ticket_id IN (${ticketIds.join(',')}) AND tc.transporte IS NOT NULL
-            `;
-
-            const sectorQuery = `
-              SELECT tc.ticket_id, li.value as sector_name  
-              FROM ost_ticket__cdata tc
-              INNER JOIN ost_list_items li ON tc.sector = li.id
-              WHERE tc.ticket_id IN (${ticketIds.join(',')}) AND tc.sector IS NOT NULL
-            `;
-
-            const [transporteResults, sectorResults] = await Promise.all([
-              sequelize.query(transporteQuery, { type: sequelize.QueryTypes.SELECT }),
-              sequelize.query(sectorQuery, { type: sequelize.QueryTypes.SELECT })
-            ]);
-
-            // Poblar mapas desde resultados SQL directos
-            transporteResults.forEach(result => {
-              transporteMap.set(result.ticket_id, result.transporte_name);
-            });
-
-            sectorResults.forEach(result => {
-              sectorMap.set(result.ticket_id, result.sector_name);
-            });
-
-            logger.info(`📊 FALLBACK: TransporteMap size: ${transporteMap.size}, SectorMap size: ${sectorMap.size}`);
-          }
-
-        } catch (error) {
-          logger.error('📊 ERROR en post-procesamiento:', error);
-        }
-      }
-
-      // Agregar nombres de transporte y sector a los resultados
-      rows.forEach(ticket => {
-        if (ticket.cdata) {
-          ticket.cdata.dataValues.transporteName = transporteMap.get(ticket.ticket_id) || null;
-          ticket.cdata.dataValues.sectorName = sectorMap.get(ticket.ticket_id) || null;
-        }
-      });
-
-      const totalPages = Math.ceil(totalCount / itemsPerPage);
-
-      res.json({
-        data: rows,
-        pagination: {
-          total_items: totalCount,
-          total_pages: totalPages,
-          current_page: currentPage,
-          items_per_page: itemsPerPage
-        }
-      });
-    } else {
-      // OPTIMIZACIÓN: Para exportación, usar consulta simplificada
-      const exportQuery = {
-        where: whereTicketCondition,
-        include: baseInclude,
-        order: [['created', 'DESC']],
-        subQuery: false
-      };
-
-      const rows = await Ticket.findAll(exportQuery);
-
-      // Post-procesamiento para exportación
-      const ticketIds = rows.map(ticket => ticket.ticket_id);
-      const transporteMap = new Map();
-      const sectorMap = new Map();
-
-      logger.info(`📊 DEBUG EXPORTACIÓN: Procesando ${ticketIds.length} tickets para exportación`);
-
-      if (ticketIds.length > 0) {
-        try {
-          // MÉTODO 1: Intentar con asociaciones Sequelize
-          const cdataWithTransportes = await TicketCdata.findAll({
-            where: { ticket_id: { [Op.in]: ticketIds } },
-            include: [
-              {
-                model: ListItems,
-                as: 'TransporteName',
-                attributes: ['id', 'value'],
-                required: false
-              },
-              {
-                model: ListItems,
-                as: 'SectorName',
-                attributes: ['id', 'value'],
-                required: false
-              }
-            ],
-            attributes: ['ticket_id', 'transporte', 'sector']
-          });
-
-          logger.info(`📊 DEBUG EXPORTACIÓN: Encontrados ${cdataWithTransportes.length} registros de cdata`);
-
-          cdataWithTransportes.forEach(cdata => {
-            logger.info(`📊 DEBUG EXPORTACIÓN: Ticket ${cdata.ticket_id} - transporte: ${cdata.transporte}, TransporteName: ${cdata.TransporteName?.value || 'null'}`);
-            
-            if (cdata.TransporteName) {
-              transporteMap.set(cdata.ticket_id, cdata.TransporteName.value);
-            }
-            if (cdata.SectorName) {
-              sectorMap.set(cdata.ticket_id, cdata.SectorName.value);
-            }
-          });
-
-          logger.info(`📊 DEBUG EXPORTACIÓN: TransporteMap size: ${transporteMap.size}`);
-
-          // MÉTODO 2: Si el Método 1 falló, usar consulta SQL directa como fallback
-          if (transporteMap.size === 0 && sectorMap.size === 0) {
-            logger.warn('📊 EXPORTACIÓN FALLBACK: Usando consulta SQL directa para obtener nombres');
-            
-            const transporteQuery = `
-              SELECT tc.ticket_id, li.value as transporte_name
-              FROM ost_ticket__cdata tc
-              INNER JOIN ost_list_items li ON tc.transporte = li.id
-              WHERE tc.ticket_id IN (${ticketIds.join(',')}) AND tc.transporte IS NOT NULL
-            `;
-
-            const sectorQuery = `
-              SELECT tc.ticket_id, li.value as sector_name  
-              FROM ost_ticket__cdata tc
-              INNER JOIN ost_list_items li ON tc.sector = li.id
-              WHERE tc.ticket_id IN (${ticketIds.join(',')}) AND tc.sector IS NOT NULL
-            `;
-
-            const [transporteResults, sectorResults] = await Promise.all([
-              sequelize.query(transporteQuery, { type: sequelize.QueryTypes.SELECT }),
-              sequelize.query(sectorQuery, { type: sequelize.QueryTypes.SELECT })
-            ]);
-
-            // Poblar mapas desde resultados SQL directos
-            transporteResults.forEach(result => {
-              transporteMap.set(result.ticket_id, result.transporte_name);
-            });
-
-            sectorResults.forEach(result => {
-              sectorMap.set(result.ticket_id, result.sector_name);
-            });
-
-            logger.info(`📊 EXPORTACIÓN FALLBACK: TransporteMap size: ${transporteMap.size}, SectorMap size: ${sectorMap.size}`);
-          }
-
-        } catch (error) {
-          logger.error('📊 ERROR en post-procesamiento de exportación:', error);
-        }
-      }
-
-      rows.forEach(ticket => {
-        if (ticket.cdata) {
-          const transporteName = transporteMap.get(ticket.ticket_id) || null;
-          const sectorName = sectorMap.get(ticket.ticket_id) || null;
-          
-          ticket.cdata.dataValues.transporteName = transporteName;
-          ticket.cdata.dataValues.sectorName = sectorName;
-          
-          logger.info(`📊 DEBUG EXPORTACIÓN: Ticket ${ticket.ticket_id} - Final transporteName: ${transporteName}`);
-        }
-      });
-      
-      res.json({
-        data: rows,
-        pagination: {
-          total_items: rows.length,
-          total_pages: 1,
-          current_page: 1,
-          items_per_page: rows.length
-        }
-      });
-    }
-  } catch (error) {
-    logger.error('Error in GET /api/tickets:', error);
-    next(error);
-  }
-});
-
-// GET ticket count
-router.get('/count', async (req, res, next) => {
-  try {
-    const { startDate, endDate } = req.query;
-    const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
-
-    logger.info(`Count endpoint called with dates: ${startDate} - ${endDate}`);
-
-    const replacements = {};
-    let whereDateClause = "";
-
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      start.setUTCHours(0, 0, 0, 0);
-      const end = new Date(endDate);
-      end.setUTCHours(23, 59, 59, 999);
-
-      whereDateClause = "AND t.created BETWEEN :startDate AND :endDate";
-      replacements.startDate = start;
-      replacements.endDate = end;
-      
-      logger.info(`Date filter applied: ${start.toISOString()} - ${end.toISOString()}`);
-    }
-
-    // Query 1: Obtener estadísticas por estado para el rango de fechas (o todos los tiempos si no hay fecha)
-    const dateStatsQuery = `
-        SELECT
-            ts.state,
-            ts.name AS statusName,
-            COUNT(t.ticket_id) AS statusCount
-        FROM ost_ticket t
-        JOIN ost_department d ON t.dept_id = d.id
-        JOIN ost_ticket_status ts ON t.status_id = ts.id
-        WHERE
-            d.name IN ('Soporte Informatico', 'Soporte IT')
-            ${whereDateClause}
-        GROUP BY ts.name, ts.state
-        ORDER BY ts.name;
-    `;
-
-    // Query 2: Obtener el conteo total de tickets abiertos de todos los tiempos
-    const totalOpenQuery = `
-        SELECT COUNT(*) as totalOpenCount
-        FROM ost_ticket t
-        JOIN ost_department d ON t.dept_id = d.id
-        JOIN ost_ticket_status ts ON t.status_id = ts.id
-        WHERE
-            d.name IN ('Soporte Informatico', 'Soporte IT')
-            AND ts.state = 'open';
-    `;
-    
-    logger.info('Executing count queries...');
-    
-    const [dateStatsResults, totalOpenResult] = await Promise.all([
-      sequelize.query(dateStatsQuery, {
-        replacements,
-        type: sequelize.QueryTypes.SELECT
-      }),
-      sequelize.query(totalOpenQuery, {
-        type: sequelize.QueryTypes.SELECT
-      })
-    ]);
-    
-    logger.info(`Date stats results count: ${dateStatsResults?.length || 0}`);
-    logger.info(`Total open result: ${JSON.stringify(totalOpenResult)}`);
-    
-    // BUGFIX: Corregir acceso a resultado de la consulta SQL
-    const totalOpenCount = totalOpenResult[0]?.totalOpenCount || 0;
-    
-    let totalInDateRange = 0;
-    let openInDateRange = 0;
-    let closedInDateRange = 0;
-    const byStatus = {};
-
-    if (dateStatsResults && Array.isArray(dateStatsResults)) {
-      dateStatsResults.forEach(row => {
-          const count = parseInt(row.statusCount, 10);
-          totalInDateRange += count;
-          if (row.state === 'open') {
-              openInDateRange += count;
-          } else if (row.state === 'closed') {
-              closedInDateRange += count;
-          }
-          byStatus[row.statusName] = (byStatus[row.statusName] || 0) + count;
-      });
-    }
-
-    const result = {
-      totalInDateRange: totalInDateRange,
-      openInDateRange: openInDateRange,
-      closedInDateRange: closedInDateRange,
-      byStatus,
-      totalOpen: parseInt(totalOpenCount, 10),
-    };
-
-    logger.info(`Count result: ${JSON.stringify(result)}`);
-    res.json(result);
-
-  } catch (error) {
-    logger.error('Error in GET /api/tickets/count:', error);
-    logger.error('Error stack:', error.stack);
-    next(error);
-  }
-});
-
-// OPTIMIZACIÓN: GET unique values for 'transporte' field - consulta directa optimizada
-router.get('/options/transporte', async (req, res, next) => {
-  try {
-    // OPTIMIZACIÓN: Consulta SQL directa para obtener transportes únicos sin cargar todos los tickets
-    const transporteQuery = `
-      SELECT DISTINCT li.id, li.value 
-      FROM ost_list_items li
-      INNER JOIN ost_ticket__cdata tc ON li.id = tc.transporte
-      INNER JOIN ost_ticket t ON tc.ticket_id = t.ticket_id
-      INNER JOIN ost_department d ON t.dept_id = d.id
-      WHERE d.name IN ('Soporte Informatico', 'Soporte IT')
-      AND li.value IS NOT NULL 
-      AND li.value != ''
-      ORDER BY li.value ASC
-    `;
-
-    const transporteResults = await sequelize.query(transporteQuery, {
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    // Transformar resultados al formato esperado
-    const transporteItems = transporteResults.map(item => ({
-      id: parseInt(item.id, 10),
-      value: item.value
-    }));
-
-    // Si no hay resultados, usar valores predeterminados
-    if (transporteItems.length === 0) {
-      logger.info("No transport items found. Using default values.");
-      const defaultTransportes = [
-        { id: 1, value: "Auto" },
-        { id: 2, value: "Camioneta" },
-        { id: 3, value: "Camión" },
-        { id: 4, value: "Moto" },
-        { id: 5, value: "Otro" }
-      ];
-      return res.json(defaultTransportes);
-    }
-
-    logger.info(`Found ${transporteItems.length} transport items using optimized query`);
-    res.json(transporteItems);
-  } catch (error) {
-    logger.error(`Error fetching /options/transporte:`, error);
-    // En caso de error, devolver valores predeterminados
-    res.json([
-      { id: 1, value: "Auto" },
-      { id: 2, value: "Camioneta" },
-      { id: 3, value: "Camión" },
-      { id: 4, value: "Moto" },
-      { id: 5, value: "Otro" }
-    ]);
-  }
-});
-
-// GET unique values for staff field
-router.get('/options/staff', async (req, res, next) => {
-  try {
-    const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
-    const staff = await Staff.findAll({
-      attributes: [
-        'staff_id',
-        [sequelize.fn('CONCAT', sequelize.col('firstname'), ' ', sequelize.col('lastname')), 'name']
-      ],
-      include: [{
-        model: Ticket,
-        as: 'AssignedTickets', // Correct alias for Staff -> Tickets
-        attributes: [],
-        required: true,
-        include: [{
-          model: Department,
-          as: 'department',
-          attributes: [],
-          where: { name: { [Op.in]: allowedDepartmentNames } },
-          required: true
-        }]
-      }],
-      group: ['Staff.staff_id', 'name'],
-      order: [[sequelize.col('name'), 'ASC']]
-    });
-    res.json(staff);
-  } catch (error) {
-    next(error);
-  }
-});
-
-// GET unique values for sector field (organizations)
-router.get('/options/sector', async (req, res, next) => {
-  try {
-    // Intentar usar el mismo endpoint que usa el modal de búsqueda avanzada
-    try {
-      const response = await fetch('http://localhost:3001/api/organizations/simple');
-      if (!response.ok) {
-        throw new Error(`Error fetching organizations: ${response.status}`);
-      }
-      const data = await response.json();
-      
-      if (data && data.length > 0) {
-        logger.info(`Found ${data.length} organizations from /organizations/simple`);
-        return res.json(data);
-      }
-    } catch (fetchError) {
-      logger.warn(`Could not fetch from /organizations/simple: ${fetchError.message}`);
-    }
-    
-    // Si el fetch falla, intentar consultar directamente
-    const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
-    const organizations = await Organization.findAll({
-      attributes: ['id', 'name'],
-      include: [{
-        model: User,
-        as: 'users',
-        attributes: [],
-        required: true,
-        include: [{
-          model: Ticket,
-          as: 'tickets',
-          attributes: [],
-          required: true,
-          include: [{
             model: Department,
             as: 'department',
-            where: { name: { [Op.in]: allowedDepartmentNames } },
-            attributes: [],
-            required: true
-          }]
-        }]
-      }],
-      group: ['Organization.id', 'Organization.name'],
-      order: [['name', 'ASC']]
-    });
-    
-    if (organizations && organizations.length > 0) {
-      logger.info(`Found ${organizations.length} organizations from direct query`);
-      return res.json(organizations);
-    }
-    
-    // Si no hay resultados, usar valores predeterminados
-    logger.warn("No organizations found. Using default values.");
-    return res.json([
-      { id: 1, name: "Casa Central" },
-      { id: 2, name: "Sucursal Norte" },
-      { id: 3, name: "Sucursal Sur" },
-      { id: 4, name: "Sucursal Este" },
-      { id: 5, name: "Sucursal Oeste" }
-    ]);
-  } catch (error) {
-    logger.error(`Error fetching /options/sector:`, error);
-    // En caso de error, devolver valores predeterminados
-    res.json([
-      { id: 1, name: "Casa Central" },
-      { id: 2, name: "Sucursal Norte" },
-      { id: 3, name: "Sucursal Sur" },
-      { id: 4, name: "Sucursal Este" },
-      { id: 5, name: "Sucursal Oeste" }
-    ]);
-  }
-});
-
-// GET unique values for status field
-router.get('/options/status', async (req, res, next) => {
-  try {
-    const statuses = await TicketStatus.findAll({
-      attributes: ['id', 'name', 'state'],
-      order: [['name', 'ASC']]
-    });
-    res.json(statuses);
-  } catch (error) {
-    next(error);
-  }
-});
-
-// GET ticket statistics by agent (for charts)
-router.get('/stats/by-agent', async (req, res, next) => {
-  try {
-    const { year, month } = req.query;
-    const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
-    
-    if (!year || !month) {
-      return res.status(400).json({ error: 'Los parámetros year y month son requeridos' });
-    }
-
-    // Crear rango de fechas para el mes especificado
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-
-    const whereCondition = {
-      created: {
-        [Op.between]: [startDate, endDate]
-      }
-    };
-
-    // Obtener tickets agrupados por agente para el mes especificado
-    const agentStats = await Ticket.findAll({
-      attributes: [
-        [sequelize.fn('COUNT', sequelize.col('Ticket.ticket_id')), 'ticket_count']
-      ],
-      include: [
-        {
-          model: Department,
-          as: 'department',
-          where: {
-            name: { [Op.in]: allowedDepartmentNames }
-          },
-          attributes: []
+            attributes: ['id', 'name']
         },
         {
-          model: Staff,
-          as: 'AssignedStaff',
-          attributes: ['staff_id', 'firstname', 'lastname'],
-          required: true
+            model: Staff,
+            as: 'AssignedStaff',
+            attributes: ['staff_id', 'firstname', 'lastname'],
+            required: false
+        },
+        {
+            model: User,
+            as: 'user',
+            attributes: ['id', 'name'],
+            required: false
+        },
+        {
+            model: HelpTopic,
+            attributes: ['topic', 'topic_id'],
+            required: false
+        },
+        {
+            model: require('../models').TicketCdata,
+            as: 'cdata',
+            attributes: ['subject', 'sector', 'transporte'],
+            required: false,
+            include: [
+                {
+                    model: require('../models').ListItems,
+                    as: 'SectorName',
+                    attributes: ['id', 'value'],
+                    required: false
+                },
+                {
+                    model: require('../models').ListItems,
+                    as: 'TransporteName',
+                    attributes: ['id', 'value'],
+                    required: false
+                }
+            ]
         }
-      ],
-      where: whereCondition,
-      group: ['AssignedStaff.staff_id'],
-      order: [[sequelize.fn('COUNT', sequelize.col('Ticket.ticket_id')), 'DESC']],
-      raw: false
+    ];
+
+    // Habilitar búsqueda ampliada por número, usuario, staff y asunto
+    if (search && search.trim() !== '') {
+        const searchTerm = `%${search.trim()}%`;
+        where[Op.or] = [
+            { number: { [Op.like]: searchTerm } },
+            { '$user.name$': { [Op.like]: searchTerm } },
+            { '$AssignedStaff.firstname$': { [Op.like]: searchTerm } },
+            { '$AssignedStaff.lastname$': { [Op.like]: searchTerm } },
+            { '$cdata.subject$': { [Op.like]: searchTerm } }
+        ];
+    }
+
+    // Filtros específicos
+    if (department && department !== 'all') where.dept_id = department;
+    if (status && status !== 'all') where.status_id = status;
+    if (priority && priority !== 'all') where.priority_id = priority;
+    if (staff && staff !== 'all') where.staff_id = staff;
+    if (sector && sector !== 'all') where['$cdata.sector$'] = sector;
+    if (transporte && transporte !== 'all') where['$cdata.transporte$'] = transporte;
+
+    // Filtro por rango de fechas para reportes
+    if (startDate && endDate) {
+        where.created = { [Op.between]: [new Date(startDate), new Date(endDate)] };
+    } else if (startDate) {
+        where.created = { [Op.gte]: new Date(startDate) };
+    }
+
+    // Filtro por fecha (mes y año)
+    if (year && year !== 'all') {
+        const yearNum = parseInt(year, 10);
+        let startDate, endDate;
+        if (month && month !== 'all') {
+            const monthNum = parseInt(month, 10);
+            startDate = new Date(yearNum, monthNum - 1, 1);
+            endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+        } else {
+            startDate = new Date(yearNum, 0, 1);
+            endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
+        }
+        where.created = { [Op.between]: [startDate, endDate] };
+    }
+
+    // Filtro automático por departamento Soporte IT (consistente con otros endpoints)
+    const departmentFilter = {
+        model: Department,
+        as: 'department',
+        where: {
+            name: { [Op.in]: ['Soporte Informatico', 'Soporte IT'] }
+        },
+        attributes: ['id', 'name']
+    };
+    
+    // Reemplazar la asociación de Department en include con el filtro
+    include = include.map(inc => {
+        if (inc.model === Department && inc.as === 'department') {
+            return departmentFilter;
+        }
+        return inc;
     });
 
+    try {
+        logger.info(`[REPORTS_LOG] 🔍 Ejecutando consulta con filtros: ${JSON.stringify(where, null, 2)}`);
+        const { count, rows } = await Ticket.findAndCountAll({
+            where,
+            include,
+            limit: parseInt(limit, 10),
+            offset,
+            order: [['created', 'DESC']],
+        });
+
+        logger.info(`[REPORTS_LOG] ✅ Consulta exitosa. Tickets encontrados: ${count}.`);
+
+        return res.status(200).json({
+            tickets: rows,
+            pagination: {
+                total_items: count,
+                total_pages: Math.ceil(count / parseInt(limit, 10)),
+                current_page: parseInt(page, 10),
+                per_page: parseInt(limit, 10)
+            }
+        });
+
+    } catch (error) {
+        logger.error(`[REPORTS_LOG] ❌ Error en la ruta /reports: ${error.message}`);
+        console.error(error); // Log completo del error para diagnóstico
+        return res.status(500).json({
+            message: 'Error interno del servidor al procesar la solicitud de reportes.',
+            error: error.message
+        });
+    }
+});
+
+// GET /api/tickets/stats - Obtener estadísticas de tickets
+router.get('/stats', asyncHandler(async (req, res) => {
+    const { month, year } = req.query;
+    const stats = await getTicketCounts({ month, year });
+    res.json(stats);
+}));
+
+// GET /api/tickets/stats/by-transport
+router.get('/stats/by-transport', asyncHandler(async (req, res) => {
+    const { month, year } = req.query;
+    let where = {};
+
+    if (year && year !== 'all') {
+        const yearNum = parseInt(year, 10);
+        let startDate, endDate;
+        if (month && month !== 'all') {
+            const monthNum = parseInt(month, 10);
+            startDate = new Date(yearNum, monthNum - 1, 1);
+            endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+        } else {
+            startDate = new Date(yearNum, 0, 1);
+            endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
+        }
+        where.created = { [Op.between]: [startDate, endDate] };
+    }
+
+    const transportData = await Ticket.findAll({
+        attributes: [
+            [Ticket.sequelize.col('location.id'), 'transportId'],
+            [Ticket.sequelize.col('location.name'), 'transportName'],
+            [Ticket.sequelize.fn('COUNT', Ticket.sequelize.col('Ticket.id')), 'count']
+        ],
+        include: [{
+            model: Location,
+            as: 'location',
+            attributes: []
+        }],
+        where,
+        group: ['location.id', 'location.name'],
+        order: [[Ticket.sequelize.fn('COUNT', Ticket.sequelize.col('Ticket.id')), 'DESC']]
+    });
+
+    res.json(transportData);
+}));
+
+// GET /api/tickets/count - Obtener conteos de tickets para dashboard
+router.get('/count', asyncHandler(async (req, res) => {
+    
+    const { startDate, endDate, month, year } = req.query;
+    let where = {};
+    
+    // Filtro por rango de fechas
+    if (startDate && endDate) {
+        where.created = {
+            [Op.between]: [new Date(startDate), new Date(endDate)]
+        };
+    } else if (year && month) {
+        // Filtro por mes y año específico
+        const yearNum = parseInt(year, 10);
+        const monthNum = parseInt(month, 10);
+        const startOfMonth = new Date(yearNum, monthNum - 1, 1);
+        const endOfMonth = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+        where.created = {
+            [Op.between]: [startOfMonth, endOfMonth]
+        };
+    }
+    
+    // Incluir filtro por departamento "Soporte IT" para ser consistente
+    const departmentInclude = {
+        model: Department,
+        as: 'department',
+        where: {
+            name: { [Op.in]: ['Soporte Informatico', 'Soporte IT'] }
+        },
+        attributes: []
+    };
+    
+    // Obtener conteos básicos (solo Soporte IT)
+    const totalTickets = await Ticket.count({ 
+        where,
+        include: [departmentInclude]
+    });
+    
+    // Obtener conteos por estado dinámicamente (solo Soporte IT)
+    const statusCounts = await Ticket.findAll({
+        attributes: [
+            'status_id',
+            [fn('COUNT', col('ticket_id')), 'count']
+        ],
+        include: [
+            {
+                model: TicketStatus,
+                as: 'status',
+                attributes: ['name']
+            },
+            departmentInclude
+        ],
+        where,
+        group: ['status_id', 'status.id'],
+        raw: false
+    });
+    
+    // Procesar conteos por estado
+    let openTickets = 0;
+    let closedTickets = 0;
+    let pendingTickets = 0;
+    const byStatus = {};
+    
+    statusCounts.forEach(item => {
+        const statusName = item.status?.name?.toLowerCase() || '';
+        const count = parseInt(item.dataValues.count) || 0;
+        
+        // Agregar al objeto byStatus para la gráfica
+        byStatus[item.status?.name || 'Desconocido'] = count;
+        
+        // Categorizar estados
+        if (statusName.includes('open') || statusName.includes('abierto') || statusName.includes('nuevo')) {
+            openTickets += count;
+        } else if (statusName.includes('closed') || statusName.includes('cerrado') || statusName.includes('resuelto')) {
+            closedTickets += count;
+        } else if (statusName.includes('pending') || statusName.includes('pendiente') || statusName.includes('espera')) {
+            pendingTickets += count;
+        }
+    });
+    
+    // Obtener total de tickets pendientes acumulados (todos los tickets NO cerrados - solo Soporte IT)
+    // Esto incluye tickets abiertos del mes actual + tickets abiertos de meses anteriores
+    // Basado en los estados que vimos: "Abierto" = pendiente, "Resuelto" y "Cerrado" = no pendiente
+    const totalPendingCount = await Ticket.count({
+        include: [
+            {
+                model: TicketStatus,
+                as: 'status',
+                where: {
+                    // Solo incluir estados que NO sean "Resuelto" o "Cerrado"
+                    name: {
+                        [Op.notIn]: ['Resuelto', 'Cerrado']
+                    }
+                }
+            },
+            departmentInclude
+        ]
+    });
+    
+    res.json({
+        total: totalTickets,
+        open: openTickets,
+        closed: closedTickets,
+        pending: pendingTickets,
+        totalPendingAccumulated: totalPendingCount,
+        byStatus: byStatus
+    });
+}));
+
+// GET /api/tickets/stats/by-agent - Obtener estadísticas de tickets por agente (solo Soporte IT)
+router.get('/stats/by-agent', asyncHandler(async (req, res) => {
+    const { year, month } = req.query;
+    const currentYear = year || new Date().getFullYear();
+    const currentMonth = month || new Date().getMonth() + 1;
+    
+    // Filtro por fecha
+    const startDate = new Date(currentYear, currentMonth - 1, 1);
+    const endDate = new Date(currentYear, currentMonth, 0, 23, 59, 59, 999);
+    
+    const where = {
+        created: {
+            [Op.between]: [startDate, endDate]
+        }
+    };
+    
+    // Obtener tickets agrupados por agente asignado (solo Soporte IT)
+    const agentStats = await Ticket.findAll({
+        attributes: [
+            [Ticket.sequelize.fn('COUNT', Ticket.sequelize.col('Ticket.ticket_id')), 'ticket_count']
+        ],
+        include: [
+            {
+                model: Staff,
+                as: 'AssignedStaff',
+                attributes: ['staff_id', 'firstname', 'lastname'],
+                include: [{
+                    model: Department,
+                    as: 'department',
+                    where: {
+                        name: { [Op.in]: ['Soporte Informatico', 'Soporte IT'] }
+                    },
+                    attributes: []
+                }],
+                required: true
+            }
+        ],
+        where,
+        group: ['AssignedStaff.staff_id', 'AssignedStaff.firstname', 'AssignedStaff.lastname'],
+        order: [[Ticket.sequelize.fn('COUNT', Ticket.sequelize.col('Ticket.ticket_id')), 'DESC']],
+        limit: 10
+    });
+    
     // Formatear respuesta
     const formattedStats = agentStats.map(ticket => ({
-      staff_id: ticket.AssignedStaff.staff_id,
-      firstname: ticket.AssignedStaff.firstname,
-      lastname: ticket.AssignedStaff.lastname,
-      ticket_count: parseInt(ticket.dataValues.ticket_count, 10)
+        agent_id: ticket.AssignedStaff.staff_id,
+        agent_name: `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}`.trim(),
+        ticket_count: parseInt(ticket.dataValues.ticket_count, 10)
     }));
-
+    
     res.json(formattedStats);
-  } catch (error) {
-    logger.error('Error en /stats/by-agent:', error);
-    next(error);
-  }
-});
+}));
+
+// GET /api/tickets/export - Exportar tickets
+router.get('/export', asyncHandler(async (req, res) => {
+    console.log('🔄 GET /api/tickets/export - Iniciando exportación con query:', req.query);
+    const { search, month, year, status, priority, department, sla, team, topic, location } = req.query;
+
+    let where = {};
+    let include = [
+        { model: User, as: 'user', attributes: ['name'] },
+        { model: Department, as: 'department', attributes: ['name'] },
+        { model: Sla, as: 'sla', attributes: ['name'] },
+        { model: Team, as: 'team', attributes: ['name'] },
+        { model: Topic, as: 'topic', attributes: ['topic'] },
+        { model: Location, as: 'location', attributes: ['name'] },
+    ];
+
+    if (search && search.trim() !== '') {
+        const searchTerm = `%${search.trim()}%`;
+        const searchCondition = {
+            [Op.or]: [
+                { '$user.name$': { [Op.like]: searchTerm } },
+                { '$department.name$': { [Op.like]: searchTerm } },
+                { '$location.name$': { [Op.like]: searchTerm } },
+                { 'number': { [Op.like]: searchTerm } }
+            ]
+        };
+        where = { ...where, ...searchCondition };
+    }
+
+    if (department && department !== 'all') where.dept_id = department;
+    if (sla && sla !== 'all') where.sla_id = sla;
+    if (team && team !== 'all') where.team_id = team;
+    if (topic && topic !== 'all') where.topic_id = topic;
+    if (location && location !== 'all') where.location_id = location;
+    if (status && status !== 'all') where.status_id = status;
+    if (priority && priority !== 'all') where.priority_id = priority;
+
+    if (year && year !== 'all') {
+        const yearNum = parseInt(year, 10);
+        let startDate, endDate;
+        if (month && month !== 'all') {
+            const monthNum = parseInt(month, 10);
+            startDate = new Date(yearNum, monthNum - 1, 1);
+            endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+        } else {
+            startDate = new Date(yearNum, 0, 1);
+            endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
+        }
+        where.created = { [Op.between]: [startDate, endDate] };
+    }
+
+    const tickets = await Ticket.findAll({
+        where,
+        include,
+        order: [['created', 'DESC']]
+    });
+
+    console.log(`✅ GET /api/tickets/export - Encontrados ${tickets.length} tickets para exportar.`);
+    res.json(tickets);
+}));
+
+module.exports = router;
 
 // GET ticket statistics by organization (for charts)
 router.get('/stats/by-organization', async (req, res, next) => {
@@ -899,8 +781,8 @@ router.get('/stats/tendencies', async (req, res, next) => {
     // Obtener tendencias diarias de tickets creados en el mes
     const dailyTrends = await Ticket.findAll({
       attributes: [
-        [sequelize.fn('DATE', sequelize.col('Ticket.created')), 'date'],
-        [sequelize.fn('COUNT', sequelize.col('Ticket.ticket_id')), 'ticket_count']
+        [fn('DATE', col('Ticket.created')), 'date'],
+        [fn('COUNT', col('Ticket.ticket_id')), 'ticket_count']
       ],
       include: [
         {
@@ -917,8 +799,8 @@ router.get('/stats/tendencies', async (req, res, next) => {
           [Op.between]: [startDate, endDate]
         }
       },
-      group: [sequelize.fn('DATE', sequelize.col('Ticket.created'))],
-      order: [[sequelize.fn('DATE', sequelize.col('Ticket.created')), 'ASC']],
+      group: [fn('DATE', col('Ticket.created'))],
+      order: [[fn('DATE', col('Ticket.created')), 'ASC']],
       raw: true
     });
 
@@ -942,5 +824,332 @@ router.get('/stats/tendencies', async (req, res, next) => {
     next(error);
   }
 });
+
+// GET /api/tickets/options/staff - Obtener opciones de staff (solo Soporte IT)
+router.get('/options/staff', asyncHandler(async (req, res) => {
+  try {
+    // Primero obtener el ID del departamento "Soporte IT"
+    const soporteITDept = await Department.findOne({
+      where: { name: { [Op.like]: '%Soporte%IT%' } }
+    });
+    
+    const staffOptions = await Staff.findAll({
+      attributes: ['staff_id', 'firstname', 'lastname'],
+      where: { 
+        isactive: 1,
+        dept_id: soporteITDept ? soporteITDept.id : null
+      },
+      order: [['firstname', 'ASC']]
+    });
+    
+    const formattedStaff = staffOptions.map(staff => ({
+      staff_id: staff.staff_id,
+      name: `${staff.firstname} ${staff.lastname}`
+    }));
+    
+    res.json(formattedStaff);
+  } catch (error) {
+    logger.error('Error obteniendo opciones de staff:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}));
+
+// GET /api/tickets/options/sector - Obtener opciones de sector (desde ListItems)
+router.get('/options/sector', asyncHandler(async (req, res) => {
+  try {
+    // Obtener sectores únicos desde TicketCdata que tengan valores no nulos
+    const { TicketCdata, ListItems } = require('../models');
+    
+    // Primero obtener todos los IDs de sector únicos que se usan en tickets
+    const usedSectorIds = await TicketCdata.findAll({
+      attributes: [[fn('DISTINCT', col('sector')), 'sector']],
+      where: {
+        sector: { [Op.not]: null }
+      },
+      raw: true
+    });
+    
+    if (usedSectorIds.length === 0) {
+      return res.json([]);
+    }
+    
+    // Obtener los nombres de los sectores desde ListItems
+    const sectorIds = usedSectorIds.map(item => item.sector);
+    const sectorOptions = await ListItems.findAll({
+      attributes: ['id', 'value'],
+      where: {
+        id: { [Op.in]: sectorIds }
+      },
+      order: [['value', 'ASC']]
+    });
+    
+    // Formatear para que coincida con el formato esperado
+    const formattedSectors = sectorOptions.map(sector => ({
+      id: sector.id,
+      name: sector.value
+    }));
+    
+    res.json(formattedSectors);
+  } catch (error) {
+    logger.error('Error obteniendo opciones de sector:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}));
+
+// GET /api/tickets/options/transporte - Obtener opciones de transporte
+router.get('/options/transporte', asyncHandler(async (req, res) => {
+  try {
+    const { TicketCdata, ListItems } = require('../models');
+    
+    // Obtener todos los IDs de transporte únicos que se usan en tickets
+    const usedTransporteIds = await TicketCdata.findAll({
+      attributes: [[fn('DISTINCT', col('transporte')), 'transporte']],
+      where: {
+        transporte: { [Op.not]: null }
+      },
+      raw: true
+    });
+    
+    if (usedTransporteIds.length === 0) {
+      return res.json([]);
+    }
+    
+    // Obtener los nombres de los transportes desde ListItems
+    const transporteIds = usedTransporteIds.map(item => item.transporte);
+    
+    const transporteOptions = await ListItems.findAll({
+      attributes: ['id', 'value'],
+      where: {
+        id: { [Op.in]: transporteIds }
+      },
+      order: [['value', 'ASC']]
+    });
+    
+    // Formatear para que coincida con el formato esperado por el frontend
+    const formattedTransporte = transporteOptions.map(transporte => ({
+      id: transporte.id,
+      name: transporte.value || `ID: ${transporte.id}`
+    }));
+    
+    res.json(formattedTransporte);
+  } catch (error) {
+    logger.error('Error obteniendo opciones de transporte:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}));
+
+// GET /api/tickets/options/status - Obtener opciones de status
+router.get('/options/status', asyncHandler(async (req, res) => {
+  try {
+    const statusOptions = await TicketStatus.findAll({
+      attributes: ['id', 'name'],
+      order: [['name', 'ASC']]
+    });
+    
+    res.json(statusOptions);
+  } catch (error) {
+    logger.error('Error obteniendo opciones de status:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}));
+
+// GET /api/tickets/:id - Obtener detalle completo de un ticket específico
+router.get('/:id', asyncHandler(async (req, res) => {
+    const ticketId = req.params.id;
+    const sequelize = require('../models').sequelize; // Obtener instancia de sequelize
+
+    console.log(`[DEBUG] /api/tickets/:id - INICIO para ticketId: ${ticketId}`);
+
+    try {
+        // Iniciar log de la petición
+        logger.info(`🚀 INICIANDO consulta detalle para ticket ID: ${ticketId}`);
+        console.log(`[DEBUG] /api/tickets/:id - Buscando ticket principal...`);
+
+        // 1. Obtener el ticket principal
+        const ticket = await Ticket.findOne({ 
+            where: { ticket_id: ticketId },
+            include: [
+                {
+                    model: require('../models').TicketCdata,
+                    as: 'cdata',
+                    attributes: ['subject', 'sector', 'transporte'],
+                    required: false
+                }
+            ]
+        });
+        console.log(`[DEBUG] /api/tickets/:id - Ticket principal encontrado: ${ticket ? 'Sí' : 'No'}`);
+
+        if (!ticket) {
+            logger.warn(`Ticket ${ticketId} no encontrado`);
+            return res.status(404).json({ 
+                error: 'Ticket no encontrado',
+                message: `No se encontró el ticket con ID: ${ticketId}` 
+            });
+        }
+
+        logger.info(`Ticket ${ticketId} encontrado, obteniendo información adicional...`);
+        logger.info(`Campos del ticket:`, Object.keys(ticket.toJSON()));
+        logger.info(`Datos del ticket:`, ticket.toJSON());
+
+        // Obtener información adicional del formulario personalizado
+        let formData = [];
+        try {
+            formData = await sequelize.query(`
+                SELECT 
+                    ff.label as field_name,
+                    fev.value as field_value,
+                    ff.type as field_type
+                FROM ost_form_entry fe
+                JOIN ost_form_entry_values fev ON fev.entry_id = fe.id
+                JOIN ost_form_field ff ON ff.id = fev.field_id
+                WHERE fe.object_id = :ticketId 
+                AND fe.object_type = 'T'
+                ORDER BY ff.sort
+            `, {
+                replacements: { ticketId },
+                type: sequelize.QueryTypes.SELECT
+            });
+            logger.info(`Campos personalizados obtenidos: ${formData.length}`);
+        } catch (formError) {
+            logger.warn(`No se pudo obtener campos personalizados para ticket ${ticketId}:`, formError.message);
+        }
+
+        // Obtener respuestas/threads del ticket - Estructura osTicket correcta
+        let ticketThreads = [];
+        try {
+            console.log(`[DEBUG] /api/tickets/:id - 🔍 BUSCANDO THREADS para ticket ${ticketId}...`);
+            
+            const threadEntries = await sequelize.query(`
+                SELECT 
+                    te.id as entry_id,
+                    te.thread_id,
+                    te.poster,
+                    te.title,
+                    te.body,
+                    te.created,
+                    te.staff_id,
+                    te.user_id,
+                    te.type,
+                    t.object_id as ticket_id,
+                    s.firstname as staff_firstname,
+                    s.lastname as staff_lastname,
+                    u.name as user_name
+                FROM ost_thread_entry te
+                JOIN ost_thread t ON te.thread_id = t.id
+                LEFT JOIN ost_staff s ON te.staff_id = s.staff_id
+                LEFT JOIN ost_user u ON te.user_id = u.id
+                WHERE t.object_id = ? AND t.object_type = 'T'
+                ORDER BY te.created ASC
+            `, {
+                replacements: [ticketId],
+                type: sequelize.QueryTypes.SELECT
+            });
+            
+            ticketThreads = threadEntries;
+            console.log(`[DEBUG] /api/tickets/:id - ✅ THREADS ENCONTRADOS: ${ticketThreads.length}`);
+            if (ticketThreads.length > 0) {
+                console.log('[DEBUG] /api/tickets/:id - Primer thread:', JSON.stringify(ticketThreads[0], null, 2));
+            }
+
+            
+        } catch (threadError) {
+            console.error(`❌ ERROR CRÍTICO obteniendo threads para ticket ${ticketId}:`, threadError);
+            console.error(`❌ Stack trace:`, threadError.stack);
+            console.error(`❌ SQL Error details:`, threadError.sql || 'No SQL info');
+            ticketThreads = [];
+        }
+
+        // Obtener información relacionada por separado para evitar errores de asociación
+        let statusInfo = null;
+        let priorityInfo = null;
+        let staffInfo = null;
+        let userInfo = null;
+        let departmentInfo = null;
+        let topicInfo = null;
+
+        try {
+            // Status
+            if (ticket.status_id) {
+                statusInfo = await TicketStatus.findByPk(ticket.status_id, {
+                    attributes: ['id', 'name', 'state']
+                });
+            }
+
+            // Priority
+            if (ticket.priority_id) {
+                priorityInfo = await TicketPriority.findByPk(ticket.priority_id, {
+                    attributes: ['priority_id', 'priority', 'priority_color']
+                });
+            }
+
+            // Staff
+            if (ticket.staff_id) {
+                staffInfo = await Staff.findByPk(ticket.staff_id, {
+                    attributes: ['staff_id', 'firstname', 'lastname', 'email']
+                });
+            }
+
+            // User
+            if (ticket.user_id) {
+                userInfo = await User.findByPk(ticket.user_id, {
+                    attributes: ['id', 'name', 'default_email_id']
+                });
+            }
+
+            // Department
+            if (ticket.dept_id) {
+                departmentInfo = await Department.findByPk(ticket.dept_id, {
+                    attributes: ['id', 'name']
+                });
+            }
+
+            // Topic
+            if (ticket.topic_id) {
+                topicInfo = await HelpTopic.findByPk(ticket.topic_id, {
+                    attributes: ['topic_id', 'topic']
+                });
+            }
+
+        } catch (relationError) {
+            logger.warn(`Error obteniendo información relacionada para ticket ${ticketId}:`, relationError.message);
+        }
+
+        // En osTicket, el asunto está en la tabla cdata
+        const subject = ticket.cdata?.subject || 
+                       (ticketThreads.length > 0 && ticketThreads[0].title) || 
+                       `Ticket #${ticket.number}`;
+
+        // Estructurar la respuesta
+        const ticketDetail = {
+            ...ticket.toJSON(),
+            subject: subject, // Asegurar que el asunto esté disponible
+            status: statusInfo,
+            priority: priorityInfo,
+            AssignedStaff: staffInfo,
+            user: userInfo,
+            department: departmentInfo,
+            topic: topicInfo,
+            customFields: formData,
+            threads: ticketThreads,
+            stats: {
+                totalThreads: ticketThreads.length,
+                lastActivity: ticketThreads.length > 0 ? ticketThreads[ticketThreads.length - 1].created : ticket.updated
+            }
+        };
+
+        logger.info(`Asunto extraído: "${subject}"`);
+        logger.info(`Total threads enviados: ${ticketThreads.length}`);
+
+        logger.info(`Detalle de ticket ${ticketId} obtenido exitosamente`);
+        res.json(ticketDetail);
+
+    } catch (error) {
+        logger.error(`Error al obtener detalle del ticket ${ticketId}:`, error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor',
+            message: `Error específico: ${error.message}`
+        });
+    }
+}));
 
 module.exports = router;
