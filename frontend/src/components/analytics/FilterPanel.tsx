@@ -22,7 +22,8 @@ interface StatusOption {
 
 interface TransporteOption {
   id: number;
-  value: string;
+  value?: string;
+  name?: string;
 }
 
 // Define el tipo para los filtros aplicados
@@ -30,7 +31,7 @@ interface AppliedFilters {
   transporte?: number;
   staff?: number;
   sector?: number;
-  statuses?: number;
+  status?: number;
   startDate?: string;
   endDate?: string;
 }
@@ -49,7 +50,7 @@ interface FilterPanelProps {
  * Candidato #1 para optimización según memorias del proyecto [[memory:2988538]]
  */
 const FilterPanel: React.FC<FilterPanelProps> = memo(({ 
-  transporteOptions, 
+  transporteOptions,
   staffOptions,
   sectorOptions,
   statusOptions,
@@ -65,17 +66,33 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
 
   // Memoizar función handleApply para evitar recreaciones
   const handleApply = useCallback(() => {
+    // LOG TEMPORAL: Debug valores seleccionados
+    console.log('🔍 FILTERPANEL - Valores seleccionados:', {
+      selectedStaff,
+      selectedStatus,
+      selectedTransporte,
+      selectedSector,
+      startDate,
+      endDate
+    });
+    console.log('🔍 FILTERPANEL - Opciones disponibles:', {
+      staffOptions: staffOptions.length,
+      statusOptions: statusOptions.length,
+      transporteOptions: transporteOptions.length,
+      sectorOptions: sectorOptions.length
+    });
+    
     const filters: AppliedFilters = {};
     if (selectedTransporte !== '') filters.transporte = parseInt(selectedTransporte, 10);
     if (selectedStaff !== '') filters.staff = parseInt(selectedStaff, 10);
     if (selectedSector !== '') filters.sector = parseInt(selectedSector, 10); // El backend espera 'sector'
-    if (selectedStatus !== '') filters.statuses = parseInt(selectedStatus, 10); // El backend espera 'statuses'
+    if (selectedStatus !== '') filters.status = parseInt(selectedStatus, 10); // El backend espera 'status'
     if (startDate !== '') filters.startDate = startDate;
     if (endDate !== '') filters.endDate = endDate;
     
-    logger.info('Aplicando filtros:', filters);
+    console.log('🔍 FILTERPANEL - Filtros construidos:', filters);
     onApplyFilters(filters);
-  }, [selectedTransporte, selectedStaff, selectedSector, selectedStatus, startDate, endDate, onApplyFilters]);
+  }, [selectedTransporte, selectedStaff, selectedSector, selectedStatus, startDate, endDate, onApplyFilters, staffOptions, statusOptions, transporteOptions, sectorOptions]);
 
   // Memoizar función handleReset para evitar recreaciones
   const handleReset = useCallback(() => {
@@ -89,21 +106,25 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
   }, [onApplyFilters]);
 
   // Memoizar onChange handlers para evitar recreaciones en cada render
-  const handleTransporteChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedTransporte(e.target.value);
-  }, []);
-
   const handleStaffChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedStaff(e.target.value);
-  }, []);
+    const value = e.target.value;
+    setSelectedStaff(value);
+  }, [setSelectedStaff]);
+
+  const handleTransporteChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setSelectedTransporte(value);
+  }, [setSelectedTransporte]);
 
   const handleSectorChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedSector(e.target.value);
-  }, []);
+    const value = e.target.value;
+    setSelectedSector(value);
+  }, [setSelectedSector]);
 
   const handleStatusChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedStatus(e.target.value);
-  }, []);
+    const value = e.target.value;
+    setSelectedStatus(value);
+  }, [setSelectedStatus]);
 
   const handleStartDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setStartDate(e.target.value);
@@ -140,9 +161,11 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
             className="mt-1 block w-full pl-3 pr-10 py-2 text-[0.875rem] border border-gray-200 dark:border-slate-600 focus:outline-none focus:ring-blue-500 dark:focus:ring-cyan-500 focus:border-blue-500 dark:focus:border-cyan-400 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white transition-colors duration-200"
           >
             <option value="">Todos</option>
-            {staffOptions.map(option => (
-              <option key={option.staff_id} value={option.staff_id}>{option.name}</option>
-            ))}
+            {staffOptions.map((option, index) => {
+              return (
+                <option key={option.staff_id || `staff-${index}`} value={option.staff_id}>{option.name}</option>
+              );
+            })}
           </select>
         </div>
 
@@ -157,11 +180,11 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
           >
             <option value="">Todos</option>
             {sectorOptions.length > 0 ? (
-              sectorOptions.map(option => (
-                <option key={option.id} value={option.id}>{option.name}</option>
+              sectorOptions.map((option, index) => (
+                <option key={option.id || `sector-${index}`} value={option.id}>{option.name}</option>
               ))
             ) : (
-              <option value="" disabled>No hay sectores disponibles</option>
+              <option key="no-sectors" value="" disabled>No hay sectores disponibles</option>
             )}
           </select>
         </div>
@@ -176,8 +199,8 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
             className="mt-1 block w-full pl-3 pr-10 py-2 text-[0.875rem] border border-gray-200 dark:border-slate-600 focus:outline-none focus:ring-blue-500 dark:focus:ring-cyan-500 focus:border-blue-500 dark:focus:border-cyan-400 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white transition-colors duration-200"
           >
             <option value="">Todos</option>
-            {statusOptions.map(option => (
-              <option key={option.id} value={option.id}>{option.name}</option>
+            {statusOptions.map((option, index) => (
+              <option key={option.id || `status-${index}`} value={option.id}>{option.name}</option>
             ))}
           </select>
         </div>
@@ -193,11 +216,13 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
           >
             <option value="">Todos</option>
             {transporteOptions.length > 0 ? (
-              transporteOptions.map(option => (
-                <option key={option.id} value={option.id}>{option.value}</option>
+              transporteOptions.map((option, index) => (
+                <option key={option.id || `transport-${index}`} value={option.id}>
+                  {option.value || option.name || `ID: ${option.id}`}
+                </option>
               ))
             ) : (
-              <option value="" disabled>No hay opciones de transporte disponibles</option>
+              <option key="no-transport" value="" disabled>No hay opciones de transporte disponibles</option>
             )}
           </select>
         </div>

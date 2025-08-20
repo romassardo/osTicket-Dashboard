@@ -13,11 +13,9 @@ const sequelize = new Sequelize(
     host: process.env.DB_HOST,
     port: process.env.DB_PORT || 3306, // Puerto por defecto de MySQL si no se especifica
     dialect: 'mysql',
-    logging: (sql, timing) => {
-      if (process.env.NODE_ENV === 'development') {
-        logger.debug(`SQL Query (${timing}ms): ${sql}`);
-      }
-    }, // Logging de consultas SQL en desarrollo para debugging de performance
+    logging: (sql) => {
+      logger.info(`[SEQUELIZE QUERY] ${sql}`);
+    }, // Forzar el logging de SQL para depuración
     dialectOptions: {
       // debug: true, // Habilitar logs de depuración para mysql2
       // Opciones específicas del dialecto MySQL si son necesarias

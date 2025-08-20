@@ -3,10 +3,11 @@ import logger from '../utils/logger';
 
 // Define el nuevo tipo de respuesta para el endpoint de conteos
 export interface TicketCounts {
-  totalInDateRange: number;
-  openInDateRange: number;
-  closedInDateRange: number;
-  totalOpen: number;
+  total: number;
+  open: number;
+  closed: number;
+  pending: number;
+  totalPendingAccumulated: number;
   byStatus: { [key: string]: number };
 }
 

@@ -42,9 +42,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   // Trigger search when debounced value changes
   useEffect(() => {
-    if (debouncedSearchTerm !== searchTerm) return; // Avoid initial trigger
     onSearch(debouncedSearchTerm);
-  }, [debouncedSearchTerm, onSearch, searchTerm]);
+  }, [debouncedSearchTerm, onSearch]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -88,7 +87,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
           value={searchTerm}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          className="block w-full rounded-xl border-0 bg-white dark:bg-slate-800 py-3.5 pl-12 pr-14 text-base text-gray-900 dark:text-gray-200 shadow-lg shadow-gray-200/20 dark:shadow-slate-900/20 ring-1 ring-inset ring-gray-200 dark:ring-slate-700 transition-all duration-300 placeholder:text-gray-500 dark:placeholder:text-slate-500 hover:shadow-gray-200/30 dark:hover:shadow-slate-900/30 hover:ring-gray-300 dark:hover:ring-slate-600 focus:ring-2 focus:ring-inset focus:ring-blue-500 dark:focus:ring-cyan-500 focus:bg-gray-50 dark:focus:bg-slate-750 focus:shadow-blue-200/10 dark:focus:shadow-cyan-900/10 focus:outline-none sm:leading-6"
+          className="block w-full rounded-xl border-0 bg-white dark:bg-slate-800 py-3.5 pl-12 pr-14 text-base text-gray-900 dark:text-gray-200 shadow-lg shadow-gray-200/20 dark:shadow-slate-900/20 ring-1 ring-inset ring-gray-200 dark:ring-slate-700 transition-all duration-300 placeholder:text-gray-500 dark:placeholder:text-slate-500 hover:shadow-gray-200/30 dark:hover:shadow-slate-900/30 hover:ring-gray-300 dark:hover:ring-slate-600 focus:ring-2 focus:ring-inset focus:ring-blue-500 dark:focus:ring-cyan-500 focus:shadow-blue-200/10 dark:focus:shadow-cyan-900/10 focus:outline-none sm:leading-6"
         />
 
         {/* Loading Spinner or Clear Button */}

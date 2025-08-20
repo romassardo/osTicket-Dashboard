@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { SoundProvider } from './context/SoundContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { Suspense, lazy } from 'react';
 
 // Lazy load components for code splitting
@@ -21,19 +23,23 @@ const LoadingSpinner = () => (
 
 function App() {
   return (
-    <BrowserRouter basename="/dashboard">
-      <Suspense fallback={<LoadingSpinner />}>
-        <Routes>
-          <Route path="/" element={<DashboardLayout />}>
-            <Route index element={<DashboardView />} />
-            <Route path="tickets" element={<TicketsTableView />} />
-            <Route path="analytics" element={<AnalyticsView />} />
-            <Route path="settings" element={<SettingsView />} />
-          </Route>
-          <Route path="*" element={<NotFoundView />} /> {/* Ruta para páginas no encontradas */}
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
+    <SoundProvider>
+      <NotificationProvider>
+        <BrowserRouter basename="/dashboard">
+          <Suspense fallback={<LoadingSpinner />}>
+            <Routes>
+              <Route path="/" element={<DashboardLayout />}>
+                <Route index element={<DashboardView />} />
+              <Route path="tickets" element={<TicketsTableView />} />
+              <Route path="analytics" element={<AnalyticsView />} />
+              <Route path="settings" element={<SettingsView />} />
+            </Route>
+            <Route path="*" element={<NotFoundView />} /> {/* Ruta para páginas no encontradas */}
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+      </NotificationProvider>
+    </SoundProvider>
   );
 }
 

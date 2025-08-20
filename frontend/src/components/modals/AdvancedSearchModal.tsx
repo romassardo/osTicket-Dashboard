@@ -38,6 +38,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
   const [selectedOrg, setSelectedOrg] = useState<string>('');
   const [selectedStaff, setSelectedStaff] = useState<string>('');
 
+
   // DEBUG: Monitorear cambios en selectedStatuses
   useEffect(() => {
     logger.debug('🔍 Modal: selectedStatuses cambió a:', selectedStatuses);
@@ -130,7 +131,9 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Estado del Ticket</label>
             <div className="flex flex-wrap gap-2">
-              {statuses.map(status => (
+              {statuses
+                .filter(status => ['Abierto', 'Cerrado', 'Resuelto'].includes(status.name))
+                .map(status => (
                 <button
                   key={status.id}
                   type="button"
@@ -150,6 +153,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
           {/* Rango de Fechas */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Rango de Fechas</label>
+            
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <DatePicker

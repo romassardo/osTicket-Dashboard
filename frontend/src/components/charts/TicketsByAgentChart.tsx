@@ -38,10 +38,10 @@ const TicketsByAgentChart: React.FC<TicketsByAgentChartProps> = ({ year, month }
   }
 
   const chartData: ChartDataItem[] = (agentStats || [])
-    .map((agent: { firstname: string; lastname: string; ticket_count: number }) => ({
-      name: `${agent.firstname || ''} ${(agent.lastname || '').charAt(0) || ''}.`.trim(),
+    .map((agent: { agent_id: number; agent_name: string; ticket_count: number }) => ({
+      name: agent.agent_name,
       value: agent.ticket_count,
-      fullName: `${agent.firstname || ''} ${agent.lastname || ''}`.trim(),
+      fullName: agent.agent_name,
     }))
     .sort((a: ChartDataItem, b: ChartDataItem) => b.value - a.value);
 

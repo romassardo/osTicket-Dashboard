@@ -7,9 +7,10 @@ import logger from '../../utils/logger';
 interface DataTableProps {
   tickets: Ticket[];
   totalCount?: number;
+  onTicketClick?: (ticketId: number) => void;
 }
 
-const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0 }) => {
+const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicketClick }) => {
   const tableHeaders = [
     'Número',
     'Asunto',
@@ -60,9 +61,12 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0 }) => {
               tickets.map((ticket) => (
                 <tr 
                   key={ticket.ticket_id} 
-                  className="bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 focus-within:bg-gray-50 dark:focus-within:bg-slate-700 transition-colors duration-150 cursor-pointer"
+                  className={`${!ticket.AssignedStaff ? 'bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-200/70 dark:hover:bg-yellow-800/50' : 'bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700'} focus-within:bg-gray-50 dark:focus-within:bg-slate-700 transition-colors duration-150 cursor-pointer`}
                   tabIndex={0}
-                  onClick={() => logger.debug(`Ticket seleccionado: ${ticket.ticket_id}`)}
+                  onClick={() => {
+                    logger.debug(`Ticket seleccionado: ${ticket.ticket_id}`);
+                    onTicketClick?.(ticket.ticket_id);
+                  }}
                 >
                   <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 font-medium">
                     <span className="text-blue-600 dark:text-cyan-400 group-hover:text-blue-700 dark:group-hover:text-cyan-300 transition-colors duration-150 inline-flex items-center">
