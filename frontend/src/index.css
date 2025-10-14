@@ -175,9 +175,38 @@
     border-right: 1px solid rgba(255, 255, 255, 0.06);
     display: flex;
     flex-direction: column;
-    transition: transform var(--duration-normal) ease;
+    transition: width var(--duration-normal) ease, transform var(--duration-normal) ease;
     position: relative;
     z-index: 10;
+    overflow: hidden;
+  }
+
+  /* Sidebar colapsado */
+  .dashboard-sidebar.collapsed {
+    width: 70px !important;
+    min-width: 70px !important;
+    max-width: 70px !important;
+  }
+
+  /* Botón toggle del sidebar */
+  .sidebar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--duration-fast) ease;
+  }
+
+  .sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    transform: scale(1.05);
   }
 
   .dashboard-main {
@@ -186,6 +215,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    transition: margin-left var(--duration-normal) ease;
   }
 
   .dashboard-header {
@@ -694,6 +724,10 @@
   .header-brand {
     padding: var(--space-6);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
   }
 
   .brand-link {
@@ -704,6 +738,25 @@
     color: var(--text-primary);
     font-weight: 700;
     font-size: 1.25rem;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  /* Header brand cuando está colapsado */
+  .dashboard-sidebar.collapsed .header-brand {
+    justify-content: center;
+    padding: var(--space-4) var(--space-2);
+    flex-direction: column;
+  }
+
+  .dashboard-sidebar.collapsed .brand-link {
+    gap: 0;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .dashboard-sidebar.collapsed .brand-link span {
+    display: none;
   }
 
   .brand-icon {
@@ -725,15 +778,16 @@
   }
 
   .nav-item {
-    display: block;
+    display: flex;
     padding: var(--space-3) var(--space-6);
     color: var(--text-secondary);
     text-decoration: none;
     transition: all var(--duration-fast) ease;
     border-left: 3px solid transparent;
-    display: flex;
     align-items: center;
     gap: var(--space-3);
+    white-space: nowrap;
+    overflow: hidden;
   }
 
   .nav-item:hover {
@@ -753,6 +807,28 @@
     width: 20px;
     height: 20px;
     flex-shrink: 0;
+  }
+
+  /* Nav items cuando el sidebar está colapsado */
+  .dashboard-sidebar.collapsed .nav-item {
+    justify-content: center;
+    padding: var(--space-3);
+    border-left: none;
+    border-bottom: 3px solid transparent;
+  }
+
+  .dashboard-sidebar.collapsed .nav-item:hover {
+    border-left: none;
+    border-bottom-color: var(--accent-primary);
+  }
+
+  .dashboard-sidebar.collapsed .nav-item.active {
+    border-left: none;
+    border-bottom-color: var(--accent-primary);
+  }
+
+  .dashboard-sidebar.collapsed .nav-item span {
+    display: none;
   }
 
   /* Sidebar Footer según DESIGN_GUIDE.md */

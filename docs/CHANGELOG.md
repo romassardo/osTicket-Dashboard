@@ -1,5 +1,61 @@
 # CHANGELOG - Dashboard osTicket
 
+## [1.2.0] - 2025-10-14
+
+### 🎉 **ACTUALIZACIÓN MAYOR: SIDEBAR COLAPSABLE + NOTIFICACIONES + DOCUMENTACIÓN**
+
+### ✨ **NUEVA FUNCIONALIDAD: SIDEBAR COLAPSABLE**
+- **Context API**: Implementado `SidebarContext.tsx` para gestión global del estado
+- **Estado Persistente**: Preferencia guardada en localStorage
+- **Animaciones**: Transiciones suaves CSS (300ms)
+- **Responsive**: 
+  - Expandido: 280px (texto completo + footer)
+  - Colapsado: 70px (solo iconos con tooltips)
+- **Toggle Button**: Iconos chevron intuitivos (izquierda/derecha)
+- **Componentes Actualizados**:
+  - `Sidebar.tsx` - Integración con context, botón toggle
+  - `DashboardLayout.tsx` - Consumo de estado colapsado
+  - `App.tsx` - Provider wrapper
+  - `index.css` - Estilos completos para ambos estados
+
+### 🔔 **MEJORA: SISTEMA DE NOTIFICACIONES**
+- **Auto-refresh Corregido**: Intervalo de 60s ahora funciona correctamente
+  - Eliminada dependencia `totalTickets` del useEffect
+  - Logs mejorados para debugging
+- **Sonido en Producción**: Implementada carga de múltiples rutas con Howler.js
+  - Rutas de fallback: `/dashboard/notification.mp3`, `/notification.mp3`, etc.
+  - Manejo robusto de errores según documentación Howler.js
+  - Logs detallados de carga de audio
+- **Botón Sonido ON/OFF**: Verificado funcionando correctamente en Header
+
+### 📚 **DOCUMENTACIÓN COMPLETA**
+Nuevos archivos en `/docs`:
+- **README.md**: Actualizado con características v1.2, estructura mejorada
+- **INSTALACION.md**: Guía paso a paso (backend + frontend + troubleshooting)
+- **GUIA_USUARIO.md**: Manual completo de uso del dashboard
+- **ARQUITECTURA.md**: Decisiones técnicas, flujos de datos, componentes
+- **API.md**: Documentación completa de todos los endpoints
+- **DESPLIEGUE.md**: Guía detallada para despliegue a producción
+
+### 🔧 **MEJORAS TÉCNICAS**
+- **Versión Actualizada**: v1.0 → v1.2 en `Sidebar.tsx`
+- **TypeScript**: Tipos correctos en todos los contexts
+- **Performance**: Optimización de re-renders con useCallback
+- **Logs**: Sistema de logging consistente con emojis
+
+### 📦 **ARCHIVOS NUEVOS**
+- `frontend/src/context/SidebarContext.tsx`
+- `docs/INSTALACION.md`
+- `docs/GUIA_USUARIO.md`
+- `docs/ARQUITECTURA.md`
+- `docs/API.md`
+- `docs/DESPLIEGUE.md`
+
+### 🐛 **CORRECCIONES**
+- Auto-refresh: Eliminado loop infinito por dependencia incorrecta
+- Sonido: Múltiples rutas de carga para compatibilidad producción/desarrollo
+- CSS: Sidebar ahora contrae correctamente a 70px con overflow hidden
+
 ## [0.41.0] - 2025-01-16
 
 ### 🚀 **MEJORAS UX Y NUEVO ANÁLISIS DE FLUJO MENSUAL**
