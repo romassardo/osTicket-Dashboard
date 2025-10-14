@@ -193,12 +193,17 @@ const TicketsTableView: React.FC = memo(() => {
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-      logger.info('Auto-refreshing tickets...');
+      logger.info('🔄 Auto-refreshing tickets...');
       fetchTickets(true);
-    }, 60000);
+    }, 60000); // 60 segundos
 
-    return () => clearInterval(intervalId);
-  }, [fetchTickets, totalTickets]);
+    logger.info('✅ Auto-refresh iniciado (cada 60 segundos)');
+
+    return () => {
+      clearInterval(intervalId);
+      logger.info('🛑 Auto-refresh detenido');
+    };
+  }, [fetchTickets]);
 
   const handleSearch = useCallback((newSearchTerm: string) => {
     setCurrentPage(1); // Reset to first page on new search

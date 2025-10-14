@@ -70,13 +70,30 @@ export const SoundProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     try {
       logger.info('🔊 Inicializando sistema de sonido con Howler.js...');
       
-      // Crear instancia de Howl con múltiples formatos para compatibilidad
+      // Crear instancia de Howl con múltiples rutas posibles
+      // Según documentación de Howler.js, intentar múltiples src para mejor compatibilidad
+      const basePath = import.meta.env.BASE_URL || '/';
+      
+      // Intentar múltiples rutas posibles para producción y desarrollo
+      const possiblePaths = [
+        `${basePath}notification.mp3`,  // Ruta con base (producción: /dashboard/notification.mp3)
+        '/dashboard/notification.mp3',   // Ruta absoluta producción
+        '/notification.mp3',             // Ruta root
+        './notification.mp3'             // Ruta relativa
+      ];
+      
+      logger.info(`🔊 Intentando cargar sonido desde: ${possiblePaths[0]}`);
+      logger.debug('📋 Rutas alternativas:', possiblePaths);
+      
       soundRef.current = new Howl({
-        src: ['./notification.mp3', './notification.webm', './notification.ogg'],
+        src: possiblePaths,
         volume: 0.7,
         preload: true,
+        html5: false, // Usar Web Audio API para mejor rendimiento
         onload: () => {
           logger.info('✅ Archivo de sonido cargado correctamente');
+          // Verificar qué ruta funcionó
+          logger.debug('🎯 URL cargada:', (soundRef.current as any)?._src);
         },
         onloaderror: (id, error) => {
           logger.warn('⚠️ Error al cargar archivo de sonido:', error);
