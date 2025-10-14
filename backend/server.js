@@ -118,9 +118,13 @@ app.use(express.static(frontendDistPath));
 // Para cualquier otra ruta no manejada por la API o los archivos estáticos,
 // servir el index.html de la aplicación de React.
 // Esto es crucial para que el enrutamiento del lado del cliente (React Router) funcione.
-// Usando expresión regular para evitar errores de path-to-regexp
-app.get(/^(?!\/api).*/, (req, res) => {
-  res.sendFile(path.join(frontendDistPath, 'index.html'));
+// Compatible con Express 5.x - usa middleware condicional en lugar de regex
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  } else {
+    next();
+  }
 });
 
 // Función para iniciar el servidor
