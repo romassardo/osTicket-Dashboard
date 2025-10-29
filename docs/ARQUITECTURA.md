@@ -257,9 +257,20 @@ GET  /api/tickets/stats              # Estadísticas generales
 GET  /api/tickets/stats/by-status    # Tickets agrupados por estado
 GET  /api/tickets/stats/by-transport # Tickets agrupados por transporte
 GET  /api/tickets/export             # Exportar todos los tickets (sin paginación)
+GET  /api/sla/alerts                 # Alertas SLA (tickets en riesgo, agentes con bajo rendimiento)
 ```
 
 Ver [API.md](API.md) para documentación completa.
+
+### Módulo SLA
+
+- **Endpoint `/api/sla/alerts`** (backend/routes/slaRoutes.js): ejecuta consultas SQL directas sobre `ost_ticket`, `ost_staff`, `ost_department` y `ost_sla` para detectar:
+  - Tickets abiertos de "Soporte IT" con más del 70% del SLA transcurrido.
+  - Agentes cuyo porcentaje de cumplimiento sea <80% en los últimos 30 días.
+  - Resumen de tickets abiertos/en riesgo/vencidos.
+- **Hardening SQL**: uso de `COALESCE(NULLIF(s_sla.grace_period, 0), 24)` y `NULLIF(...)` para evitar divisiones por cero cuando `grace_period` es `NULL` o `0`.
+- **Normalización frontend** (`frontend/src/views/SLAAlertView.tsx`): se convierte cada campo numérico a `Number` antes de renderizar (especialmente `porcentaje_transcurrido` y `porcentaje_cumplimiento`) para prevenir errores al aplicar `.toFixed()`.
+- **Auto-refresh**: la vista SLA actualiza datos automáticamente cada 5 minutos y permite refresco manual.
 
 ## 🔐 Seguridad
 

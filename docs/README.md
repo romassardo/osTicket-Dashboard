@@ -9,8 +9,10 @@ Dashboard web interactivo para visualización y análisis en tiempo real de tick
 - ✅ Gráficos interactivos con Chart.js y Recharts
 - ✅ Distribución por estado con gráfico donut
 - ✅ Análisis de tickets por tipo de transporte
+- ✅ Vista de alertas SLA con tickets en riesgo y agentes con bajo rendimiento
 - ✅ Filtros por año y mes
 - ✅ Actualización automática cada 60 segundos
+- ℹ️ La vista de alertas SLA se refresca automáticamente cada 5 minutos
 
 ### 🎯 Gestión de Tickets
 - ✅ Tabla completa con paginación (50 tickets por página)

@@ -22,6 +22,7 @@ const statusRoutes = require('./routes/statusRoutes');
 const priorityRoutes = require('./routes/priorityRoutes');
 const helpTopicRoutes = require('./routes/helpTopicRoutes');
 const statsRoutes = require('./routes/statsRoutes'); // <-- AÑADIR NUEVA RUTA
+const slaRoutes = require('./routes/slaRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 // Crear una instancia de la aplicación Express
@@ -100,6 +101,10 @@ logger.debug('✓ Ruta /api/helptopics registrada exitosamente');
 logger.debug('Registrando ruta /api/stats...');
 app.use('/api/stats', statsRoutes); // <-- AÑADIR USO DE LA RUTA
 logger.debug('✓ Ruta /api/stats registrada exitosamente');
+
+logger.debug('Registrando ruta /api/sla...');
+app.use('/api/sla', slaRoutes);
+logger.debug('✓ Ruta /api/sla registrada exitosamente');
 
 logger.info('✓ Todas las rutas API registradas exitosamente');
 

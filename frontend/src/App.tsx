@@ -9,6 +9,8 @@ const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout')
 const DashboardView = lazy(() => import('./views/DashboardView'));
 const TicketsTableView = lazy(() => import('./views/TicketsTableView'));
 const AnalyticsView = lazy(() => import('./views/AnalyticsView'));
+const SLADashboardView = lazy(() => import('./views/SLADashboardView'));
+const SLAAlertView = lazy(() => import('./views/SLAAlertView'));
 const SettingsView = lazy(() => import('./views/SettingsView'));
 const NotFoundView = lazy(() => import('./views/NotFoundView'));
 
@@ -34,6 +36,8 @@ function App() {
                   <Route index element={<DashboardView />} />
                 <Route path="tickets" element={<TicketsTableView />} />
                 <Route path="analytics" element={<AnalyticsView />} />
+                <Route path="sla" element={<SLADashboardView />} />
+                <Route path="sla-alerts" element={<SLAAlertView />} />
                 <Route path="settings" element={<SettingsView />} />
               </Route>
               <Route path="*" element={<NotFoundView />} /> {/* Ruta para páginas no encontradas */}

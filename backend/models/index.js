@@ -13,6 +13,7 @@ const helpTopicFactory = require('./HelpTopic');
 const TicketCdata = require('./TicketCdata'); // Importa directamente el modelo
 const ListItems = require('./ListItems'); // Modelo para los nombres de los sectores
 const List = require('./List');
+const SLA = require('./SLA'); // Modelo para SLA
 const HelpTopic = helpTopicFactory(sequelize); // HelpTopic sí es una fábrica
 
 const db = {
@@ -29,6 +30,7 @@ const db = {
   TicketCdata,
   ListItems,
   List,
+  SLA,
   models: {
     User,
     Ticket,
@@ -41,6 +43,7 @@ const db = {
     TicketCdata,
     ListItems,
     List,
+    SLA,
   }
 };
 
@@ -96,6 +99,10 @@ TicketCdata.belongsTo(ListItems, { foreignKey: 'sector', targetKey: 'id', as: 'S
 // El campo 'transporte' en TicketCdata es el ID de un item en ListItems.
 TicketCdata.belongsTo(ListItems, { foreignKey: 'transporte', targetKey: 'id', as: 'TransporteName' });
 
+// Ticket <-> SLA
+// Un Ticket puede tener un SLA asociado. FK: Ticket.sla_id -> SLA.id
+Ticket.belongsTo(SLA, { foreignKey: 'sla_id', targetKey: 'id', as: 'sla' });
+SLA.hasMany(Ticket, { foreignKey: 'sla_id', sourceKey: 'id', as: 'tickets' });
 
 // Opcional: Sincronizar modelos (mejor hacerlo en server.js al iniciar)
 // db.sequelize.sync({ alter: true }).then(() => {
