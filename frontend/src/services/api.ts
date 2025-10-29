@@ -242,4 +242,50 @@ export const getMonthlyComparison = async (month1: number, year1: number, month2
   }
 };
 
+// ==================== SLA API FUNCTIONS ====================
+
+/**
+ * Obtiene estadísticas detalladas de SLA agrupadas por agente, mes y año
+ * @param params - year, month, agent (opcionales)
+ * @returns Array de estadísticas SLA por agente
+ */
+export const getSLAStats = async (params?: { year?: number; month?: number; agent?: string }) => {
+  try {
+    const response = await apiClient.get('/sla/stats', { params });
+    return response.data;
+  } catch (error) {
+    logger.error('Error al obtener estadísticas SLA:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene alertas de SLA: tickets en riesgo, agentes con bajo rendimiento y tendencias negativas
+ * @returns Objeto con resumen de alertas, tickets en riesgo, agentes con problemas y tendencias
+ */
+export const getSLAAlerts = async () => {
+  try {
+    const response = await apiClient.get('/sla/alerts');
+    return response.data;
+  } catch (error) {
+    logger.error('Error al obtener alertas SLA:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene un resumen general de SLA para mostrar en tarjetas del dashboard
+ * @param params - year, month (opcionales)
+ * @returns Objeto con métricas generales de SLA
+ */
+export const getSLASummary = async (params?: { year?: number; month?: number }) => {
+  try {
+    const response = await apiClient.get('/sla/summary', { params });
+    return response.data;
+  } catch (error) {
+    logger.error('Error al obtener resumen SLA:', error);
+    throw error;
+  }
+};
+
 export default apiClient;

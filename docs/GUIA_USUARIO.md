@@ -16,6 +16,7 @@ El dashboard se actualiza automáticamente cada 60 segundos.
 
 #### Menú de Navegación
 - **Dashboard** - Vista general con métricas y gráficos
+- **Alertas SLA** - Seguimiento de tickets críticos y desempeño de agentes
 - **Tickets** - Tabla completa de todos los tickets
 - **Reportes** - Análisis y reportes detallados
 - **Settings** - Configuración del sistema
@@ -61,6 +62,31 @@ El dashboard se actualiza automáticamente cada 60 segundos.
 - **Año:** Filtra por año (2024, 2025, etc.)
 - **Mes:** Filtra por mes específico
 - Ambos filtros afectan TODAS las métricas y gráficos
+
+## 🚨 Vista Alertas SLA
+
+### Secciones Principales
+
+1. **Resumen General**
+   - Tarjetas con total de tickets abiertos, en riesgo (>70% del SLA transcurrido) y vencidos.
+   - Los valores se actualizan automáticamente a partir de la consulta a `/api/sla/alerts`.
+
+2. **Tickets en Riesgo**
+   - Tabla priorizada con número de ticket, asunto, usuario, agente asignado y tiempo restante.
+   - Barra de progreso con código de color (verde → dentro del SLA, amarillo → >70%, rojo → vencido).
+
+3. **Agentes con Bajo Rendimiento**
+   - Lista de agentes con cumplimiento <80% en los últimos 30 días.
+   - Muestra tickets cumplidos, vencidos y porcentaje de cumplimiento.
+
+4. **Tendencias Negativas**
+   - Comparación de desempeño por agente entre mes actual y anterior.
+   - Destaca caídas significativas en puntos porcentuales.
+
+### Actualización
+
+- La vista refresca datos automáticamente cada **5 minutos** y ofrece botón **“Actualizar”** para refresco manual inmediato.
+- Los valores numéricos se normalizan para evitar errores de formato en la interfaz.
 
 ### Gráficos Interactivos
 
@@ -194,6 +220,8 @@ El dashboard se actualiza cada **60 segundos**:
 - Gráficos
 - Tabla de tickets
 - Detección de tickets nuevos
+
+La vista **Alertas SLA** realiza un refresco independiente cada **5 minutos** para minimizar carga en la base de datos.
 
 ## 🎨 Atajos de Teclado
 

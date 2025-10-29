@@ -233,6 +233,56 @@ GET /api/tickets/export?statuses=2&startDate=2025-10-01&endDate=2025-10-31
 
 ⚠️ **Advertencia:** Este endpoint puede devolver miles de tickets. Usar con precaución.
 
+### 6. Alertas SLA
+
+**GET** `/api/sla/alerts`
+
+Retorna métricas de SLA para el departamento "Soporte IT": tickets abiertos en riesgo, agentes con bajo rendimiento y resumen general.
+
+> **Nota:** El backend calcula los porcentajes con SQL y el frontend convierte los valores a `Number` antes de renderizarlos para evitar errores al usar `.toFixed()`.
+
+#### Normalización Frontend
+
+Al consumir este endpoint desde `SLAAlertView`, los campos numéricos (`total_tickets_abiertos`, `tickets_en_riesgo`, `tickets_vencidos`, `sla_horas`, `horas_transcurridas`, `horas_restantes`, `porcentaje_transcurrido`, `porcentaje_cumplimiento`) se transforman a `Number`. Esto garantiza que cualquier string retornado por MySQL (p. ej. `"26"`) sea seguro para operaciones como `.toFixed()` o cálculos de porcentajes.
+
+#### Query Parameters
+
+No requiere parámetros.
+
+#### Ejemplo de Response
+
+```json
+{
+  "resumen": {
+    "total_tickets_abiertos": 32,
+    "tickets_en_riesgo": 26,
+    "tickets_vencidos": 21
+  },
+  "tickets_en_riesgo": [
+    {
+      "ticket_id": 14321,
+      "number": "013321",
+      "agente_asignado": "María González",
+      "fecha_creacion": "2025-10-25T12:34:00.000Z",
+      "sla_horas": 24,
+      "horas_transcurridas": 20,
+      "horas_restantes": 4,
+      "porcentaje_transcurrido": 83.3
+    }
+  ],
+  "agentes_bajo_rendimiento": [
+    {
+      "agente": "Juan Pérez",
+      "total_tickets": 12,
+      "tickets_cumplidos": 8,
+      "tickets_vencidos": 4,
+      "porcentaje_cumplimiento": 66.7
+    }
+  ],
+  "tendencias_negativas": []
+}
+```
+
 ## Códigos de Estado HTTP
 
 | Código | Significado | Descripción |

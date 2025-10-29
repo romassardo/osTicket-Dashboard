@@ -131,3 +131,75 @@ export interface AdvancedFilters {
   selectedSector?: string;
   selectedStaff?: string;
 }
+
+// ==================== SLA TYPES ====================
+
+export interface SLAStats {
+  departamento: string;
+  agente: string;
+  staff_id: number;
+  anio: number;
+  mes: number;
+  mes_nombre: string;
+  total_tickets: number;
+  tickets_sla_cumplido: number;
+  tickets_sla_vencido: number;
+  porcentaje_sla_cumplido: number;
+  tiempo_promedio_primera_respuesta: string; // Formato: "Xd HH:MM"
+  tiempo_promedio_resolucion: string; // Formato: "Xd HH:MM"
+  tiempo_primera_respuesta_segundos?: number;
+  tiempo_resolucion_segundos?: number;
+}
+
+export interface SLASummary {
+  total_tickets: number;
+  tickets_cumplidos: number;
+  tickets_vencidos: number;
+  porcentaje_cumplimiento: number;
+  avg_tiempo_primera_respuesta: number; // En segundos
+  avg_tiempo_resolucion: number; // En segundos
+  tiempo_promedio_primera_respuesta: string; // Formato: "Xd HH:MM"
+  tiempo_promedio_resolucion: string; // Formato: "Xd HH:MM"
+}
+
+export interface TicketEnRiesgo {
+  ticket_id: number;
+  number: string;
+  usuario: string;
+  agente_asignado: string;
+  asunto: string;
+  fecha_creacion: string;
+  sla_horas: number;
+  horas_transcurridas: number;
+  horas_restantes: number;
+  porcentaje_transcurrido: number;
+}
+
+export interface AgenteConProblema {
+  staff_id: number;
+  agente: string;
+  total_tickets: number;
+  tickets_cumplidos: number;
+  tickets_vencidos: number;
+  porcentaje_cumplimiento: number;
+}
+
+export interface TendenciaNegativa {
+  agente: string;
+  mes_actual: string;
+  porcentaje_mes_actual: number;
+  mes_anterior: string;
+  porcentaje_mes_anterior: number;
+  diferencia: number;
+}
+
+export interface SLAAlerts {
+  resumen: {
+    total_tickets_abiertos: number;
+    tickets_en_riesgo: number;
+    tickets_vencidos: number;
+  };
+  tickets_en_riesgo: TicketEnRiesgo[];
+  agentes_bajo_rendimiento: AgenteConProblema[];
+  tendencias_negativas: TendenciaNegativa[];
+}

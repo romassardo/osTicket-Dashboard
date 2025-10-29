@@ -7,6 +7,8 @@ import {
   HomeIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { useSidebar } from '../../context/SidebarContext';
 
@@ -21,6 +23,8 @@ const Sidebar: React.FC = () => {
     { name: 'Dashboard', href: '/', icon: HomeIcon },
     { name: 'Tickets', href: '/tickets', icon: TicketIcon },
     { name: 'Reportes', href: '/analytics', icon: ChartBarIcon },
+    { name: 'SLA Dashboard', href: '/sla', icon: ClockIcon },
+    { name: 'Alertas SLA', href: '/sla-alerts', icon: ExclamationTriangleIcon },
     { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
   ];
 
