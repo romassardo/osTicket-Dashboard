@@ -144,7 +144,9 @@ router.get('/', asyncHandler(async (req, res) => {
         ],
         limit: parseInt(limit, 10),
         offset,
-        order: [['created', 'DESC']]
+        order: [['created', 'DESC']],
+        subQuery: false,
+        distinct: true
     });
     
     console.log(`[DEBUG] Consulta completada - Total encontrados: ${count}, Devolviendo: ${rows.length}`);
