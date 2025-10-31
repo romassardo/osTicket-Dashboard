@@ -1,5 +1,77 @@
 # CHANGELOG - Dashboard osTicket
 
+## [1.2.1] - 2025-10-31
+
+### 🔧 **CORRECCIONES CRÍTICAS: DASHBOARD SLA - SOPORTE IT**
+
+#### **Bug Fix: Cálculo de Porcentajes en Gráfico "Cumplimiento por Agente"**
+- **Problema**: Backend retornaba `tickets_sla_cumplido` y `tickets_sla_vencido` como strings
+- **Causa**: Concatenación de strings ("12" + "1" = "121") en lugar de suma (12 + 1 = 13)
+- **Solución**: Conversión explícita a `Number()` antes de operaciones aritméticas
+- **Archivo**: `frontend/src/components/sla/AgentComparisonChart.tsx` (líneas 21-23)
+- **Resultado**: Porcentajes correctos (ej: Esteban Ravier 92.9% en lugar de 0.1%)
+
+#### **Actualización: Rangos SLA en Todo el Sistema**
+- **Rangos NUEVOS**:
+  - ✅ Excelente: 90-100% (verde)
+  - ⚠️ Regular: 70-89% (amarillo)  
+  - ❌ Crítico: 0-69% (rojo)
+- **Rangos ANTERIORES** (reemplazados):
+  - Excelente: >95%
+  - Regular: 80-95%
+  - Crítico: <80%
+- **Archivos modificados**:
+  - `AgentComparisonChart.tsx`: Función getBarColor() + etiquetas (líneas 60-62, 141-149)
+  - `SLAMetricsCards.tsx`: Condiciones isGood/isWarning/isBad (líneas 31-33)
+  - `SLADetailTable.tsx`: Colores en tabla (líneas 231-233)
+  - `SLATrendChart.tsx`: Leyenda del gráfico (líneas 141-145)
+
+#### **Mejora: Internacionalización - Fechas en Español**
+- **Problema**: Meses se mostraban en inglés (January, February, etc.)
+- **Solución**: Función helper `translateMonth()` para traducción frontend
+- **Archivo**: `frontend/src/components/sla/SLADetailTable.tsx` (líneas 14-30, 260)
+- **Resultado**: Fechas como "Octubre 2025", "Enero 2025", "Marzo 2025"
+
+#### **Bug Fix: Consolidación de Registros por Agente/Mes**
+- **Problema**: Agentes aparecían duplicados en el mismo mes (múltiples SLAs)
+  - Ejemplo: Leonardo Alesso 3 veces en "Octubre 2025" (74 + 1 + 2 tickets)
+- **Causa**: Backend agrupa por `(agente, año, mes, nombre_sla)`
+- **Solución**: Consolidación frontend por clave `${staff_id}-${anio}-${mes}`
+- **Archivo**: `frontend/src/components/sla/SLADetailTable.tsx` (líneas 49-85)
+- **Resultado**: 1 registro por agente/mes con tickets sumados correctamente
+
+#### **Mejora: Búsqueda en Español**
+- **Problema**: No se podía buscar "octubre" (backend retorna "October")
+- **Solución**: Búsqueda ahora incluye 3 campos:
+  - Nombre de agente
+  - Mes en inglés (backend)
+  - Mes en español (traducido)
+- **Archivo**: `frontend/src/components/sla/SLADetailTable.tsx` (líneas 89-97)
+
+#### **Bug Fix: Ordenamiento Cronológico de Fechas**
+- **Problema**: Columna MES ordenaba alfabéticamente (Septiembre, Agosto, Julio...)
+- **Causa**: Comparación de strings `"2025-2"` vs `"2025-10"`
+- **Solución**: Conversión a números `año * 100 + mes` (202502 vs 202510)
+- **Archivo**: `frontend/src/components/sla/SLADetailTable.tsx` (líneas 109-111)
+- **Resultado**: Ordenamiento cronológico correcto (Febrero, Marzo... Octubre)
+
+#### **Mejora: Filtro de Agentes Inactivos**
+- **Agentes excluidos de gráficos SLA**:
+  - Roberto Gerhardt
+  - Diego Gomez
+- **Componentes afectados**:
+  - `SLATrendChart.tsx` (Evolución SLA)
+  - `AgentComparisonChart.tsx` (Cumplimiento por Agente)
+
+### 📊 **IMPACTO DE LOS CAMBIOS**
+- ✅ Datos precisos y confiables en todos los gráficos SLA
+- ✅ UX mejorada con fechas y búsqueda en español
+- ✅ Sin duplicados ni registros incorrectos
+- ✅ Ordenamiento intuitivo y funcional
+- ✅ Rangos SLA más alcanzables y justos
+
+---
+
 ## [1.2.0] - 2025-10-14
 
 ### 🎉 **ACTUALIZACIÓN MAYOR: SIDEBAR COLAPSABLE + NOTIFICACIONES + DOCUMENTACIÓN**

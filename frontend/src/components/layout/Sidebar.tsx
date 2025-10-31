@@ -9,6 +9,7 @@ import {
   ChevronRightIcon,
   ClockIcon,
   ExclamationTriangleIcon,
+  ChartPieIcon,
 } from '@heroicons/react/24/outline';
 import { useSidebar } from '../../context/SidebarContext';
 
@@ -25,6 +26,7 @@ const Sidebar: React.FC = () => {
     { name: 'Reportes', href: '/analytics', icon: ChartBarIcon },
     { name: 'SLA Dashboard', href: '/sla', icon: ClockIcon },
     { name: 'Alertas SLA', href: '/sla-alerts', icon: ExclamationTriangleIcon },
+    { name: 'Estadísticas SLA', href: '/sla-stats', icon: ChartPieIcon },
     { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
   ];
 

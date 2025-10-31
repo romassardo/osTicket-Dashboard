@@ -288,4 +288,26 @@ export const getSLASummary = async (params?: { year?: number; month?: number }) 
   }
 };
 
+/**
+ * Obtiene lista detallada de tickets con información individual de SLA
+ * @param params - year, month, agent_id, status ('cumplido' | 'vencido'), page, limit
+ * @returns Objeto con array de tickets y paginación
+ */
+export const getSLATickets = async (params?: { 
+  year?: number; 
+  month?: number; 
+  agent_id?: number;
+  status?: 'cumplido' | 'vencido';
+  page?: number;
+  limit?: number;
+}) => {
+  try {
+    const response = await apiClient.get('/sla/tickets', { params });
+    return response.data;
+  } catch (error) {
+    logger.error('Error al obtener tickets SLA:', error);
+    throw error;
+  }
+};
+
 export default apiClient;

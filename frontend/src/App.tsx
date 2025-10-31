@@ -11,6 +11,7 @@ const TicketsTableView = lazy(() => import('./views/TicketsTableView'));
 const AnalyticsView = lazy(() => import('./views/AnalyticsView'));
 const SLADashboardView = lazy(() => import('./views/SLADashboardView'));
 const SLAAlertView = lazy(() => import('./views/SLAAlertView'));
+const SLAStatsView = lazy(() => import('./views/SLAStatsView'));
 const SettingsView = lazy(() => import('./views/SettingsView'));
 const NotFoundView = lazy(() => import('./views/NotFoundView'));
 
@@ -38,6 +39,7 @@ function App() {
                 <Route path="analytics" element={<AnalyticsView />} />
                 <Route path="sla" element={<SLADashboardView />} />
                 <Route path="sla-alerts" element={<SLAAlertView />} />
+                <Route path="sla-stats" element={<SLAStatsView />} />
                 <Route path="settings" element={<SettingsView />} />
               </Route>
               <Route path="*" element={<NotFoundView />} /> {/* Ruta para páginas no encontradas */}

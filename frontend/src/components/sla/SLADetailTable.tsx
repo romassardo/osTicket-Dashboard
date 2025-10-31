@@ -10,6 +10,25 @@ interface SLADetailTableProps {
 type SortField = 'agente' | 'mes' | 'total_tickets' | 'porcentaje_sla_cumplido' | 'tiempo_promedio_resolucion';
 type SortOrder = 'asc' | 'desc';
 
+// Helper para traducir nombres de meses al español
+const translateMonth = (monthName: string): string => {
+  const translations: { [key: string]: string } = {
+    'January': 'Enero',
+    'February': 'Febrero',
+    'March': 'Marzo',
+    'April': 'Abril',
+    'May': 'Mayo',
+    'June': 'Junio',
+    'July': 'Julio',
+    'August': 'Agosto',
+    'September': 'Septiembre',
+    'October': 'Octubre',
+    'November': 'Noviembre',
+    'December': 'Diciembre'
+  };
+  return translations[monthName] || monthName;
+};
+
 const SLADetailTable: React.FC<SLADetailTableProps> = ({ stats, loading }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<SortField>('porcentaje_sla_cumplido');
@@ -27,14 +46,53 @@ const SLADetailTable: React.FC<SLADetailTableProps> = ({ stats, loading }) => {
   const filteredAndSortedData = useMemo(() => {
     if (!stats) return [];
 
-    let filtered = [...stats];
+    // PASO 1: Consolidar por agente/año/mes (múltiples SLAs en un solo registro)
+    const consolidated = new Map<string, typeof stats[0]>();
+    stats.forEach(stat => {
+      const key = `${stat.staff_id}-${stat.anio}-${stat.mes}`;
+      const existing = consolidated.get(key);
+      
+      if (existing) {
+        // Sumar tickets de diferentes SLAs del mismo mes
+        const totalCumplidos = Number(existing.tickets_sla_cumplido) + Number(stat.tickets_sla_cumplido);
+        const totalVencidos = Number(existing.tickets_sla_vencido) + Number(stat.tickets_sla_vencido);
+        const totalTickets = Number(existing.total_tickets) + Number(stat.total_tickets);
+        
+        existing.tickets_sla_cumplido = totalCumplidos as any;
+        existing.tickets_sla_vencido = totalVencidos as any;
+        existing.total_tickets = totalTickets;
+        existing.porcentaje_sla_cumplido = totalTickets > 0 ? (totalCumplidos / totalTickets) * 100 : 0;
+        
+        // Promedio ponderado de tiempos
+        const existingCount = (existing as any)._recordCount || 1;
+        if (stat.tiempo_resolucion_segundos) {
+          existing.tiempo_resolucion_segundos = 
+            ((existing.tiempo_resolucion_segundos || 0) * existingCount + stat.tiempo_resolucion_segundos) / (existingCount + 1);
+        }
+        if (stat.tiempo_primera_respuesta_segundos) {
+          existing.tiempo_primera_respuesta_segundos = 
+            ((existing.tiempo_primera_respuesta_segundos || 0) * existingCount + stat.tiempo_primera_respuesta_segundos) / (existingCount + 1);
+        }
+        (existing as any)._recordCount = existingCount + 1;
+      } else {
+        consolidated.set(key, { 
+          ...stat, 
+          tickets_sla_cumplido: Number(stat.tickets_sla_cumplido) as any,
+          tickets_sla_vencido: Number(stat.tickets_sla_vencido) as any,
+          _recordCount: 1 
+        } as any);
+      }
+    });
 
-    // Filtrar por búsqueda
+    let filtered = Array.from(consolidated.values());
+
+    // PASO 2: Filtrar por búsqueda (incluye búsqueda en español)
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(item => 
         item.agente.toLowerCase().includes(term) ||
-        item.mes_nombre.toLowerCase().includes(term)
+        item.mes_nombre.toLowerCase().includes(term) ||
+        translateMonth(item.mes_nombre).toLowerCase().includes(term)
       );
     }
 
@@ -48,8 +106,9 @@ const SLADetailTable: React.FC<SLADetailTableProps> = ({ stats, loading }) => {
           bVal = b.agente;
           break;
         case 'mes':
-          aVal = `${a.anio}-${a.mes}`;
-          bVal = `${b.anio}-${b.mes}`;
+          // Convertir a número para ordenar cronológicamente: año*100 + mes
+          aVal = a.anio * 100 + a.mes;
+          bVal = b.anio * 100 + b.mes;
           break;
         case 'total_tickets':
           aVal = a.total_tickets;
@@ -228,8 +287,8 @@ const SLADetailTable: React.FC<SLADetailTableProps> = ({ stats, loading }) => {
                 const porcentaje = typeof row.porcentaje_sla_cumplido === 'number' 
                   ? row.porcentaje_sla_cumplido 
                   : parseFloat(row.porcentaje_sla_cumplido as any) || 0;
-                const colorClass = porcentaje >= 95 ? 'text-green-600 dark:text-green-400' :
-                                 porcentaje >= 80 ? 'text-yellow-600 dark:text-yellow-400' :
+                const colorClass = porcentaje >= 90 ? 'text-green-600 dark:text-green-400' :
+                                 porcentaje >= 70 ? 'text-yellow-600 dark:text-yellow-400' :
                                  'text-red-600 dark:text-red-400';
 
                 return (
@@ -238,7 +297,7 @@ const SLADetailTable: React.FC<SLADetailTableProps> = ({ stats, loading }) => {
                       {row.agente}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
-                      {row.mes_nombre} {row.anio}
+                      {translateMonth(row.mes_nombre)} {row.anio}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
                       {row.total_tickets}

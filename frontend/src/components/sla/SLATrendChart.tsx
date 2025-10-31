@@ -35,23 +35,27 @@ const SLATrendChart: React.FC<SLATrendChartProps> = ({ stats, loading }) => {
     return Object.values(groupedByMonth).map((month: any) => {
       const data: any = { mes: month.mes };
       
-      // Agregar cada agente como una serie
+      // Agregar cada agente como una serie (excluyendo agentes que ya no trabajan)
+      const excludedAgents = ['Roberto Gerhardt', 'Diego Gomez'];
       month.agentes.forEach((a: any) => {
-        data[a.agente] = a.porcentaje;
+        if (!excludedAgents.includes(a.agente)) {
+          data[a.agente] = a.porcentaje;
+        }
       });
-      
-      // Calcular promedio del mes
-      const total = month.agentes.reduce((sum: number, a: any) => sum + a.porcentaje, 0);
-      data['Promedio'] = month.agentes.length > 0 ? total / month.agentes.length : 0;
       
       return data;
     });
   }, [stats]);
 
-  // Obtener nombres únicos de agentes para las líneas
+  // Obtener nombres únicos de agentes para las líneas (excluyendo agentes que ya no trabajan)
   const agenteNames = useMemo(() => {
     if (!stats || stats.length === 0) return [];
-    const names = new Set(stats.map(s => s.agente));
+    const excludedAgents = ['Roberto Gerhardt', 'Diego Gomez'];
+    const names = new Set(
+      stats
+        .filter(s => !excludedAgents.includes(s.agente))
+        .map(s => s.agente)
+    );
     return Array.from(names);
   }, [stats]);
 
@@ -117,16 +121,6 @@ const SLATrendChart: React.FC<SLATrendChartProps> = ({ stats, loading }) => {
             iconType="line"
           />
           
-          {/* Línea de promedio (más gruesa y destacada) */}
-          <Line 
-            type="monotone" 
-            dataKey="Promedio" 
-            stroke="#9333ea" 
-            strokeWidth={3}
-            dot={{ fill: '#9333ea', r: 4 }}
-            activeDot={{ r: 6 }}
-          />
-          
           {/* Líneas de cada agente */}
           {agenteNames.map((nombre, index) => (
             <Line 
@@ -143,12 +137,12 @@ const SLATrendChart: React.FC<SLATrendChartProps> = ({ stats, loading }) => {
       </ResponsiveContainer>
       
       <div className="mt-4 flex items-center text-xs text-gray-500 dark:text-gray-400">
-        <div className="w-3 h-0.5 bg-red-500 mr-2"></div>
-        <span className="mr-4">Meta: &gt;95%</span>
-        <div className="w-3 h-0.5 bg-yellow-500 mr-2"></div>
-        <span className="mr-4">Advertencia: 80-95%</span>
         <div className="w-3 h-0.5 bg-green-500 mr-2"></div>
-        <span>Crítico: &lt;80%</span>
+        <span className="mr-4">Excelente: 90-100%</span>
+        <div className="w-3 h-0.5 bg-yellow-500 mr-2"></div>
+        <span className="mr-4">Regular: 70-89%</span>
+        <div className="w-3 h-0.5 bg-red-500 mr-2"></div>
+        <span>Crítico: &lt;70%</span>
       </div>
     </div>
   );

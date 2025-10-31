@@ -40,17 +40,6 @@ const SLAAlertView: React.FC = () => {
       }
 
       const data = await getSLAAlerts();
-      
-      // DEBUG: Ver qué datos llegan del backend
-      console.log('🔍 Datos recibidos del backend:', {
-        resumen: data?.resumen,
-        vencidos_count: data?.tickets_vencidos?.length,
-        criticos_count: data?.tickets_criticos?.length,
-        enRiesgo_count: data?.tickets_en_riesgo?.length,
-        vencidos_sample: data?.tickets_vencidos?.[0],
-        criticos_sample: data?.tickets_criticos?.[0],
-        enRiesgo_sample: data?.tickets_en_riesgo?.[0]
-      });
 
       const normalized: SLAAlerts = {
         resumen: {
@@ -462,7 +451,6 @@ const SLAAlertView: React.FC = () => {
       {/* Modal de detalle */}
       {isModalOpen && selectedTicketId && (
         <TicketDetailModal
-          isOpen={isModalOpen}
           ticketId={selectedTicketId}
           onClose={handleCloseModal}
         />
