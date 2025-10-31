@@ -28,9 +28,9 @@ const SLAMetricsCards: React.FC<SLAMetricsCardsProps> = ({ summary, loading }) =
   const porcentaje = typeof summary.porcentaje_cumplimiento === 'number' 
     ? summary.porcentaje_cumplimiento 
     : parseFloat(summary.porcentaje_cumplimiento as any) || 0;
-  const isGood = porcentaje >= 95;
-  const isWarning = porcentaje >= 80 && porcentaje < 95;
-  const isBad = porcentaje < 80;
+  const isGood = porcentaje >= 90;
+  const isWarning = porcentaje >= 70 && porcentaje < 90;
+  const isBad = porcentaje < 70;
 
   const getColorClass = () => {
     if (isGood) return 'text-green-600 dark:text-green-400';

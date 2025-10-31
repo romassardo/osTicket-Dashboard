@@ -110,3 +110,9 @@ public
 # Operating System Files
 .DS_Store
 Thumbs.db
+
+# Environment files (contienen credenciales)
+.env
+.env.local
+.env.*.local
+backend/config/.env.local

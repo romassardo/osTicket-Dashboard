@@ -11,26 +11,34 @@ const AgentComparisonChart: React.FC<AgentComparisonChartProps> = ({ stats, load
   const chartData = useMemo(() => {
     if (!stats || stats.length === 0) return [];
 
-    // Agrupar por agente y calcular promedio general
-    const groupedByAgent = stats.reduce((acc: any, item) => {
-      if (!acc[item.agente]) {
-        acc[item.agente] = {
-          agente: item.agente,
-          tickets: [],
-          cumplidos: 0,
-          vencidos: 0
-        };
-      }
-      
-      acc[item.agente].tickets.push(item);
-      acc[item.agente].cumplidos += item.tickets_sla_cumplido;
-      acc[item.agente].vencidos += item.tickets_sla_vencido;
-      
-      return acc;
-    }, {});
+    // Filtrar agentes que ya no trabajan
+    const excludedAgents = ['Roberto Gerhardt', 'Diego Gomez'];
+    const filteredStats = stats.filter(s => !excludedAgents.includes(s.agente));
 
-    // Calcular porcentaje promedio para cada agente
-    const agentData = Object.values(groupedByAgent).map((agent: any) => {
+    // Consolidar por staff_id (puede haber múltiples registros por mes/año/SLA)
+    const agentMap = new Map<number, any>();
+    filteredStats.forEach(stat => {
+      // IMPORTANTE: Convertir a números para evitar concatenación de strings
+      const cumplidos = Number(stat.tickets_sla_cumplido) || 0;
+      const vencidos = Number(stat.tickets_sla_vencido) || 0;
+      
+      const existing = agentMap.get(stat.staff_id);
+      if (existing) {
+        // Consolidar datos sumando tickets (ya como números)
+        existing.cumplidos += cumplidos;
+        existing.vencidos += vencidos;
+      } else {
+        agentMap.set(stat.staff_id, {
+          agente: stat.agente,
+          staff_id: stat.staff_id,
+          cumplidos: cumplidos,
+          vencidos: vencidos
+        });
+      }
+    });
+
+    // Calcular porcentaje para cada agente consolidado
+    const agentData = Array.from(agentMap.values()).map((agent: any) => {
       const total = agent.cumplidos + agent.vencidos;
       const porcentaje = total > 0 ? (agent.cumplidos / total) * 100 : 0;
       const numPorcentaje = typeof porcentaje === 'number' ? porcentaje : parseFloat(porcentaje as any) || 0;
@@ -49,8 +57,8 @@ const AgentComparisonChart: React.FC<AgentComparisonChartProps> = ({ stats, load
   }, [stats]);
 
   const getBarColor = (porcentaje: number) => {
-    if (porcentaje >= 95) return '#10b981'; // Verde
-    if (porcentaje >= 80) return '#f59e0b'; // Amarillo
+    if (porcentaje >= 90) return '#10b981'; // Verde
+    if (porcentaje >= 70) return '#f59e0b'; // Amarillo
     return '#ef4444'; // Rojo
   };
 
@@ -130,15 +138,15 @@ const AgentComparisonChart: React.FC<AgentComparisonChartProps> = ({ stats, load
       <div className="mt-4 grid grid-cols-3 gap-4 text-xs">
         <div className="flex items-center">
           <div className="w-3 h-3 bg-green-500 rounded mr-2"></div>
-          <span className="text-gray-600 dark:text-gray-400">Excelente (&gt;95%)</span>
+          <span className="text-gray-600 dark:text-gray-400">Excelente (90-100%)</span>
         </div>
         <div className="flex items-center">
           <div className="w-3 h-3 bg-yellow-500 rounded mr-2"></div>
-          <span className="text-gray-600 dark:text-gray-400">Regular (80-95%)</span>
+          <span className="text-gray-600 dark:text-gray-400">Regular (70-89%)</span>
         </div>
         <div className="flex items-center">
           <div className="w-3 h-3 bg-red-500 rounded mr-2"></div>
-          <span className="text-gray-600 dark:text-gray-400">Crítico (&lt;80%)</span>
+          <span className="text-gray-600 dark:text-gray-400">Crítico (&lt;70%)</span>
         </div>
       </div>
     </div>

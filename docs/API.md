@@ -241,9 +241,25 @@ Retorna métricas de SLA para el departamento "Soporte IT": tickets abiertos en 
 
 > **Nota:** El backend calcula los porcentajes con SQL y el frontend convierte los valores a `Number` antes de renderizarlos para evitar errores al usar `.toFixed()`.
 
+#### Campos Incluidos
+
+**Tickets en Riesgo:**
+- `ticket_id`: ID del ticket
+- `number`: Número de ticket (formato 013321)
+- `agente_asignado`: Nombre completo del agente
+- `nombre_sla`: Nombre del SLA asignado (ej: "48", "Semana", "Mes en curso")
+- `fecha_creacion`: Timestamp de creación
+- `sla_horas`: Límite del SLA en horas
+- `horas_transcurridas`: Horas desde la creación
+- `horas_restantes`: Horas restantes hasta vencimiento
+- `diferencia_horas`: Margen disponible (positivo = horas de margen, negativo = horas excedidas)
+- `porcentaje_transcurrido`: Porcentaje del SLA utilizado
+
+**Campos eliminados:** `asunto` y `usuario` no se incluyen para simplificar la respuesta y mejorar el rendimiento.
+
 #### Normalización Frontend
 
-Al consumir este endpoint desde `SLAAlertView`, los campos numéricos (`total_tickets_abiertos`, `tickets_en_riesgo`, `tickets_vencidos`, `sla_horas`, `horas_transcurridas`, `horas_restantes`, `porcentaje_transcurrido`, `porcentaje_cumplimiento`) se transforman a `Number`. Esto garantiza que cualquier string retornado por MySQL (p. ej. `"26"`) sea seguro para operaciones como `.toFixed()` o cálculos de porcentajes.
+Al consumir este endpoint desde `SLAAlertView`, los campos numéricos (`total_tickets_abiertos`, `tickets_en_riesgo`, `tickets_vencidos`, `sla_horas`, `horas_transcurridas`, `horas_restantes`, `diferencia_horas`, `porcentaje_transcurrido`, `porcentaje_cumplimiento`) se transforman a `Number`. Esto garantiza que cualquier string retornado por MySQL (p. ej. `"26"`) sea seguro para operaciones como `.toFixed()` o cálculos de porcentajes.
 
 #### Query Parameters
 
@@ -263,11 +279,13 @@ No requiere parámetros.
       "ticket_id": 14321,
       "number": "013321",
       "agente_asignado": "María González",
+      "nombre_sla": "48",
       "fecha_creacion": "2025-10-25T12:34:00.000Z",
-      "sla_horas": 24,
-      "horas_transcurridas": 20,
+      "sla_horas": 48,
+      "horas_transcurridas": 44,
       "horas_restantes": 4,
-      "porcentaje_transcurrido": 83.3
+      "diferencia_horas": 4,
+      "porcentaje_transcurrido": 91.7
     }
   ],
   "agentes_bajo_rendimiento": [
@@ -282,6 +300,104 @@ No requiere parámetros.
   "tendencias_negativas": []
 }
 ```
+
+### 7. Estadísticas SLA Agregadas
+
+**GET** `/api/sla/stats`
+
+Retorna estadísticas de cumplimiento de SLA agregadas por agente y mes, incluyendo la **diferencia promedio** entre el tiempo real de resolución y el límite del SLA.
+
+#### Query Parameters
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|-----------|-------------|
+| `year` | Integer | No | Año a filtrar (ej: 2025) |
+| `month` | Integer | No | Mes a filtrar (1-12) |
+| `agent_id` | Integer | No | ID del agente a filtrar |
+
+#### Ejemplo de Response
+
+```json
+{
+  "stats": [
+    {
+      "departamento": "Soporte IT",
+      "agente": "Juan Pérez",
+      "nombre_sla": "48",
+      "anio": 2025,
+      "mes": 10,
+      "mes_nombre": "Octubre",
+      "total_tickets": 45,
+      "tickets_sla_cumplido": 38,
+      "tickets_sla_vencido": 7,
+      "porcentaje_sla_cumplido": "84.44 %",
+      "tiempo_promedio_primera_respuesta": "0d 02:15",
+      "tiempo_promedio_resolucion": "1d 08:30",
+      "diferencia_sla_promedio": "Cumplió 5.3h antes"
+    }
+  ]
+}
+```
+
+**Campos destacados:**
+- `diferencia_sla_promedio`: Texto descriptivo del margen/exceso promedio (ej: "Cumplió 5.3h antes" o "Se pasó 3.2h")
+- `nombre_sla`: Nombre del SLA asignado a los tickets del grupo
+
+### 8. Detalle de Tickets con SLA Individual
+
+**GET** `/api/sla/tickets`
+
+Retorna lista detallada de tickets cerrados con información individual de cumplimiento SLA, incluyendo la **diferencia exacta** en horas y el **porcentaje de SLA utilizado**.
+
+#### Query Parameters
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|-----------|-------------|
+| `year` | Integer | No | Año a filtrar |
+| `month` | Integer | No | Mes a filtrar (1-12) |
+| `agent_id` | Integer | No | ID del agente |
+| `status` | String | No | Estado SLA: 'cumplido' o 'vencido' |
+| `page` | Integer | No | Página (default: 1) |
+| `limit` | Integer | No | Items por página (default: 50) |
+
+#### Ejemplo de Response
+
+```json
+{
+  "tickets": [
+    {
+      "numero_ticket": "013589",
+      "departamento": "Soporte IT",
+      "agente": "María González",
+      "nombre_sla": "48",
+      "limite_sla_horas": 48,
+      "fecha_creacion": "2025-10-15T09:00:00.000Z",
+      "fecha_cierre": "2025-10-17T11:30:00.000Z",
+      "horas_resolucion_real": 50,
+      "tiempo_resolucion_legible": "2d 02:30",
+      "diferencia_horas": -2,
+      "estado_sla": "Vencido",
+      "diferencia_sla": "Se pasó 2.0h",
+      "porcentaje_sla_utilizado": "104.17 %",
+      "tiempo_primera_respuesta": "1h 45m"
+    }
+  ],
+  "pagination": {
+    "total": 156,
+    "page": 1,
+    "per_page": 50,
+    "total_pages": 4
+  }
+}
+```
+
+**Campos destacados:**
+- `diferencia_horas`: Diferencia numérica (positivo = cumplió antes, negativo = se pasó)
+- `diferencia_sla`: Texto descriptivo de la diferencia
+- `porcentaje_sla_utilizado`: Porcentaje del tiempo SLA consumido
+- `estado_sla`: "Cumplido" o "Vencido"
+
+**Uso recomendado:** Filtrar por los últimos 3-6 meses para optimizar el rendimiento de la query.
 
 ## Códigos de Estado HTTP
 

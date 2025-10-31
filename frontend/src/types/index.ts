@@ -165,14 +165,17 @@ export interface SLASummary {
 export interface TicketEnRiesgo {
   ticket_id: number;
   number: string;
-  usuario: string;
   agente_asignado: string;
-  asunto: string;
+  nombre_sla: string;
   fecha_creacion: string;
+  ultima_actualizacion?: string;
   sla_horas: number;
   horas_transcurridas: number;
   horas_restantes: number;
-  porcentaje_transcurrido: number;
+  priority_id: number;
+  prioridad_nombre: string;
+  horas_desde_ultima_actividad: number;
+  porcentaje_consumido: number; // % del SLA utilizado (0-100+)
 }
 
 export interface AgenteConProblema {
@@ -196,10 +199,13 @@ export interface TendenciaNegativa {
 export interface SLAAlerts {
   resumen: {
     total_tickets_abiertos: number;
-    tickets_en_riesgo: number;
-    tickets_vencidos: number;
+    tickets_vencidos: number;        // >100% SLA
+    tickets_criticos: number;        // 90-100% SLA
+    tickets_en_riesgo: number;       // 70-90% SLA
   };
-  tickets_en_riesgo: TicketEnRiesgo[];
+  tickets_vencidos: TicketEnRiesgo[];     // >100% SLA
+  tickets_criticos: TicketEnRiesgo[];     // 90-100% SLA
+  tickets_en_riesgo: TicketEnRiesgo[];    // 70-90% SLA
   agentes_bajo_rendimiento: AgenteConProblema[];
   tendencias_negativas: TendenciaNegativa[];
 }

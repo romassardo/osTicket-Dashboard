@@ -5,7 +5,18 @@ const dotenv = require('dotenv');
 const path = require('path');
 
 // Cargar variables de entorno desde el archivo .env PRIMERO
-dotenv.config({ path: './config/.env' });
+// Priorizar .env.local si existe (para desarrollo local)
+const fs = require('fs');
+const envLocalPath = './config/.env.local';
+const envPath = './config/.env';
+
+if (fs.existsSync(envLocalPath)) {
+  dotenv.config({ path: envLocalPath });
+  console.log('🔧 Usando configuración LOCAL: .env.local');
+} else {
+  dotenv.config({ path: envPath });
+  console.log('🌐 Usando configuración PRODUCCIÓN: .env');
+}
 
 // LUEGO importar módulos que usen las variables de entorno
 // Importar la instancia de Sequelize y los modelos desde el archivo index.js de la carpeta models
