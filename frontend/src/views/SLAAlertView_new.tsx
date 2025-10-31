@@ -451,6 +451,7 @@ const SLAAlertView: React.FC = () => {
       {/* Modal de detalle */}
       {isModalOpen && selectedTicketId && (
         <TicketDetailModal
+          isOpen={isModalOpen}
           ticketId={selectedTicketId}
           onClose={handleCloseModal}
         />
