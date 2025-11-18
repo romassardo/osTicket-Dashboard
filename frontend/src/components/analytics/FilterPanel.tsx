@@ -20,15 +20,14 @@ interface StatusOption {
   state: string;
 }
 
-interface TransporteOption {
+interface SLAOption {
   id: number;
-  value?: string;
-  name?: string;
+  name: string;
 }
 
 // Define el tipo para los filtros aplicados
 interface AppliedFilters {
-  transporte?: number;
+  sla?: number;
   staff?: number;
   sector?: number;
   status?: number;
@@ -38,7 +37,7 @@ interface AppliedFilters {
 
 // Define las props del componente
 interface FilterPanelProps {
-  transporteOptions: TransporteOption[];
+  slaOptions: SLAOption[];
   staffOptions: StaffOption[];
   sectorOptions: SectorOption[];
   statusOptions: StatusOption[];
@@ -50,14 +49,14 @@ interface FilterPanelProps {
  * Candidato #1 para optimización según memorias del proyecto [[memory:2988538]]
  */
 const FilterPanel: React.FC<FilterPanelProps> = memo(({ 
-  transporteOptions,
+  slaOptions,
   staffOptions,
   sectorOptions,
   statusOptions,
   onApplyFilters 
 }) => {
   // Estados para los filtros seleccionados
-  const [selectedTransporte, setSelectedTransporte] = useState('');
+  const [selectedSla, setSelectedSla] = useState('');
   const [selectedStaff, setSelectedStaff] = useState('');
   const [selectedSector, setSelectedSector] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -70,7 +69,7 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
     console.log('🔍 FILTERPANEL - Valores seleccionados:', {
       selectedStaff,
       selectedStatus,
-      selectedTransporte,
+      selectedSla,
       selectedSector,
       startDate,
       endDate
@@ -78,12 +77,12 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
     console.log('🔍 FILTERPANEL - Opciones disponibles:', {
       staffOptions: staffOptions.length,
       statusOptions: statusOptions.length,
-      transporteOptions: transporteOptions.length,
+      slaOptions: slaOptions.length,
       sectorOptions: sectorOptions.length
     });
     
     const filters: AppliedFilters = {};
-    if (selectedTransporte !== '') filters.transporte = parseInt(selectedTransporte, 10);
+    if (selectedSla !== '') filters.sla = parseInt(selectedSla, 10);
     if (selectedStaff !== '') filters.staff = parseInt(selectedStaff, 10);
     if (selectedSector !== '') filters.sector = parseInt(selectedSector, 10); // El backend espera 'sector'
     if (selectedStatus !== '') filters.status = parseInt(selectedStatus, 10); // El backend espera 'status'
@@ -92,11 +91,11 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
     
     console.log('🔍 FILTERPANEL - Filtros construidos:', filters);
     onApplyFilters(filters);
-  }, [selectedTransporte, selectedStaff, selectedSector, selectedStatus, startDate, endDate, onApplyFilters, staffOptions, statusOptions, transporteOptions, sectorOptions]);
+  }, [selectedSla, selectedStaff, selectedSector, selectedStatus, startDate, endDate, onApplyFilters, staffOptions, statusOptions, slaOptions, sectorOptions]);
 
   // Memoizar función handleReset para evitar recreaciones
   const handleReset = useCallback(() => {
-    setSelectedTransporte('');
+    setSelectedSla('');
     setSelectedStaff('');
     setSelectedSector('');
     setSelectedStatus('');
@@ -111,10 +110,10 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
     setSelectedStaff(value);
   }, [setSelectedStaff]);
 
-  const handleTransporteChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleSlaChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
-    setSelectedTransporte(value);
-  }, [setSelectedTransporte]);
+    setSelectedSla(value);
+  }, [setSelectedSla]);
 
   const handleSectorChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -205,24 +204,24 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
           </select>
         </div>
 
-        {/* Filtro por Transporte */}
+        {/* Filtro por SLA */}
         <div className="lg:col-span-1">
-          <label htmlFor="transporte" className="block text-[0.75rem] font-medium text-gray-700 dark:text-gray-300 mb-1">Transporte</label>
+          <label htmlFor="sla" className="block text-[0.75rem] font-medium text-gray-700 dark:text-gray-300 mb-1">SLA</label>
           <select
-            id="transporte"
-            value={selectedTransporte}
-            onChange={handleTransporteChange}
+            id="sla"
+            value={selectedSla}
+            onChange={handleSlaChange}
             className="mt-1 block w-full pl-3 pr-10 py-2 text-[0.875rem] border border-gray-200 dark:border-slate-600 focus:outline-none focus:ring-blue-500 dark:focus:ring-cyan-500 focus:border-blue-500 dark:focus:border-cyan-400 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white transition-colors duration-200"
           >
             <option value="">Todos</option>
-            {transporteOptions.length > 0 ? (
-              transporteOptions.map((option, index) => (
-                <option key={option.id || `transport-${index}`} value={option.id}>
-                  {option.value || option.name || `ID: ${option.id}`}
+            {slaOptions.length > 0 ? (
+              slaOptions.map((option, index) => (
+                <option key={option.id || `sla-${index}`} value={option.id}>
+                  {option.name}
                 </option>
               ))
             ) : (
-              <option key="no-transport" value="" disabled>No hay opciones de transporte disponibles</option>
+              <option key="no-sla" value="" disabled>No hay opciones de SLA disponibles</option>
             )}
           </select>
         </div>

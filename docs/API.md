@@ -49,6 +49,7 @@ Obtiene lista paginada de tickets con filtros opcionales.
 | `statuses` | string | No | IDs de estados separados por coma (ej: "1,2,3") |
 | `staff` | string | No | ID de agente asignado |
 | `sector` | string | No | ID de sector |
+| `sla` | string | No | ID de SLA (`sla_id`) |
 | `startDate` | string | No | Fecha inicio (YYYY-MM-DD) |
 | `endDate` | string | No | Fecha fin (YYYY-MM-DD) |
 
@@ -212,7 +213,7 @@ Obtiene TODOS los tickets que coinciden con los filtros (sin paginación). Usar 
 
 #### Query Parameters
 
-Mismos que `/api/tickets` excepto `page` y `limit`
+Mismos que `/api/tickets` excepto `page` y `limit` (incluye `sla` para filtrar por SLA)
 
 #### Ejemplo de Request
 
@@ -232,6 +233,29 @@ GET /api/tickets/export?statuses=2&startDate=2025-10-01&endDate=2025-10-31
 ```
 
 ⚠️ **Advertencia:** Este endpoint puede devolver miles de tickets. Usar con precaución.
+
+### 5.1 Opciones de SLA para Filtros
+
+**GET** `/api/tickets/options/sla`
+
+Devuelve la lista de SLAs disponibles para ser usados en filtros del frontend.
+
+#### Ejemplo de Response
+
+```json
+[
+  {
+    "id": 1,
+    "name": "24",
+    "grace_period": 24
+  },
+  {
+    "id": 2,
+    "name": "48",
+    "grace_period": 48
+  }
+]
+```
 
 ### 6. Alertas SLA
 

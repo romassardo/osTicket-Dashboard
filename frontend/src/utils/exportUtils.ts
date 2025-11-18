@@ -43,6 +43,8 @@ export const exportTicketsToCSV = (tickets: Ticket[], options: ExportOptions = {
     'Agente',
     'Sector/Sucursal',
     'Transporte',
+    'SLA',
+    'SLA Cumplido',
     'Fecha Creación'
   ];
 
@@ -71,6 +73,43 @@ export const exportTicketsToCSV = (tickets: Ticket[], options: ExportOptions = {
       return sectorValue ? String(sectorValue) : '-';
     };
 
+    // Helper para obtener nombre de SLA
+    const getSlaName = (ticket: any): string => {
+      return ticket.sla?.name ? String(ticket.sla.name) : '-';
+    };
+
+    // Helper para determinar si el SLA está cumplido
+    // Lógica basada en slaRoutes (TIMESTAMPDIFF HOUR entre created y closed):
+    // - Si el ticket está cerrado: comparar horas entre created y closed vs grace_period
+    //     * diffHoras <= grace_period  => "Sí" (cumplido)
+    //     * diffHoras >  grace_period  => "No" (no cumplido)
+    // - Si el ticket está abierto: comparar horas entre created y ahora
+    //     * diffHoras > grace_period  => "No" (ya vencido)
+    //     * diffHoras <= grace_period => "Pendiente"
+    const getSlaCumplido = (ticket: any): string => {
+      if (!ticket.sla || ticket.sla.grace_period == null) return '-';
+      if (!ticket.created) return '-';
+
+      const graceHours = Number(ticket.sla.grace_period);
+      const createdDate = new Date(ticket.created);
+      const endDate = ticket.closed ? new Date(ticket.closed) : new Date();
+
+      if (isNaN(createdDate.getTime()) || isNaN(endDate.getTime()) || isNaN(graceHours)) {
+        return '-';
+      }
+
+      const diffMs = endDate.getTime() - createdDate.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      if (!ticket.closed) {
+        // Ticket abierto
+        return diffHours > graceHours ? 'No' : 'Pendiente';
+      }
+
+      // Ticket cerrado
+      return diffHours <= graceHours ? 'Sí' : 'No';
+    };
+
     return [
       ticket.number || '-',
       (ticket.cdata?.subject || '-').replace(/"/g, '""'), // Escape quotes
@@ -79,6 +118,8 @@ export const exportTicketsToCSV = (tickets: Ticket[], options: ExportOptions = {
       ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}`.replace(/"/g, '""') : '-',
       getSectorValue(ticket).replace(/"/g, '""'),
       getTransporteValue(ticket).replace(/"/g, '""'),
+      getSlaName(ticket).replace(/"/g, '""'),
+      getSlaCumplido(ticket).replace(/"/g, '""'),
       ticket.created ? new Date(ticket.created).toLocaleDateString('es-ES') : '-'
     ];
   });
@@ -98,6 +139,7 @@ export const exportTicketsToCSV = (tickets: Ticket[], options: ExportOptions = {
           let filterName = key;
           switch (key) {
             case 'transporte': filterName = 'Transporte'; break;
+            case 'sla': filterName = 'SLA'; break;
             case 'staff': filterName = 'Agente'; break;
             case 'organization': filterName = 'Sector/Organización'; break;
             case 'statuses': filterName = 'Estados'; break;
@@ -176,6 +218,42 @@ export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions =
       return sectorValue ? String(sectorValue) : '-';
     };
 
+    // Helper para obtener nombre de SLA
+    const getSlaName = (ticket: any): string => {
+      return ticket.sla?.name ? String(ticket.sla.name) : '-';
+    };
+
+    // Helper para determinar si el SLA está cumplido (misma lógica que en CSV)
+    // - Si el ticket está cerrado: comparar horas entre created y closed vs grace_period
+    //     * diffHoras <= grace_period  => "Sí" (cumplido)
+    //     * diffHoras >  grace_period  => "No" (no cumplido)
+    // - Si el ticket está abierto: comparar horas entre created y ahora
+    //     * diffHoras > grace_period  => "No" (ya vencido)
+    //     * diffHoras <= grace_period => "Pendiente"
+    const getSlaCumplido = (ticket: any): string => {
+      if (!ticket.sla || ticket.sla.grace_period == null) return '-';
+      if (!ticket.created) return '-';
+
+      const graceHours = Number(ticket.sla.grace_period);
+      const createdDate = new Date(ticket.created);
+      const endDate = ticket.closed ? new Date(ticket.closed) : new Date();
+
+      if (isNaN(createdDate.getTime()) || isNaN(endDate.getTime()) || isNaN(graceHours)) {
+        return '-';
+      }
+
+      const diffMs = endDate.getTime() - createdDate.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      if (!ticket.closed) {
+        // Ticket abierto
+        return diffHours > graceHours ? 'No' : 'Pendiente';
+      }
+
+      // Ticket cerrado
+      return diffHours <= graceHours ? 'Sí' : 'No';
+    };
+
     // Convertir tickets a array de objetos para SheetJS
     const ticketsData = tickets.map(ticket => ({
       'Nº Ticket': ticket.number || '-',
@@ -185,6 +263,8 @@ export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions =
       'Agente': ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}` : '-',
       'Sector/Sucursal': getSectorValue(ticket),
       'Transporte': getTransporteValue(ticket),
+      'SLA': getSlaName(ticket),
+      'SLA Cumplido': getSlaCumplido(ticket),
       'Fecha Creación': ticket.created ? new Date(ticket.created).toLocaleDateString('es-ES') : '-'
     }));
 
@@ -211,6 +291,7 @@ export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions =
             let filterName = key;
             switch (key) {
               case 'transporte': filterName = 'Transporte'; break;
+              case 'sla': filterName = 'SLA'; break;
               case 'staff': filterName = 'Agente'; break;
               case 'organization': filterName = 'Sector/Organización'; break;
               case 'statuses': filterName = 'Estados'; break;
@@ -238,6 +319,8 @@ export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions =
       { wch: 25 },  // Agente
       { wch: 20 },  // Sector/Sucursal
       { wch: 15 },  // Transporte
+      { wch: 15 },  // SLA
+      { wch: 14 },  // SLA Cumplido
       { wch: 15 }   // Fecha Creación
     ];
     worksheet["!cols"] = colWidths;

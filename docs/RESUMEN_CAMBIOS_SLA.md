@@ -227,7 +227,7 @@ Diferencia: Se pasó 2.0h  ← NUEVO
 | Componente | Estado | Última Actualización |
 |------------|--------|---------------------|
 | **Queries SQL** | ✅ Completado | 2025-10-29 |
-| **Documentación** | ✅ Actualizado | 2025-10-31 |
+| **Documentación** | ✅ Actualizado | 2025-11-18 |
 | **Backend Endpoints** | ✅ Funcional | 2025-10-29 |
 | **Frontend Vistas** | ✅ Corregido | 2025-10-31 |
 | **Consolidación Datos** | ✅ Implementado | 2025-10-31 |
@@ -236,6 +236,34 @@ Diferencia: Se pasó 2.0h  ← NUEVO
 ---
 
 **Fecha inicial:** 2025-10-29  
-**Última actualización:** 2025-10-31  
-**Versión:** 1.2.1  
-**Estado:** ✅ Sistema SLA completamente funcional y corregido
+**Última actualización:** 2025-11-18  
+**Versión:** 1.2.2  
+**Estado:** ✅ Sistema SLA completamente funcional, integrado con filtros y exportación
+
+---
+
+## 🔄 Cambios Adicionales Noviembre 2025
+
+### 5. Integración de SLA en Tickets y Análisis Avanzado
+
+- **Columna SLA en tabla de Tickets**
+  - `DataTable.tsx` muestra ahora el SLA asociado a cada ticket (relación `ticket.sla`).
+
+- **Filtro SLA en pestaña Tickets**
+  - `TicketsTableView.tsx` incorpora `selectedSla` como filtro.
+  - El endpoint `/api/tickets` admite el parámetro `sla` y filtra por `sla_id`.
+
+- **Filtro SLA en Análisis Avanzado de Tickets**
+  - `AnalyticsView.tsx` y `FilterPanel.tsx` reemplazan el filtro de transporte por SLA.
+  - El endpoint `/api/tickets/reports` soporta el parámetro `sla` y lo aplica en el `where`.
+
+### 6. Exportación con SLA y Cumplimiento
+
+- **CSV y Excel (`exportUtils.ts`)**
+  - Nuevas columnas agregadas en exportación:
+    - `SLA`: nombre del SLA del ticket.
+    - `SLA Cumplido`: valor calculado basado en:
+      - Horas entre `created` y `closed` (o ahora si está abierto).
+      - Comparación contra `sla.grace_period`.
+      - Estados posibles: `Sí`, `No`, `Pendiente`.
+  - Lógica alineada con las queries de `/api/sla/tickets` y `/api/sla/stats` para mantener consistencia de negocio.

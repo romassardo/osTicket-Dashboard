@@ -14,10 +14,11 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
   const tableHeaders = [
     'Número',
     'Asunto',
-    'Sector',
-    'Transporte',
-    'Usuario',
+    'SLA',
     'Agente',
+    'Sector',
+    'Usuario',
+    'Transporte',
     'Fecha Creación',
   ];
 
@@ -79,19 +80,28 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2.5 py-1 text-xs font-medium bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white">
-                      {ticket.cdata?.dataValues?.sectorName ?? ticket.cdata?.SectorName?.value ?? `ID: ${ticket.cdata?.sector}` ?? '-'}
+                      {ticket.sla?.name ?? 'Sin SLA'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-700 dark:text-gray-300">{ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}`.trim() : '-'}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2.5 py-1 text-xs font-medium bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white">
-                      {ticket.cdata?.dataValues?.transporteName ?? ticket.cdata?.TransporteName?.value ?? `ID: ${ticket.cdata?.transporte}` ?? '-'}
+                      {ticket.cdata?.dataValues?.sectorName
+                        ?? ticket.cdata?.SectorName?.value
+                        ?? (ticket.cdata?.sector ? `ID: ${ticket.cdata.sector}` : '-')}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-700 dark:text-gray-300">{ticket.user?.name ?? '-'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-700 dark:text-gray-300">{ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}`.trim() : '-'}</div>
+                    <span className="px-2.5 py-1 text-xs font-medium bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white">
+                      {ticket.cdata?.dataValues?.transporteName
+                        ?? ticket.cdata?.TransporteName?.value
+                        ?? (ticket.cdata?.transporte ? `ID: ${ticket.cdata.transporte}` : '-')}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500 dark:text-gray-400">

@@ -41,6 +41,7 @@ const TicketsTableView: React.FC = memo(() => {
   // NUEVO: tipo de fecha
   const [selectedSector, setSelectedSector] = useState<string>('');
   const [selectedStaff, setSelectedStaff] = useState<string>('');
+  const [selectedSla, setSelectedSla] = useState<string>('');
   
   // Estado para el modal de detalle de ticket
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -110,6 +111,10 @@ const TicketsTableView: React.FC = memo(() => {
       if (selectedStaff) {
         params.append('staff', selectedStaff.toString());
         logger.debug('Frontend: enviando staff:', selectedStaff);
+      }
+      if (selectedSla) {
+        params.append('sla', selectedSla.toString());
+        logger.debug('Frontend: enviando sla:', selectedSla);
       }
 
       const url = `/api/tickets?${params.toString()}`;
@@ -181,7 +186,7 @@ const TicketsTableView: React.FC = memo(() => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff]);
+  }, [currentPage, debouncedSearchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff, selectedSla]);
 
   useEffect(() => {
     fetchTickets();
@@ -217,6 +222,7 @@ const TicketsTableView: React.FC = memo(() => {
 
     setSelectedSector(appliedFilters.selectedSector || '');
     setSelectedStaff(appliedFilters.selectedStaff || '');
+    setSelectedSla(appliedFilters.selectedSla || '');
   }, []);
 
   const handlePageChange = useCallback((page: number) => {
@@ -236,8 +242,9 @@ const TicketsTableView: React.FC = memo(() => {
     if (dateRange && (dateRange[0] || dateRange[1])) count++;
     if (selectedSector) count++;
     if (selectedStaff) count++;
+    if (selectedSla) count++;
     return count;
-  }, [searchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff]);
+  }, [searchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff, selectedSla]);
 
   return (
     <div className="p-6 lg:p-8 bg-gray-50 dark:bg-slate-900 min-h-screen">
