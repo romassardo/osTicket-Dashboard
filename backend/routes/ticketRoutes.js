@@ -1,6 +1,6 @@
 const express = require('express');
 const { Op, fn, col } = require('sequelize');
-const { Ticket, User, Department, Staff, Organization, TicketStatus, TicketPriority, HelpTopic } = require('../models');
+const { Ticket, User, Department, Staff, Organization, TicketStatus, TicketPriority, HelpTopic, SLA } = require('../models');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -12,7 +12,7 @@ const asyncHandler = fn => (req, res, next) => {
 
 // GET /api/tickets - Ruta principal para la tabla de tickets
 router.get('/', asyncHandler(async (req, res) => {
-    const { page = 1, limit = 50, search, status, statuses, staff, sector, transporte, startDate, endDate } = req.query;
+    const { page = 1, limit = 100, search, status, statuses, staff, sector, transporte, sla, startDate, endDate } = req.query;
     const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
     
     let where = {};
@@ -37,6 +37,15 @@ router.get('/', asyncHandler(async (req, res) => {
     if (transporte && transporte !== 'all') {
         console.log(`[DEBUG] Filtro por transporte - transporte recibido: ${transporte}`);
         where['$cdata.transporte$'] = transporte;
+    }
+    if (sla && sla !== 'all') {
+        const slaId = parseInt(sla, 10);
+        if (!Number.isNaN(slaId)) {
+            console.log(`[DEBUG] Filtro por SLA - sla recibido: ${sla} (id numérico: ${slaId})`);
+            where.sla_id = slaId;
+        } else {
+            console.log(`[DEBUG] Filtro por SLA ignorado: valor no numérico ->`, sla);
+        }
     }
     
     // Filtro por rango de fechas (manejando zona horaria Argentina GMT-3)
@@ -107,6 +116,7 @@ router.get('/', asyncHandler(async (req, res) => {
         where,
         include: [
             { model: TicketStatus, as: 'status', attributes: ['name'] },
+            { model: SLA, as: 'sla', attributes: ['id', 'name', 'grace_period'], required: false },
             { 
                 model: Department, 
                 as: 'department', 
@@ -153,6 +163,12 @@ router.get('/', asyncHandler(async (req, res) => {
             number: rows[0].number,
             status: rows[0].status?.name,
             status_id: rows[0].status_id,
+            sla_id: rows[0].sla_id,
+            sla: rows[0].sla ? {
+                id: rows[0].sla.id,
+                name: rows[0].sla.name,
+                grace_period: rows[0].sla.grace_period,
+            } : null,
             created: rows[0].created
         });
     }
@@ -229,6 +245,12 @@ router.get('/reports', async (req, res) => {
             attributes: ['id', 'name']
         },
         {
+            model: SLA,
+            as: 'sla',
+            attributes: ['id', 'name', 'grace_period'],
+            required: false
+        },
+        {
             model: Department,
             as: 'department',
             attributes: ['id', 'name']
@@ -290,6 +312,12 @@ router.get('/reports', async (req, res) => {
     if (staff && staff !== 'all') where.staff_id = staff;
     if (sector && sector !== 'all') where['$cdata.sector$'] = sector;
     if (transporte && transporte !== 'all') where['$cdata.transporte$'] = transporte;
+    if (sla && sla !== 'all') {
+        const slaId = parseInt(sla, 10);
+        if (!Number.isNaN(slaId)) {
+            where.sla_id = slaId;
+        }
+    }
 
     // Filtro por rango de fechas para reportes
     if (startDate && endDate) {
@@ -579,7 +607,7 @@ router.get('/export', asyncHandler(async (req, res) => {
     let include = [
         { model: User, as: 'user', attributes: ['name'] },
         { model: Department, as: 'department', attributes: ['name'] },
-        { model: Sla, as: 'sla', attributes: ['name'] },
+        { model: SLA, as: 'sla', attributes: ['name'] },
         { model: Team, as: 'team', attributes: ['name'] },
         { model: Topic, as: 'topic', attributes: ['topic'] },
         { model: Location, as: 'location', attributes: ['name'] },
@@ -933,6 +961,35 @@ router.get('/options/transporte', asyncHandler(async (req, res) => {
   } catch (error) {
     logger.error('Error obteniendo opciones de transporte:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}));
+
+// GET /api/tickets/options/sla - Obtener opciones de SLA
+// Simplificado: devuelve todos los SLA definidos en la tabla ost_sla
+router.get('/options/sla', asyncHandler(async (req, res) => {
+  logger.info('[DEBUG] /api/tickets/options/sla - Handler iniciado');
+  try {
+    const slaOptions = await SLA.findAll({
+      attributes: ['id', 'name'],
+      order: [['name', 'ASC']]
+    });
+
+    logger.info(`[DEBUG] /api/tickets/options/sla - Query ejecutada, registros crudos: ${slaOptions.length}`);
+
+    const formattedSla = slaOptions.map(sla => ({
+      id: sla.id,
+      name: sla.name
+    }));
+
+    logger.info(`[DEBUG] /api/tickets/options/sla - SLAs formateados: ${formattedSla.length}`);
+    res.json(formattedSla);
+  } catch (error) {
+    console.error('❌ Error obteniendo opciones de SLA:', error);
+    logger.error('Error obteniendo opciones de SLA:', {
+      message: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ error: 'Error interno del servidor', details: error.message });
   }
 }));
 

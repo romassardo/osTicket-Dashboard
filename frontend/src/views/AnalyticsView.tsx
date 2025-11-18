@@ -12,9 +12,9 @@ import { useConfig } from '../contexts/ConfigContext';
 import logger from '../utils/logger';
 
 // Definir interfaces para las opciones de filtro
-interface TransporteOption {
+interface SLAOption {
   id: number;
-  value: string;
+  name: string;
 }
 
 /**
@@ -31,7 +31,7 @@ const AnalyticsView: React.FC = memo(() => {
   const [filters, setFilters] = useState({});
   
   // Estados para opciones de filtro
-  const [transporteOptions, setTransporteOptions] = useState<TransporteOption[]>([]);
+  const [slaOptions, setSlaOptions] = useState<SLAOption[]>([]);
   const [staffOptions, setStaffOptions] = useState<any[]>([]);
   const [sectorOptions, setSectorOptions] = useState<any[]>([]);
   const [statusOptions, setStatusOptions] = useState<any[]>([]);
@@ -40,31 +40,31 @@ const AnalyticsView: React.FC = memo(() => {
   const fetchFilterOptions = useCallback(async () => {
     try {
       logger.info('Fetching filter options...');
-      const [transporteRes, staffRes, sectorRes, statusRes] = await Promise.all([
-        fetch('/api/tickets/options/transporte'),
-        fetch('/api/tickets/options/staff'),
+      const [slaRes, staffRes, sectorRes, statusRes] = await Promise.all([
+        fetch('/api/tickets/options/sla'),
+        fetch('/api/staff/simple'),
         fetch('/api/tickets/options/sector'),
-        fetch('/api/tickets/options/status'),
+        fetch('/api/statuses/simple'),
       ]);
 
-      // Procesar opciones de transporte
-      if (transporteRes.ok) {
+      // Procesar opciones de SLA
+      if (slaRes.ok) {
         try {
-          const transporteData = await transporteRes.json();
-          logger.info('Transporte data:', transporteData);
-          if (Array.isArray(transporteData) && transporteData.length > 0) {
-            setTransporteOptions(transporteData);
+          const slaData = await slaRes.json();
+          logger.info('SLA data:', slaData);
+          if (Array.isArray(slaData) && slaData.length > 0) {
+            setSlaOptions(slaData);
           } else {
-            logger.warn('Transporte data is empty');
-            setTransporteOptions([]);
+            logger.warn('SLA data is empty');
+            setSlaOptions([]);
           }
         } catch (e) {
-          logger.error('Error parsing transporte data:', e);
-          setTransporteOptions([]);
+          logger.error('Error parsing SLA data:', e);
+          setSlaOptions([]);
         }
       } else {
-        logger.warn('Transporte response not OK');
-        setTransporteOptions([]);
+        logger.warn('SLA response not OK');
+        setSlaOptions([]);
       }
       
       // Procesar opciones de staff
@@ -110,7 +110,7 @@ const AnalyticsView: React.FC = memo(() => {
       }
     } catch (error) {
       logger.error('Error fetching filter options:', error);
-      setTransporteOptions([]);
+      setSlaOptions([]);
       setStaffOptions([]);
       setSectorOptions([]);
       setStatusOptions([]);
@@ -131,7 +131,7 @@ const AnalyticsView: React.FC = memo(() => {
       params.append('limit', config.defaultTableSize.toString()); // Usar límite configurable
 
       // Añadir parámetros de filtro si existen
-      if (currentFilters.transporte) params.append('transporte', currentFilters.transporte);
+      if (currentFilters.sla) params.append('sla', currentFilters.sla);
       if (currentFilters.staff) params.append('staff', currentFilters.staff);
       if (currentFilters.sector) params.append('sector', currentFilters.sector);
       if (currentFilters.status) params.append('status', currentFilters.status);
@@ -166,7 +166,7 @@ const AnalyticsView: React.FC = memo(() => {
       params.append('page', '1'); // Especificar página 1
 
       // Añadir parámetros de filtro si existen
-      if (currentFilters.transporte) params.append('transporte', currentFilters.transporte);
+      if (currentFilters.sla) params.append('sla', currentFilters.sla);
       if (currentFilters.staff) params.append('staff', currentFilters.staff);
       if (currentFilters.sector) params.append('sector', currentFilters.sector);
       if (currentFilters.status) params.append('status', currentFilters.status);
@@ -344,7 +344,7 @@ const AnalyticsView: React.FC = memo(() => {
       
       {/* Panel de filtros con estilos actualizados */}
       <FilterPanel 
-        transporteOptions={transporteOptions}
+        slaOptions={slaOptions}
         staffOptions={staffOptions}
         sectorOptions={sectorOptions}
         statusOptions={statusOptions}

@@ -52,7 +52,7 @@ Integrar información detallada de SLA con diferencia promedio (margen/exceso) e
 }
 ```
 
-**Query base:** `docs/query sla (2).txt`
+**Implementación actual:** lógica SQL integrada en `backend/routes/slaRoutes.js` (endpoint `/api/sla/stats`).
 
 #### 1.2 Crear `/api/sla/tickets` (Tickets Individuales)
 **Archivo:** `backend/routes/slaRoutes.js`
@@ -87,7 +87,7 @@ Integrar información detallada de SLA con diferencia promedio (margen/exceso) e
 }
 ```
 
-**Query base:** `docs/query_sla_detallada_individual.txt`
+**Implementación actual:** lógica SQL integrada en `backend/routes/slaRoutes.js` (endpoint `/api/sla/tickets`).
 
 #### 1.3 Actualizar `/api/sla/alerts` (Simplificar)
 **Archivo:** `backend/routes/slaRoutes.js` (si ya existe) o crear
@@ -493,5 +493,29 @@ dashboard-osticket/
 
 ---
 
-**Última actualización:** 2025-10-29
+**Última actualización:** 2025-11-18
 **Autor:** Dashboard OsTicket Team
+
+---
+
+## 🔄 Actualización Noviembre 2025: Integración SLA en Dashboard General
+
+Además del plan original de estadísticas y vistas dedicadas de SLA, se implementaron mejoras directas sobre el dashboard principal de tickets:
+
+- **Columna SLA en tablas de Tickets**
+  - `DataTable.tsx` muestra ahora el nombre del SLA asociado a cada ticket.
+
+- **Filtro SLA en pestaña Tickets**
+  - `TicketsTableView.tsx` envía el parámetro `sla` al endpoint `/api/tickets`.
+  - El backend (`ticketRoutes.js`) filtra por `sla_id` cuando se especifica.
+
+- **Filtro SLA en Análisis Avanzado de Tickets**
+  - `AnalyticsView.tsx` y `FilterPanel.tsx` reemplazan el filtro de transporte por un filtro de **SLA**.
+  - El endpoint `/api/tickets/reports` acepta ahora el parámetro `sla` y filtra por `sla_id`.
+
+- **Exportación con SLA y cumplimiento**
+  - `exportUtils.ts` agrega dos columnas nuevas a CSV/Excel:
+    - `SLA`: nombre del SLA del ticket.
+    - `SLA Cumplido`: calcula si el ticket cumplió el SLA comparando horas entre `created` y `closed` contra `grace_period` del SLA, usando la misma lógica que `/api/sla/tickets`.
+
+Estas mejoras conectan el sistema SLA avanzado con las vistas de uso diario (Tickets, Analytics y exportaciones), sin depender solo de las vistas específicas de SLA.

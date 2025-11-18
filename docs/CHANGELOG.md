@@ -1,5 +1,31 @@
 # CHANGELOG - Dashboard osTicket
 
+## [1.2.2] - 2025-11-18
+
+### ✨ Integración SLA en Tickets, Analytics y Exportación
+
+#### Frontend
+- **Tickets (pestaña principal):**
+  - Agregada columna **SLA** en `DataTable.tsx` mostrando el nombre del SLA asociado al ticket.
+  - Incorporado filtro por SLA en `TicketsTableView.tsx` (`selectedSla`), enviando el parámetro `sla` al backend.
+
+- **Análisis Avanzado de Tickets:**
+  - Reemplazado el filtro de **Transporte** por **SLA** en `AnalyticsView.tsx` y `FilterPanel.tsx`.
+  - El panel de filtros avanzados muestra ahora un combo de SLAs (`slaOptions`).
+
+- **Exportación CSV/Excel:**
+  - `exportUtils.ts` agrega dos columnas nuevas en las exportaciones de Analytics:
+    - `SLA`: nombre del SLA del ticket.
+    - `SLA Cumplido`: cálculo basado en horas entre `created` y `closed` (o ahora, si está abierto) vs `sla.grace_period`, con estados `Sí`, `No`, `Pendiente`.
+
+#### Backend
+- `ticketRoutes.js`:
+  - Endpoint `/api/tickets` ya soporta el parámetro `sla` y filtra por `sla_id`.
+  - Endpoint `/api/tickets/reports` incluye la asociación con `SLA` y aplica el filtro `sla` cuando se especifica.
+  - Nuevo endpoint `/api/tickets/options/sla` que devuelve la lista de SLAs disponibles para filtros.
+
+---
+
 ## [1.2.1] - 2025-10-31
 
 ### 🔧 **CORRECCIONES CRÍTICAS: DASHBOARD SLA - SOPORTE IT**

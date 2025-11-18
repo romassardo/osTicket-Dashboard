@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AlertTriangle, Clock, RefreshCw, XCircle, AlertOctagon, ChevronDown, ChevronUp } from 'lucide-react';
 import { getSLAAlerts } from '../services/api';
 import logger from '../utils/logger';
@@ -16,6 +16,44 @@ const SLAAlertView: React.FC = () => {
     criticos: true,
     enRiesgo: false
   });
+
+  // Filtros por columna para las tablas de tickets SLA en tiempo real
+  const [filterTicket, setFilterTicket] = useState('');
+  const [filterAgent, setFilterAgent] = useState('');
+  const [filterSla, setFilterSla] = useState('');
+  const [filterMinPercent, setFilterMinPercent] = useState('');
+  const [filterMaxHorasUltAct, setFilterMaxHorasUltAct] = useState('');
+  const [filterPriority, setFilterPriority] = useState('');
+
+  // Opciones únicas para selects de Agente y SLA (derivadas de las alertas actuales)
+  const allTickets = useMemo(() => {
+    if (!alerts) return [] as TicketEnRiesgo[];
+    return [
+      ...alerts.tickets_vencidos,
+      ...alerts.tickets_criticos,
+      ...alerts.tickets_en_riesgo,
+    ];
+  }, [alerts]);
+
+  const agentOptions = useMemo(() => {
+    const set = new Set<string>();
+    allTickets.forEach((ticket) => {
+      if (ticket.agente_asignado) {
+        set.add(ticket.agente_asignado);
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [allTickets]);
+
+  const slaOptions = useMemo(() => {
+    const set = new Set<string>();
+    allTickets.forEach((ticket) => {
+      if (ticket.nombre_sla) {
+        set.add(ticket.nombre_sla);
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [allTickets]);
 
   const handleTicketClick = (ticketId: number) => {
     setSelectedTicketId(ticketId);
@@ -167,6 +205,44 @@ const SLAAlertView: React.FC = () => {
       return `${Math.floor(abs)}h`;
     };
 
+    // Aplicar filtros en memoria sobre el conjunto de tickets recibido
+    const filteredTickets = tickets.filter((ticket) => {
+      if (filterTicket && !ticket.number.toLowerCase().includes(filterTicket.toLowerCase())) {
+        return false;
+      }
+
+      const agente = ticket.agente_asignado || '';
+      if (filterAgent && agente !== filterAgent) {
+        return false;
+      }
+
+      const slaName = ticket.nombre_sla || '';
+      if (filterSla && slaName !== filterSla) {
+        return false;
+      }
+
+      if (filterMinPercent) {
+        const minPercent = Number(filterMinPercent);
+        if (!Number.isNaN(minPercent) && ticket.porcentaje_consumido < minPercent) {
+          return false;
+        }
+      }
+
+      if (filterMaxHorasUltAct) {
+        const maxHoras = Number(filterMaxHorasUltAct);
+        if (!Number.isNaN(maxHoras) && ticket.horas_desde_ultima_actividad > maxHoras) {
+          return false;
+        }
+      }
+
+      const prioridad = ticket.prioridad_nombre || '';
+      if (filterPriority && !prioridad.toLowerCase().includes(filterPriority.toLowerCase())) {
+        return false;
+      }
+
+      return true;
+    });
+
     return (
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -194,9 +270,81 @@ const SLAAlertView: React.FC = () => {
                 Última Actividad
               </th>
             </tr>
+            <tr className="border-t border-gray-200 dark:border-gray-700">
+              <th className="px-4 py-2">
+                <input
+                  type="text"
+                  value={filterTicket}
+                  onChange={(e) => setFilterTicket(e.target.value)}
+                  placeholder="# Ticket"
+                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </th>
+              <th className="px-4 py-2">
+                <select
+                  value={filterAgent}
+                  onChange={(e) => setFilterAgent(e.target.value)}
+                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">Todos los agentes</option>
+                  {agentOptions.map((agent) => (
+                    <option key={agent} value={agent}>
+                      {agent}
+                    </option>
+                  ))}
+                </select>
+              </th>
+              <th className="px-4 py-2">
+                <select
+                  value={filterSla}
+                  onChange={(e) => setFilterSla(e.target.value)}
+                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">Todos los SLA</option>
+                  {slaOptions.map((sla) => (
+                    <option key={sla} value={sla}>
+                      {sla}
+                    </option>
+                  ))}
+                </select>
+              </th>
+              <th className="px-4 py-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={200}
+                  value={filterMinPercent}
+                  onChange={(e) => setFilterMinPercent(e.target.value)}
+                  placeholder="% mín."
+                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </th>
+              <th className="px-4 py-2">
+                {/* Filtro opcional por tiempo restante: lo dejamos sin input para mantenerlo simple */}
+              </th>
+              <th className="px-4 py-2">
+                <input
+                  type="text"
+                  value={filterPriority}
+                  onChange={(e) => setFilterPriority(e.target.value)}
+                  placeholder="Prioridad"
+                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </th>
+              <th className="px-4 py-2">
+                <input
+                  type="number"
+                  min={0}
+                  value={filterMaxHorasUltAct}
+                  onChange={(e) => setFilterMaxHorasUltAct(e.target.value)}
+                  placeholder="Máx horas"
+                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </th>
+            </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {tickets.map((ticket, idx) => (
+            {filteredTickets.map((ticket, idx) => (
               <tr key={ticket.ticket_id || `ticket-${idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                 <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                   <button

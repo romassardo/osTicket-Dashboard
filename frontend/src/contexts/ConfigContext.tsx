@@ -19,7 +19,7 @@ export interface AppConfig {
 
 // Configuración por defecto
 const DEFAULT_CONFIG: AppConfig = {
-  defaultTableSize: 50,
+  defaultTableSize: 100,
   autoRefresh: true,
   refreshInterval: 30,
   defaultExportFormat: 'xlsx',

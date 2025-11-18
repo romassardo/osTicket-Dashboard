@@ -38,6 +38,12 @@ export interface Priority {
   priority_color: string;
 }
 
+export interface TicketSLA {
+  id: number;
+  name: string;
+  grace_period: number;
+}
+
 export interface Staff {
   staff_id: number;
   firstname: string;
@@ -69,6 +75,7 @@ export interface Ticket {
   user?: User;
   status?: Status;
   priority?: Priority;
+  sla?: TicketSLA;
   staff?: Staff; // Alias para la relación con el agente asignado
   AssignedStaff?: Staff; // Relación con el agente asignado (nombre usado en el backend)
   // department?: Department; // Eliminado, ya que 'sector' viene de cdata
@@ -130,6 +137,7 @@ export interface AdvancedFilters {
 
   selectedSector?: string;
   selectedStaff?: string;
+  selectedSla?: string;
 }
 
 // ==================== SLA TYPES ====================

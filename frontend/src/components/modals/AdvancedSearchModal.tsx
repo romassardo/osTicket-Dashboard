@@ -20,6 +20,11 @@ interface Staff {
   fullname: string;
 }
 
+interface SLAOption {
+  id: number;
+  name: string;
+}
+
 interface AdvancedSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -30,6 +35,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [slaOptions, setSlaOptions] = useState<SLAOption[]>([]);
 
   // Filter states
   const [selectedStatuses, setSelectedStatuses] = useState<number[]>([]);
@@ -37,6 +43,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [selectedOrg, setSelectedOrg] = useState<string>('');
   const [selectedStaff, setSelectedStaff] = useState<string>('');
+  const [selectedSla, setSelectedSla] = useState<string>('');
 
 
   // DEBUG: Monitorear cambios en selectedStatuses
@@ -76,6 +83,10 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
       fetchData('/api/statuses/simple', setStatuses);
       fetchData('/api/tickets/options/sector', setOrganizations);
       fetchData('/api/staff/simple', setStaff);
+      fetchData('/api/tickets/options/sla', (data) => {
+        logger.debug('Modal: SLA options recibidas:', data);
+        setSlaOptions(data);
+      });
     }
   }, [isOpen]);
 
@@ -95,6 +106,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
       dateRange: [startDate, endDate],
       selectedSector: selectedOrg,
       selectedStaff: selectedStaff,
+      selectedSla: selectedSla,
     };
     logger.debug('Modal: Aplicando filtros:', filtersToApply);
     onApplyFilters(filtersToApply);
@@ -107,6 +119,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
     setEndDate(undefined);
     setSelectedOrg('');
     setSelectedStaff('');
+    setSelectedSla('');
     logger.debug('Modal: Filtros limpiados');
   };
 
@@ -185,8 +198,8 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
             </div>
           </div>
 
-          {/* Sector y Agente */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Sector, Agente y SLA */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Sector (Organization) */}
             <div>
               <label htmlFor="sector" className="block text-sm font-medium text-[#b8c5d6] mb-2">Sector</label>
@@ -223,6 +236,29 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
                   <option value="">Todos los agentes</option>
                   {staff.map(s => (
                     <option key={s.staff_id} value={s.staff_id}>{s.fullname}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#7a8394]">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* SLA */}
+            <div>
+              <label htmlFor="sla" className="block text-sm font-medium text-[#b8c5d6] mb-2">SLA</label>
+              <div className="relative">
+                <select
+                  id="sla"
+                  value={selectedSla}
+                  onChange={(e) => setSelectedSla(e.target.value)}
+                  className="w-full appearance-none bg-[#252a35] border border-[#2d3441] rounded-lg p-2.5 pr-10 text-[#b8c5d6] shadow-inner focus:ring-2 focus:ring-[#00d9ff] focus:border-transparent focus:outline-none transition-all duration-200"
+                >
+                  <option value="">Todos los SLA</option>
+                  {slaOptions.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#7a8394]">
