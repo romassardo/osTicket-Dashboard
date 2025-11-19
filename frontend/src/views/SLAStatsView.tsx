@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { BarChart3, Download, Calendar, Users, TrendingUp, Clock, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { BarChart3, Download, Calendar, Users, TrendingUp, TrendingDown, Clock, RefreshCw } from 'lucide-react';
 import { getSLAStats } from '../services/api';
 import logger from '../utils/logger';
 
@@ -85,7 +85,23 @@ const SLAStatsView: React.FC = () => {
         }
       });
 
-      const consolidatedStats = Array.from(agentMap.values());
+      // Regenerar el texto de diferencia promedio y convertir map a array
+      const consolidatedStats = Array.from(agentMap.values()).map(stat => {
+        const horasAbs = Math.abs(stat.diferencia_sla_horas);
+        let diferenciaTexto = '';
+        if (stat.diferencia_sla_horas >= 0) {
+          diferenciaTexto = `Cumplió ${horasAbs.toFixed(1)}h antes`;
+        } else {
+          diferenciaTexto = `Se pasó ${horasAbs.toFixed(1)}h`;
+        }
+        return {
+          ...stat,
+          // Luego de consolidar por agente, las métricas son sobre todos los SLA
+          nombre_sla: 'Todos los SLA',
+          diferencia_sla_promedio: diferenciaTexto
+        };
+      });
+
       setStats(consolidatedStats);
       logger.info(`📊 Estadísticas SLA cargadas: ${consolidatedStats.length} agentes únicos (de ${normalizedData.length} registros)`);
     } catch (error) {
@@ -114,34 +130,103 @@ const SLAStatsView: React.FC = () => {
     }
   };
 
-  const sortedStats = [...stats].sort((a, b) => {
-    const aVal = a[sortBy];
-    const bVal = b[sortBy];
-    
-    if (typeof aVal === 'number' && typeof bVal === 'number') {
-      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-    }
-    
-    const aStr = String(aVal);
-    const bStr = String(bVal);
-    return sortOrder === 'asc' 
-      ? aStr.localeCompare(bStr) 
-      : bStr.localeCompare(aStr);
-  });
+  const sortedStats = useMemo(() => {
+    const data = [...stats];
+
+    data.sort((a, b) => {
+      const aVal = a[sortBy];
+      const bVal = b[sortBy];
+      
+      if (aVal === null || aVal === undefined) return 1;
+      if (bVal === null || bVal === undefined) return -1;
+  
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      return sortOrder === 'asc' 
+        ? aStr.localeCompare(bStr) 
+        : bStr.localeCompare(aStr);
+    });
+
+    return data;
+  }, [stats, sortBy, sortOrder]);
 
   // Calcular resumen general
   const totalTickets = stats.reduce((sum, s) => sum + s.total_tickets, 0);
   const totalCumplidos = stats.reduce((sum, s) => sum + s.tickets_sla_cumplido, 0);
   const totalVencidos = stats.reduce((sum, s) => sum + s.tickets_sla_vencido, 0);
   const promedioGeneral = totalTickets > 0 ? ((totalCumplidos / totalTickets) * 100).toFixed(1) : '0.0';
-  const diferenciPromedio = stats.length > 0 
-    ? (stats.reduce((sum, s) => sum + s.diferencia_sla_horas, 0) / stats.length).toFixed(1)
-    : '0.0';
+  const porcentajeNoCumplido = totalTickets > 0 ? ((totalVencidos / totalTickets) * 100).toFixed(1) : '0.0';
 
   const exportToExcel = () => {
-    // Placeholder para exportación
-    logger.info('🔽 Exportando estadísticas SLA a Excel...');
-    alert('Función de exportación en desarrollo');
+    logger.info('🔽 Exportando estadísticas SLA a Excel (XLS)...');
+
+    try {
+      // Encabezados del archivo
+      const headers = [
+        'Agente',
+        'SLA',
+        'Año',
+        'Mes',
+        'Total Tickets',
+        'Cumplidos',
+        'Vencidos',
+        '% Cumplimiento',
+        'Diferencia SLA',
+        'T. Promedio Resolución'
+      ];
+
+      const escapeHtml = (value: any) => {
+        const str = value !== null && value !== undefined ? String(value) : '';
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      };
+
+      const headerRow = `<tr>${headers
+        .map((h) => `<th style="background:#f3f4f6;font-weight:bold;">${escapeHtml(h)}</th>`)
+        .join('')}</tr>`;
+
+      const bodyRows = sortedStats
+        .map((stat) =>
+          `<tr>` +
+          `<td>${escapeHtml(stat.agente)}</td>` +
+          `<td>${escapeHtml(stat.nombre_sla)}</td>` +
+          `<td>${escapeHtml(stat.anio)}</td>` +
+          `<td>${escapeHtml(stat.mes_nombre)}</td>` +
+          `<td>${escapeHtml(stat.total_tickets)}</td>` +
+          `<td>${escapeHtml(stat.tickets_sla_cumplido)}</td>` +
+          `<td>${escapeHtml(stat.tickets_sla_vencido)}</td>` +
+          `<td>${escapeHtml(stat.porcentaje_sla_cumplido.toFixed(1))}%</td>` +
+          `<td>${escapeHtml(stat.diferencia_sla_promedio)}</td>` +
+          `<td>${escapeHtml(stat.tiempo_promedio_resolucion)}</td>` +
+          `</tr>`
+        )
+        .join('');
+
+      const tableHtml = `<!DOCTYPE html><html><head><meta charset="utf-8" /></head><body><table border="1">${headerRow}${bodyRows}</table></body></html>`;
+
+      const blob = new Blob(['\ufeff' + tableHtml], {
+        type: 'application/vnd.ms-excel;charset=utf-8;',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const fecha = new Date().toISOString().split('T')[0];
+
+      link.href = url;
+      link.setAttribute('download', `sla_analisis_historico_${fecha}.xls`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      logger.error('❌ Error al exportar estadísticas SLA a XLS:', error);
+      alert('Ocurrió un error al exportar el archivo.');
+    }
   };
 
   if (loading) {
@@ -264,6 +349,19 @@ const SLAStatsView: React.FC = () => {
           </p>
         </div>
 
+        <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg shadow-md p-6 border-l-4 border-orange-500">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">% No Cumplido</h3>
+            <TrendingDown className="w-5 h-5 text-orange-600" />
+          </div>
+          <div className="text-3xl font-bold text-orange-600">
+            {porcentajeNoCumplido}%
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            {totalVencidos} tickets fuera de tiempo
+          </p>
+        </div>
+
         <div className="bg-red-50 dark:bg-red-900/20 rounded-lg shadow-md p-6 border-l-4 border-red-500">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Vencidos</h3>
@@ -274,19 +372,6 @@ const SLAStatsView: React.FC = () => {
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
             {totalTickets > 0 ? ((totalVencidos / totalTickets) * 100).toFixed(1) : '0.0'}% del total
-          </p>
-        </div>
-
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg shadow-md p-6 border-l-4 border-blue-500">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Diferencia Promedio</h3>
-            <Clock className="w-5 h-5 text-blue-600" />
-          </div>
-          <div className={`text-3xl font-bold ${parseFloat(diferenciPromedio) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {parseFloat(diferenciPromedio) >= 0 ? '+' : ''}{diferenciPromedio}h
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            {parseFloat(diferenciPromedio) >= 0 ? 'Cumple antes' : 'Se excede'}
           </p>
         </div>
       </div>
@@ -300,7 +385,7 @@ const SLAStatsView: React.FC = () => {
             Top 5 Agentes - Mayor Cumplimiento
           </h3>
           <div className="space-y-4">
-            {sortedStats
+            {[...sortedStats]
               .sort((a, b) => b.porcentaje_sla_cumplido - a.porcentaje_sla_cumplido)
               .slice(0, 5)
               .map((stat, idx) => (
