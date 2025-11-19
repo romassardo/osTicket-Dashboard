@@ -6,7 +6,7 @@ import logger from '../../utils/logger';
 // Define los tipos para las opciones de los filtros
 interface StaffOption {
   staff_id: number;
-  name: string;
+  fullname: string;
 }
 
 interface SectorOption {
@@ -33,6 +33,7 @@ interface AppliedFilters {
   status?: number;
   startDate?: string;
   endDate?: string;
+  slaStatus?: 'cumplido' | 'no_cumplido' | 'en_curso';
 }
 
 // Define las props del componente
@@ -62,6 +63,7 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
   const [selectedStatus, setSelectedStatus] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedSlaStatus, setSelectedSlaStatus] = useState('');
 
   // Memoizar función handleApply para evitar recreaciones
   const handleApply = useCallback(() => {
@@ -72,7 +74,8 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
       selectedSla,
       selectedSector,
       startDate,
-      endDate
+      endDate,
+      selectedSlaStatus
     });
     console.log('🔍 FILTERPANEL - Opciones disponibles:', {
       staffOptions: staffOptions.length,
@@ -88,10 +91,24 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
     if (selectedStatus !== '') filters.status = parseInt(selectedStatus, 10); // El backend espera 'status'
     if (startDate !== '') filters.startDate = startDate;
     if (endDate !== '') filters.endDate = endDate;
+    if (selectedSlaStatus !== '') filters.slaStatus = selectedSlaStatus as AppliedFilters['slaStatus'];
     
     console.log('🔍 FILTERPANEL - Filtros construidos:', filters);
     onApplyFilters(filters);
-  }, [selectedSla, selectedStaff, selectedSector, selectedStatus, startDate, endDate, onApplyFilters, staffOptions, statusOptions, slaOptions, sectorOptions]);
+  }, [
+    selectedSla,
+    selectedStaff,
+    selectedSector,
+    selectedStatus,
+    startDate,
+    endDate,
+    selectedSlaStatus,
+    onApplyFilters,
+    staffOptions,
+    statusOptions,
+    slaOptions,
+    sectorOptions,
+  ]);
 
   // Memoizar función handleReset para evitar recreaciones
   const handleReset = useCallback(() => {
@@ -101,6 +118,7 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
     setSelectedStatus('');
     setStartDate('');
     setEndDate('');
+    setSelectedSlaStatus('');
     onApplyFilters({});
   }, [onApplyFilters]);
 
@@ -125,6 +143,11 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
     setSelectedStatus(value);
   }, [setSelectedStatus]);
 
+  const handleSlaStatusChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setSelectedSlaStatus(value);
+  }, []);
+
   const handleStartDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setStartDate(e.target.value);
   }, []);
@@ -148,7 +171,7 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
           Limpiar
         </button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-4">
         
         {/* Filtro por Agente */}
         <div className="lg:col-span-1">
@@ -157,14 +180,29 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
             id="staff"
             value={selectedStaff}
             onChange={handleStaffChange}
-            className="mt-1 block w-full pl-3 pr-10 py-2 text-[0.875rem] border border-gray-200 dark:border-slate-600 focus:outline-none focus:ring-blue-500 dark:focus:ring-cyan-500 focus:border-blue-500 dark:focus:border-cyan-400 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white transition-colors duration-200"
+            className="mt-1 block w-full pl-3 pr-10 py-2 text-[0.875rem] border border-gray-200 dark:border-slate-600 focus:outline-none focus:ring-blue-500 dark:focus:ring-cyan-500 focus:border-blue-500 dark:focus:border-cyan-400 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white transition-colors duración-200"
           >
             <option value="">Todos</option>
             {staffOptions.map((option, index) => {
               return (
-                <option key={option.staff_id || `staff-${index}`} value={option.staff_id}>{option.name}</option>
+                <option key={option.staff_id || `staff-${index}`} value={option.staff_id}>{option.fullname}</option>
               );
             })}
+          </select>
+        </div>
+
+        <div className="lg:col-span-1">
+          <label htmlFor="sla-status" className="block text-[0.75rem] font-medium text-gray-700 dark:text-gray-300 mb-1">Estado SLA</label>
+          <select
+            id="sla-status"
+            value={selectedSlaStatus}
+            onChange={handleSlaStatusChange}
+            className="mt-1 block w-full pl-3 pr-10 py-2 text-[0.875rem] border border-gray-200 dark:border-slate-600 focus:outline-none focus:ring-blue-500 dark:focus:ring-cyan-500 focus:border-blue-500 dark:focus:border-cyan-400 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white transition-colors duration-200"
+          >
+            <option value="">Todos</option>
+            <option value="cumplido">Cumplido</option>
+            <option value="no_cumplido">No cumplido</option>
+            <option value="en_curso">En curso</option>
           </select>
         </div>
 
