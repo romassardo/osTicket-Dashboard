@@ -17,6 +17,46 @@ interface SLAOption {
   name: string;
 }
 
+const getSlaStatusCode = (
+  ticket: Ticket
+): 'cumplido' | 'no_cumplido' | 'en_curso' | 'sin_sla' | 'sin_datos' => {
+  const sla = ticket.sla;
+
+  if (!sla || !sla.grace_period) {
+    return 'sin_sla';
+  }
+
+  if (!ticket.closed || ticket.closed === '0000-00-00 00:00:00') {
+    return 'en_curso';
+  }
+
+  const createdDate = ticket.created ? new Date(ticket.created) : null;
+  const closedDate = new Date(ticket.closed);
+
+  if (!createdDate || isNaN(createdDate.getTime()) || isNaN(closedDate.getTime())) {
+    return 'sin_datos';
+  }
+
+  const diffHours = (closedDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60);
+
+  if (diffHours <= sla.grace_period) {
+    return 'cumplido';
+  }
+
+  return 'no_cumplido';
+};
+
+const filterTicketsBySlaStatus = (
+  tickets: Ticket[],
+  slaStatus?: 'cumplido' | 'no_cumplido' | 'en_curso'
+): Ticket[] => {
+  if (!slaStatus) {
+    return tickets;
+  }
+
+  return tickets.filter((ticket) => getSlaStatusCode(ticket) === slaStatus);
+};
+
 /**
  * AnalyticsView optimizado con React.memo y useCallback para evitar re-renders innecesarios
  * Vista principal de analytics - useEffect optimization needed según memorias del proyecto [[memory:2988538]]
@@ -137,6 +177,7 @@ const AnalyticsView: React.FC = memo(() => {
       if (currentFilters.status) params.append('status', currentFilters.status);
       if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
       if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
+      // NOTA: slaStatus se maneja solo en frontend, no se envía al backend
 
       const url = `/api/tickets/reports?${params.toString()}`;
       logger.info('Fetching tickets with URL:', url);
@@ -218,19 +259,32 @@ const AnalyticsView: React.FC = memo(() => {
     try {
       // Obtener TODOS los tickets filtrados para exportación
       const allTicketsForExport = await fetchAllTicketsForExport(filters);
+
+      const currentSlaStatus = (filters as any).slaStatus as
+        | 'cumplido'
+        | 'no_cumplido'
+        | 'en_curso'
+        | undefined;
+
+      const allTicketsFiltered = filterTicketsBySlaStatus(
+        allTicketsForExport,
+        currentSlaStatus === 'cumplido' || currentSlaStatus === 'no_cumplido' || currentSlaStatus === 'en_curso'
+          ? currentSlaStatus
+          : undefined
+      );
       
-      if (allTicketsForExport.length === 0) {
+      if (allTicketsFiltered.length === 0) {
         alert('No hay datos para exportar con los filtros aplicados.');
         return;
       }
 
       // DEBUG: Log de la estructura de datos para debuggear el problema de transporte
       logger.info('🔍 DEBUG EXPORTACIÓN: Estructura de datos recibidos:');
-      logger.info('🔍 DEBUG EXPORTACIÓN: Primer ticket completo:', JSON.stringify(allTicketsForExport[0], null, 2));
-      logger.info('🔍 DEBUG EXPORTACIÓN: Cantidad total de tickets:', allTicketsForExport.length);
+      logger.info('🔍 DEBUG EXPORTACIÓN: Primer ticket completo:', JSON.stringify(allTicketsFiltered[0], null, 2));
+      logger.info('🔍 DEBUG EXPORTACIÓN: Cantidad total de tickets tras filtro SLA:', allTicketsFiltered.length);
 
       // Verificar la estructura de cdata para transporte en los primeros 3 tickets
-      allTicketsForExport.slice(0, 3).forEach((ticket: any, index: number) => {
+      allTicketsFiltered.slice(0, 3).forEach((ticket: any, index: number) => {
         logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1} cdata:`, JSON.stringify(ticket.cdata, null, 2));
         logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1} transporte value:`, ticket.cdata?.transporte);
         if (ticket.cdata?.TransporteName) {
@@ -246,7 +300,7 @@ const AnalyticsView: React.FC = memo(() => {
       const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.xlsx`;
       
       // Use the secure Excel export function with ALL filtered data
-      exportTicketsToExcel(allTicketsForExport, {
+      exportTicketsToExcel(allTicketsFiltered, {
         filename: fileName,
         includeFilters: true,
         filters: filters
@@ -267,8 +321,21 @@ const AnalyticsView: React.FC = memo(() => {
     try {
       // Obtener TODOS los tickets filtrados para exportación
       const allTicketsForExport = await fetchAllTicketsForExport(filters);
+
+      const currentSlaStatus = (filters as any).slaStatus as
+        | 'cumplido'
+        | 'no_cumplido'
+        | 'en_curso'
+        | undefined;
+
+      const allTicketsFiltered = filterTicketsBySlaStatus(
+        allTicketsForExport,
+        currentSlaStatus === 'cumplido' || currentSlaStatus === 'no_cumplido' || currentSlaStatus === 'en_curso'
+          ? currentSlaStatus
+          : undefined
+      );
       
-      if (allTicketsForExport.length === 0) {
+      if (allTicketsFiltered.length === 0) {
         alert('No hay datos para exportar con los filtros aplicados.');
         return;
       }
@@ -278,7 +345,7 @@ const AnalyticsView: React.FC = memo(() => {
       const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.csv`;
       
       // Use the secure CSV export function with ALL filtered data
-      exportTicketsToCSV(allTicketsForExport, {
+      exportTicketsToCSV(allTicketsFiltered, {
         filename: fileName,
         includeFilters: true,
         filters: filters
@@ -292,6 +359,19 @@ const AnalyticsView: React.FC = memo(() => {
       setIsExporting(false);
     }
   }, [fetchAllTicketsForExport, filters]);
+
+  const currentSlaStatusForView = (filters as any).slaStatus as
+    | 'cumplido'
+    | 'no_cumplido'
+    | 'en_curso'
+    | undefined;
+
+  const filteredTickets = filterTicketsBySlaStatus(
+    tickets,
+    currentSlaStatusForView === 'cumplido' || currentSlaStatusForView === 'no_cumplido' || currentSlaStatusForView === 'en_curso'
+      ? currentSlaStatusForView
+      : undefined
+  );
 
   return (
     <div className="max-w-1400 mx-auto px-8 py-12 bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-white">
@@ -359,7 +439,7 @@ const AnalyticsView: React.FC = memo(() => {
         </div>
       ) : (
         <>
-          <DataTable tickets={tickets} />
+          <DataTable tickets={filteredTickets} totalCount={filteredTickets.length} />
           {pagination && pagination.total_pages > 1 && (
             <div className="mt-6 flex justify-end">
               <Pagination pagination={pagination} onPageChange={handlePageChange} />
