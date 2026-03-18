@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useConfig } from '../contexts/ConfigContext';
+import { useConfig } from '../context/ConfigContext';
 
 /**
  * Hook useDebounce para optimizar búsquedas y evitar llamadas excesivas a APIs

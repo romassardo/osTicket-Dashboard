@@ -15,6 +15,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.3.1",
     "mysql2": "^3.14.1",
     "odbc": "^2.4.9",
     "recharts": "^2.15.3",

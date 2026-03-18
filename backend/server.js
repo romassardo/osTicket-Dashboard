@@ -35,6 +35,8 @@ const helpTopicRoutes = require('./routes/helpTopicRoutes');
 const statsRoutes = require('./routes/statsRoutes'); // <-- AÑADIR NUEVA RUTA
 const slaRoutes = require('./routes/slaRoutes');
 const errorHandler = require('./middleware/errorHandler');
+const { apiLimiter, slaLimiter } = require('./middleware/rateLimiter');
+const { validateQueryParams } = require('./middleware/validateParams');
 
 // Crear una instancia de la aplicación Express
 const app = express();
@@ -76,48 +78,30 @@ app.use(cors()); // Esto permitirá todas las solicitudes CORS por defecto
 
 // --- API Endpoints ---
 
-// Usar los manejadores de rutas
-logger.debug('Registrando ruta /api/tickets...');
+// Rate limiting global para todas las rutas API
+app.use('/api/', apiLimiter);
+
+// Validación de parámetros comunes en rutas que los usan
+app.use('/api/tickets', validateQueryParams);
+app.use('/api/sla', validateQueryParams);
+app.use('/api/stats', validateQueryParams);
+
+// Rate limiting más estricto para endpoints SLA (costosos computacionalmente)
+app.use('/api/sla', slaLimiter);
+
+// Registrar manejadores de rutas
 app.use('/api/tickets', ticketRoutes);
-logger.debug('✓ Ruta /api/tickets registrada exitosamente');
-
-logger.debug('Registrando ruta /api/departments...');
 app.use('/api/departments', departmentRoutes);
-logger.debug('✓ Ruta /api/departments registrada exitosamente');
-
-logger.debug('Registrando ruta /api/users...');
 app.use('/api/users', userRoutes);
-logger.debug('✓ Ruta /api/users registrada exitosamente');
-
-logger.debug('Registrando ruta /api/staff...');
 app.use('/api/staff', staffRoutes);
-logger.debug('✓ Ruta /api/staff registrada exitosamente');
-
-logger.debug('Registrando ruta /api/organizations...');
 app.use('/api/organizations', organizationRoutes);
-logger.debug('✓ Ruta /api/organizations registrada exitosamente');
-
-logger.debug('Registrando ruta /api/statuses...');
 app.use('/api/statuses', statusRoutes);
-logger.debug('✓ Ruta /api/statuses registrada exitosamente');
-
-logger.debug('Registrando ruta /api/priorities...');
 app.use('/api/priorities', priorityRoutes);
-logger.debug('✓ Ruta /api/priorities registrada exitosamente');
-
-logger.debug('Registrando ruta /api/helptopics...');
 app.use('/api/helptopics', helpTopicRoutes);
-logger.debug('✓ Ruta /api/helptopics registrada exitosamente');
-
-logger.debug('Registrando ruta /api/stats...');
-app.use('/api/stats', statsRoutes); // <-- AÑADIR USO DE LA RUTA
-logger.debug('✓ Ruta /api/stats registrada exitosamente');
-
-logger.debug('Registrando ruta /api/sla...');
+app.use('/api/stats', statsRoutes);
 app.use('/api/sla', slaRoutes);
-logger.debug('✓ Ruta /api/sla registrada exitosamente');
 
-logger.info('✓ Todas las rutas API registradas exitosamente');
+logger.info('Todas las rutas API registradas');
 
 // Middleware de manejo de errores centralizado
 // Debe registrarse DESPUÉS de las rutas de la API pero ANTES de servir el frontend.

@@ -106,7 +106,7 @@ npm run dev  # Puerto 5173
 
 ### Producción
 
-URL: **https://***REDACTED_DOMAIN***/dashboard/**
+URL: **https://<DOMAIN>/dashboard/**
 
 ## 👤 Desarrollador
 

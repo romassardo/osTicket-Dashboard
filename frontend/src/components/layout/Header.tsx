@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSound } from '../../context/SoundContext'; // Importar el hook
 import { ArrowPathIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 
 /**
  * Header del Dashboard siguiendo DESIGN_GUIDE.md

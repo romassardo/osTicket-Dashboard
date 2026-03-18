@@ -2,7 +2,7 @@
 
 ## Servidor de Producción
 
-**URL:** https://***REDACTED_DOMAIN***/dashboard/  
+**URL:** https://<DOMAIN>/dashboard/  
 **Sistema Operativo:** Ubuntu 24.04 LTS  
 **Servidor Web:** Apache 2.4 con SSL (Let's Encrypt)  
 **Process Manager:** PM2
@@ -11,7 +11,7 @@
 
 ### Acceso al Servidor
 ```bash
-ssh soporte@***REDACTED_SERVER_IP***
+ssh soporte@<SERVER_IP>
 ```
 
 ### Software Instalado
@@ -47,12 +47,12 @@ Archivo: `/etc/apache2/sites-available/soporteticket.conf`
 
 ```apache
 <VirtualHost *:443>
-    ServerName ***REDACTED_DOMAIN***
+    ServerName <DOMAIN>
     
     # SSL Configuration
     SSLEngine on
-    SSLCertificateFile /etc/letsencrypt/live/***REDACTED_DOMAIN***/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/***REDACTED_DOMAIN***/privkey.pem
+    SSLCertificateFile /etc/letsencrypt/live/<DOMAIN>/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/<DOMAIN>/privkey.pem
     
     # Redirección automática de /dashboard a /dashboard/
     RewriteEngine On
@@ -78,8 +78,8 @@ Archivo: `/etc/apache2/sites-available/soporteticket.conf`
 
 # Redirección HTTP a HTTPS
 <VirtualHost *:80>
-    ServerName ***REDACTED_DOMAIN***
-    Redirect permanent / https://***REDACTED_DOMAIN***/
+    ServerName <DOMAIN>
+    Redirect permanent / https://<DOMAIN>/
 </VirtualHost>
 ```
 
@@ -127,14 +127,14 @@ Esto genera la carpeta `dist/` con:
 
 ```bash
 # Subir index.html
-scp dist/index.html soporte@***REDACTED_SERVER_IP***:/tmp/dashboard-index.html
+scp dist/index.html soporte@<SERVER_IP>:/tmp/dashboard-index.html
 
 # Subir assets
-scp -r dist/assets/* soporte@***REDACTED_SERVER_IP***:/tmp/dashboard-assets/
+scp -r dist/assets/* soporte@<SERVER_IP>:/tmp/dashboard-assets/
 
 # Subir archivos estáticos
-scp dist/notification.mp3 soporte@***REDACTED_SERVER_IP***:/tmp/
-scp dist/vite.svg soporte@***REDACTED_SERVER_IP***:/tmp/
+scp dist/notification.mp3 soporte@<SERVER_IP>:/tmp/
+scp dist/vite.svg soporte@<SERVER_IP>:/tmp/
 ```
 
 #### Opción B: Git Pull (Si frontend está en repo)
@@ -151,7 +151,7 @@ npm run build
 
 ```bash
 # Conectarse al servidor
-ssh soporte@***REDACTED_SERVER_IP***
+ssh soporte@<SERVER_IP>
 
 # Hacer backup del dist actual (opcional pero recomendado)
 sudo mv /var/www/dashboardsop/frontend/dist /var/www/dashboardsop/frontend/dist.backup.$(date +%Y%m%d_%H%M%S)
@@ -182,7 +182,7 @@ ls -lh /var/www/dashboardsop/frontend/dist/assets/ | head -10
 
 ```bash
 # Subir archivo modificado
-scp backend/routes/ticketRoutes.js soporte@***REDACTED_SERVER_IP***:/tmp/
+scp backend/routes/ticketRoutes.js soporte@<SERVER_IP>:/tmp/
 
 # En el servidor
 sudo mv /tmp/ticketRoutes.js /var/www/dashboardsop/backend/routes/
@@ -229,7 +229,7 @@ pm2 logs dashboard-osticket --lines 0
 
 #### Check Frontend
 
-1. Abrir navegador en **https://***REDACTED_DOMAIN***/dashboard/**
+1. Abrir navegador en **https://<DOMAIN>/dashboard/**
 2. **Limpiar caché del navegador** (Ctrl+Shift+Delete)
 3. O abrir en **modo incógnito**
 4. Verificar que:
@@ -244,8 +244,8 @@ pm2 logs dashboard-osticket --lines 0
 
 ```bash
 # Desde cualquier máquina
-curl https://***REDACTED_DOMAIN***/api/tickets?page=1&limit=5
-curl https://***REDACTED_DOMAIN***/api/tickets/stats
+curl https://<DOMAIN>/api/tickets?page=1&limit=5
+curl https://<DOMAIN>/api/tickets/stats
 ```
 
 ## 🔍 Troubleshooting
@@ -311,7 +311,7 @@ sudo chmod -R 755 /var/www/dashboardsop/frontend/dist/assets
 ```javascript
 // En backend/server.js
 app.use(cors({
-  origin: 'https://***REDACTED_DOMAIN***',
+  origin: 'https://<DOMAIN>',
   credentials: true
 }));
 ```

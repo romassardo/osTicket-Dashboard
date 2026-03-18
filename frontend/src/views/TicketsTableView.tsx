@@ -7,7 +7,7 @@ import Pagination from '../components/tables/Pagination.tsx';
 import TicketDetailModal from '../components/modals/TicketDetailModal';
 import type { Ticket, PaginationInfo, AdvancedFilters } from '../types';
 import { useDebounce } from '../lib/hooks';
-import { useConfig } from '../contexts/ConfigContext';
+import { useConfig } from '../context/ConfigContext';
 import logger from '../utils/logger';
 
 /**

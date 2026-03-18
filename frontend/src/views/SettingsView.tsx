@@ -4,8 +4,8 @@ import { Button } from "../components/ui/Button";
 import { Switch } from "../components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Label } from "../components/ui/label";
-import { useTheme } from "../contexts/ThemeContext";
-import { useConfig } from "../contexts/ConfigContext";
+import { useTheme } from "../context/ThemeContext";
+import { useConfig } from "../context/ConfigContext";
 
 const SettingsView: React.FC = () => {
   const { theme, setTheme } = useTheme();

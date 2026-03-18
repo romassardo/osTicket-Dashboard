@@ -10,6 +10,8 @@ const {
   cargarFeriados,
   HOURS_PER_DAY 
 } = require('../utils/businessHours');
+const { formatHorasHabiles, formatDiferenciaSLA, formatTime, formatPrimeraRespuesta } = require('../utils/formatters');
+const cache = require('../utils/cache');
 
 /**
  * GET /api/sla/stats
@@ -167,30 +169,6 @@ router.get('/stats', async (req, res, next) => {
         ? grupo.suma_diferencia_sla / grupo.total_tickets
         : 0;
 
-      // Convertir horas hábiles a formato legible
-      const formatHorasHabiles = (horas) => {
-        if (!horas) return '0h 00m';
-        const h = Math.floor(horas);
-        const m = Math.round((horas - h) * 60);
-        if (h >= HOURS_PER_DAY) {
-          const dias = Math.floor(h / HOURS_PER_DAY);
-          const horasRestantes = h % HOURS_PER_DAY;
-          return `${dias}d ${horasRestantes}h ${String(m).padStart(2, '0')}m`;
-        }
-        return `${h}h ${String(m).padStart(2, '0')}m`;
-      };
-
-      // Formatear diferencia SLA
-      const formatDiferenciaSLA = (horas) => {
-        if (horas === null || horas === undefined) return 'Sin datos';
-        const horasAbs = Math.abs(horas);
-        if (horas >= 0) {
-          return `Cumplió ${horasAbs.toFixed(1)}h antes`;
-        } else {
-          return `Se pasó ${horasAbs.toFixed(1)}h`;
-        }
-      };
-
       return {
         departamento: grupo.departamento,
         agente: grupo.agente,
@@ -247,7 +225,15 @@ router.get('/stats', async (req, res, next) => {
  */
 router.get('/alerts', async (req, res, next) => {
   try {
-    logger.info('🚨 Obteniendo alertas SLA con horas hábiles...');
+    // Verificar cache (TTL 2 minutos para alertas)
+    const cacheKey = 'sla:alerts';
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      logger.debug('SLA Alerts: sirviendo desde cache');
+      return res.json(cached);
+    }
+
+    logger.info('Calculando alertas SLA con horas hábiles...');
     
     // Obtener todos los tickets abiertos con su información básica
     const qTicketsAbiertos = `
@@ -356,7 +342,10 @@ router.get('/alerts', async (req, res, next) => {
       usa_horas_habiles: true
     };
 
-    logger.info(`🚨 SLA Alerts (Horas Hábiles): ${ticketsVencidos.length} vencidos, ${ticketsCriticos.length} críticos, ${ticketsEnRiesgo.length} en riesgo`);
+    // Cachear resultado por 2 minutos
+    cache.set(cacheKey, response, 120);
+
+    logger.info(`SLA Alerts: ${ticketsVencidos.length} vencidos, ${ticketsCriticos.length} críticos, ${ticketsEnRiesgo.length} en riesgo`);
     res.json(response);
 
   } catch (error) {
@@ -487,37 +476,8 @@ router.get('/tickets', async (req, res, next) => {
       type: sequelize.QueryTypes.SELECT
     });
 
-    // Formatear resultados
+    // Formatear resultados (usando funciones compartidas de utils/formatters.js)
     const formattedTickets = tickets.map(ticket => {
-      // Formatear tiempo de resolución
-      const formatTime = (seconds) => {
-        if (!seconds) return '0d 00:00';
-        const days = Math.floor(seconds / 86400);
-        const hours = Math.floor((seconds % 86400) / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        return `${days}d ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-      };
-
-      // Formatear diferencia SLA
-      const formatDiferenciaSLA = (horas) => {
-        if (horas === null || horas === undefined) return 'Sin datos';
-        const horasAbs = Math.abs(horas);
-        if (horas >= 0) {
-          return `Cumplió ${horasAbs.toFixed(1)}h antes`;
-        } else {
-          return `Se pasó ${horasAbs.toFixed(1)}h`;
-        }
-      };
-
-      // Formatear tiempo primera respuesta
-      const formatPrimeraRespuesta = (fechaCreacion, fechaRespuesta) => {
-        if (!fechaRespuesta) return 'Sin respuesta';
-        const diffSeconds = Math.floor((new Date(fechaRespuesta) - new Date(fechaCreacion)) / 1000);
-        const hours = Math.floor(diffSeconds / 3600);
-        const minutes = Math.floor((diffSeconds % 3600) / 60);
-        return `${hours}h ${String(minutes).padStart(2, '0')}m`;
-      };
-
       return {
         numero_ticket: ticket.numero_ticket,
         departamento: ticket.departamento,
@@ -558,6 +518,7 @@ router.get('/tickets', async (req, res, next) => {
 /**
  * GET /api/sla/summary
  * Devuelve un resumen general de SLA para las tarjetas del dashboard
+ * AHORA USA HORAS HÁBILES (consistente con /stats)
  */
 router.get('/summary', async (req, res, next) => {
   const { year, month } = req.query;
@@ -575,37 +536,14 @@ router.get('/summary', async (req, res, next) => {
       replacements.year = parseInt(year, 10);
     }
 
-    const summary = await sequelize.query(`
+    // Obtener tickets cerrados con sus datos de SLA y primera respuesta
+    const tickets = await sequelize.query(`
       SELECT
-        COUNT(t.ticket_id) AS total_tickets,
-        SUM(
-          CASE 
-            WHEN TIMESTAMPDIFF(HOUR, t.created, t.closed) <= s_sla.grace_period 
-            THEN 1 ELSE 0 
-          END
-        ) AS tickets_cumplidos,
-        SUM(
-          CASE 
-            WHEN TIMESTAMPDIFF(HOUR, t.created, t.closed) > s_sla.grace_period 
-            THEN 1 ELSE 0 
-          END
-        ) AS tickets_vencidos,
-        ROUND(
-          SUM(
-            CASE 
-              WHEN TIMESTAMPDIFF(HOUR, t.created, t.closed) <= s_sla.grace_period 
-              THEN 1 ELSE 0 
-            END
-          ) / NULLIF(COUNT(t.ticket_id), 0) * 100,
-          1
-        ) AS porcentaje_cumplimiento,
-        AVG(
-          CASE
-            WHEN fr.first_response IS NOT NULL
-            THEN TIMESTAMPDIFF(SECOND, t.created, fr.first_response)
-          END
-        ) AS avg_tiempo_primera_respuesta,
-        AVG(TIMESTAMPDIFF(SECOND, t.created, t.closed)) AS avg_tiempo_resolucion
+        t.ticket_id,
+        t.created,
+        t.closed,
+        s_sla.grace_period,
+        fr.first_response
       FROM ost_ticket t
       INNER JOIN ost_department d ON d.id = t.dept_id
       LEFT JOIN ost_sla s_sla ON s_sla.id = t.sla_id
@@ -620,32 +558,63 @@ router.get('/summary', async (req, res, next) => {
       ) fr ON fr.ticket_id = t.ticket_id
       WHERE t.closed IS NOT NULL
         AND d.name = 'Soporte IT'
+        AND s_sla.id IS NOT NULL
         ${dateFilter}
     `, {
       replacements,
       type: sequelize.QueryTypes.SELECT
     });
 
-    // Formatear tiempos
-    const formatTime = (seconds) => {
-      if (!seconds) return '0d 00:00';
-      const days = Math.floor(seconds / 86400);
-      const hours = Math.floor((seconds % 86400) / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      return `${days}d ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-    };
+    // Calcular usando horas hábiles (consistente con /stats)
+    let ticketsCumplidos = 0;
+    let ticketsVencidos = 0;
+    let sumaTiempoResolucion = 0;
+    let sumaTiempoPrimeraRespuesta = 0;
+    let cuentaPrimeraRespuesta = 0;
+
+    const resultados = await Promise.all(tickets.map(async (ticket) => {
+      const horasResolucion = await calcularHorasHabiles(ticket.created, ticket.closed);
+      const gracePeriod = ticket.grace_period || 0;
+      const cumplido = horasResolucion <= gracePeriod;
+
+      if (cumplido) ticketsCumplidos++;
+      else ticketsVencidos++;
+
+      sumaTiempoResolucion += horasResolucion;
+
+      if (ticket.first_response) {
+        const horasPrimeraRespuesta = await calcularHorasHabiles(ticket.created, ticket.first_response);
+        sumaTiempoPrimeraRespuesta += horasPrimeraRespuesta;
+        cuentaPrimeraRespuesta++;
+      }
+
+      return { horasResolucion, cumplido };
+    }));
+
+    const totalTickets = tickets.length;
+    const porcentajeCumplimiento = totalTickets > 0
+      ? Math.round((ticketsCumplidos / totalTickets) * 100 * 10) / 10
+      : 0;
+    const avgResolucionHoras = totalTickets > 0 ? sumaTiempoResolucion / totalTickets : 0;
+    const avgPrimeraRespuestaHoras = cuentaPrimeraRespuesta > 0 ? sumaTiempoPrimeraRespuesta / cuentaPrimeraRespuesta : 0;
 
     const result = {
-      ...summary[0],
-      tiempo_promedio_primera_respuesta: formatTime(summary[0].avg_tiempo_primera_respuesta),
-      tiempo_promedio_resolucion: formatTime(summary[0].avg_tiempo_resolucion)
+      total_tickets: totalTickets,
+      tickets_cumplidos: ticketsCumplidos,
+      tickets_vencidos: ticketsVencidos,
+      porcentaje_cumplimiento: porcentajeCumplimiento,
+      avg_tiempo_primera_respuesta: avgPrimeraRespuestaHoras * 3600,
+      avg_tiempo_resolucion: avgResolucionHoras * 3600,
+      tiempo_promedio_primera_respuesta: formatHorasHabiles(avgPrimeraRespuestaHoras),
+      tiempo_promedio_resolucion: formatHorasHabiles(avgResolucionHoras),
+      usa_horas_habiles: true
     };
 
-    logger.info(`📊 SLA Summary generado correctamente`);
+    logger.info(`SLA Summary generado: ${totalTickets} tickets, ${porcentajeCumplimiento}% cumplimiento`);
     res.json(result);
 
   } catch (error) {
-    logger.error('❌ Error al obtener resumen SLA:', error);
+    logger.error('Error al obtener resumen SLA:', error);
     next(error);
   }
 });

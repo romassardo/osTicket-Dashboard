@@ -10,6 +10,10 @@ class Logger {
     if (!fs.existsSync(this.logDir)) {
       fs.mkdirSync(this.logDir, { recursive: true });
     }
+
+    // Abrir write streams para evitar bloquear el event loop (async I/O)
+    this._appStream = fs.createWriteStream(path.join(this.logDir, 'app.log'), { flags: 'a' });
+    this._errorStream = fs.createWriteStream(path.join(this.logDir, 'error.log'), { flags: 'a' });
   }
 
   _formatMessage(level, message, ...args) {
@@ -23,12 +27,9 @@ class Logger {
 
   _writeToFile(level, formattedMessage) {
     if (level === 'error') {
-      const errorLogPath = path.join(this.logDir, 'error.log');
-      fs.appendFileSync(errorLogPath, formattedMessage + '\n');
+      this._errorStream.write(formattedMessage + '\n');
     }
-    
-    const allLogPath = path.join(this.logDir, 'app.log');
-    fs.appendFileSync(allLogPath, formattedMessage + '\n');
+    this._appStream.write(formattedMessage + '\n');
   }
 
   info(message, ...args) {

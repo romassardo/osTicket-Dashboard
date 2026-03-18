@@ -321,7 +321,7 @@ const SLAStatsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Tarjetas de Resumen */}
+      {/* Tarjetas de Resumen con indicadores de tendencia */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
           <div className="flex items-center justify-between mb-2">
@@ -336,38 +336,80 @@ const SLAStatsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg shadow-md p-6 border-l-4 border-green-500">
+        {(() => {
+          const pct = parseFloat(promedioGeneral);
+          const isGood = pct >= 90;
+          const isWarning = pct >= 70 && pct < 90;
+          const colorBg = isGood ? 'bg-green-50 dark:bg-green-900/20' : isWarning ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-red-50 dark:bg-red-900/20';
+          const colorBorder = isGood ? 'border-green-500' : isWarning ? 'border-yellow-500' : 'border-red-500';
+          const colorText = isGood ? 'text-green-600' : isWarning ? 'text-yellow-600' : 'text-red-600';
+          const statusLabel = isGood ? 'Excelente' : isWarning ? 'Requiere atención' : 'Crítico';
+          const TrendIcon = isGood ? TrendingUp : TrendingDown;
+          return (
+            <div className={`${colorBg} rounded-lg shadow-md p-6 border-l-4 ${colorBorder}`}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">% Cumplimiento</h3>
+                <TrendIcon className={`w-5 h-5 ${colorText}`} />
+              </div>
+              <div className={`text-3xl font-bold ${colorText}`}>
+                {promedioGeneral}%
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  isGood ? 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-300' :
+                  isWarning ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-300' :
+                  'bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-300'
+                }`}>
+                  {statusLabel}
+                </span>
+                <span className="text-xs text-gray-400">Meta: 90%</span>
+              </div>
+              {/* Mini progress bar with goal line */}
+              <div className="relative mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-visible">
+                <div className={`h-2 rounded-full ${isGood ? 'bg-green-500' : isWarning ? 'bg-yellow-500' : 'bg-red-500'}`}
+                  style={{ width: `${Math.min(pct, 100)}%` }} />
+                <div className="absolute top-0 h-2 w-0.5 bg-gray-800 dark:bg-white" style={{ left: '90%' }}
+                  title="Meta 90%" />
+              </div>
+            </div>
+          );
+        })()}
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">% Cumplimiento</h3>
-            <TrendingUp className="w-5 h-5 text-green-600" />
+            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Cumplidos / Vencidos</h3>
+            <BarChart3 className="w-5 h-5 text-indigo-600" />
           </div>
-          <div className="text-3xl font-bold text-green-600">
-            {promedioGeneral}%
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-green-600">{totalCumplidos}</span>
+            <span className="text-gray-400">/</span>
+            <span className="text-2xl font-bold text-red-600">{totalVencidos}</span>
+          </div>
+          <div className="relative mt-3 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
+            <div className="h-2 bg-green-500 rounded-l-full"
+              style={{ width: totalTickets > 0 ? `${(totalCumplidos / totalTickets) * 100}%` : '0%' }} />
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            {totalCumplidos} de {totalTickets} cumplidos
+            {totalTickets} tickets analizados
           </p>
         </div>
 
-        <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg shadow-md p-6 border-l-4 border-orange-500">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">% No Cumplido</h3>
-            <TrendingDown className="w-5 h-5 text-orange-600" />
-          </div>
-          <div className="text-3xl font-bold text-orange-600">
-            {porcentajeNoCumplido}%
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            {totalVencidos} tickets fuera de tiempo
-          </p>
-        </div>
-
-        <div className="bg-red-50 dark:bg-red-900/20 rounded-lg shadow-md p-6 border-l-4 border-red-500">
+        <div className={`rounded-lg shadow-md p-6 border-l-4 ${
+          totalVencidos === 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-500' :
+          totalVencidos <= 5 ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-500' :
+          'bg-red-50 dark:bg-red-900/20 border-red-500'
+        }`}>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Vencidos</h3>
-            <Clock className="w-5 h-5 text-red-600" />
+            <Clock className={`w-5 h-5 ${
+              totalVencidos === 0 ? 'text-green-600' :
+              totalVencidos <= 5 ? 'text-orange-600' : 'text-red-600'
+            }`} />
           </div>
-          <div className="text-3xl font-bold text-red-600">
+          <div className={`text-3xl font-bold ${
+            totalVencidos === 0 ? 'text-green-600' :
+            totalVencidos <= 5 ? 'text-orange-600' : 'text-red-600'
+          }`}>
             {totalVencidos}
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -396,7 +438,7 @@ const SLAStatsView: React.FC = () => {
                     </span>
                     <span className={`font-bold ${
                       stat.porcentaje_sla_cumplido >= 90 ? 'text-green-600' :
-                      stat.porcentaje_sla_cumplido >= 80 ? 'text-yellow-600' : 'text-red-600'
+                      stat.porcentaje_sla_cumplido >= 70 ? 'text-yellow-600' : 'text-red-600'
                     }`}>
                       {stat.porcentaje_sla_cumplido.toFixed(1)}%
                     </span>
@@ -405,7 +447,7 @@ const SLAStatsView: React.FC = () => {
                     <div
                       className={`absolute h-full rounded-full transition-all ${
                         stat.porcentaje_sla_cumplido >= 90 ? 'bg-green-500' :
-                        stat.porcentaje_sla_cumplido >= 80 ? 'bg-yellow-500' : 'bg-red-500'
+                        stat.porcentaje_sla_cumplido >= 70 ? 'bg-yellow-500' : 'bg-red-500'
                       }`}
                       style={{ width: `${Math.min(stat.porcentaje_sla_cumplido, 100)}%` }}
                     />
@@ -428,9 +470,9 @@ const SLAStatsView: React.FC = () => {
           <div className="space-y-4">
             {(() => {
               const excelente = sortedStats.filter(s => s.porcentaje_sla_cumplido >= 90).length;
-              const bueno = sortedStats.filter(s => s.porcentaje_sla_cumplido >= 80 && s.porcentaje_sla_cumplido < 90).length;
-              const regular = sortedStats.filter(s => s.porcentaje_sla_cumplido >= 70 && s.porcentaje_sla_cumplido < 80).length;
-              const bajo = sortedStats.filter(s => s.porcentaje_sla_cumplido < 70).length;
+              const bueno = sortedStats.filter(s => s.porcentaje_sla_cumplido >= 70 && s.porcentaje_sla_cumplido < 90).length;
+              const regular = sortedStats.filter(s => s.porcentaje_sla_cumplido >= 50 && s.porcentaje_sla_cumplido < 70).length;
+              const bajo = sortedStats.filter(s => s.porcentaje_sla_cumplido < 50).length;
               const total = sortedStats.length || 1;
 
               return (
@@ -447,7 +489,7 @@ const SLAStatsView: React.FC = () => {
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Bueno (80-89%)</span>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Bueno (70-89%)</span>
                       <span className="text-sm font-bold text-yellow-600">{bueno} agentes</span>
                     </div>
                     <div className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -457,7 +499,7 @@ const SLAStatsView: React.FC = () => {
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Regular (70-79%)</span>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Regular (50-69%)</span>
                       <span className="text-sm font-bold text-orange-600">{regular} agentes</span>
                     </div>
                     <div className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -467,7 +509,7 @@ const SLAStatsView: React.FC = () => {
 
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Bajo (&lt;70%)</span>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Bajo (&lt;50%)</span>
                       <span className="text-sm font-bold text-red-600">{bajo} agentes</span>
                     </div>
                     <div className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -553,7 +595,7 @@ const SLAStatsView: React.FC = () => {
                 {sortedStats.map((stat, index) => {
                   const cumplimientoColor = 
                     stat.porcentaje_sla_cumplido >= 90 ? 'text-green-600 font-bold' :
-                    stat.porcentaje_sla_cumplido >= 80 ? 'text-yellow-600 font-semibold' :
+                    stat.porcentaje_sla_cumplido >= 70 ? 'text-yellow-600 font-semibold' :
                     'text-red-600 font-bold';
 
                   const diferenciaColor = 
@@ -598,7 +640,7 @@ const SLAStatsView: React.FC = () => {
                             <div 
                               className={`h-2 rounded-full ${
                                 stat.porcentaje_sla_cumplido >= 90 ? 'bg-green-500' :
-                                stat.porcentaje_sla_cumplido >= 80 ? 'bg-yellow-500' :
+                                stat.porcentaje_sla_cumplido >= 70 ? 'bg-yellow-500' :
                                 'bg-red-500'
                               }`}
                               style={{ width: `${Math.min(stat.porcentaje_sla_cumplido, 100)}%` }}

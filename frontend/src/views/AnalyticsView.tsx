@@ -8,7 +8,7 @@ import Pagination from '../components/tables/Pagination.tsx'; // Importar el com
 import { ArrowPathIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
 // Importar utilidades de exportación seguras
 import { exportTicketsToExcel, exportTicketsToCSV } from '../utils/exportUtils';
-import { useConfig } from '../contexts/ConfigContext';
+import { useConfig } from '../context/ConfigContext';
 import logger from '../utils/logger';
 
 // Definir interfaces para las opciones de filtro

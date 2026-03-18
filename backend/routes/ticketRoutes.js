@@ -20,31 +20,25 @@ router.get('/', asyncHandler(async (req, res) => {
     // Filtros específicos - manejar tanto estado único como múltiples estados
     if (statuses && statuses !== 'all') {
         const statusArray = statuses.split(',').map(s => s.trim()).filter(s => s !== '');
-        console.log(`[DEBUG] Filtro por estados múltiples - statuses recibidos: ${statusArray.join(', ')}`);
         where.status_id = { [Op.in]: statusArray };
     } else if (status && status !== 'all') {
-        console.log(`[DEBUG] Filtro por estado único - status recibido: ${status}`);
         where.status_id = status;
     }
     if (staff && staff !== 'all') {
-        console.log(`[DEBUG] Filtro por staff - staff recibido: ${staff}`);
         where.staff_id = staff;
     }
     if (sector && sector !== 'all') {
-        console.log(`[DEBUG] Filtro por sector - sector recibido: ${sector}`);
         where['$cdata.sector$'] = sector;
     }
     if (transporte && transporte !== 'all') {
-        console.log(`[DEBUG] Filtro por transporte - transporte recibido: ${transporte}`);
         where['$cdata.transporte$'] = transporte;
     }
     if (sla && sla !== 'all') {
         const slaId = parseInt(sla, 10);
         if (!Number.isNaN(slaId)) {
-            console.log(`[DEBUG] Filtro por SLA - sla recibido: ${sla} (id numérico: ${slaId})`);
             where.sla_id = slaId;
         } else {
-            console.log(`[DEBUG] Filtro por SLA ignorado: valor no numérico ->`, sla);
+            logger.warn(`Filtro SLA ignorado: valor no numérico -> ${sla}`);
         }
     }
     
@@ -67,7 +61,7 @@ router.get('/', asyncHandler(async (req, res) => {
             dateField = 'closed';
         }
         
-        console.log(`[DEBUG] Filtro automático de fechas - Campo: ${dateField} (basado en estados), Start: ${start.toISOString()}, End: ${end.toISOString()}`);
+        logger.debug(`Filtro fechas - Campo: ${dateField}, Start: ${start.toISOString()}, End: ${end.toISOString()}`);
         where[dateField] = { [Op.between]: [start, end] };
     } else if (startDate) {
         const start = new Date(startDate + 'T00:00:00.000-03:00');
@@ -83,7 +77,6 @@ router.get('/', asyncHandler(async (req, res) => {
             dateField = 'closed';
         }
         
-        console.log(`[DEBUG] Filtro automático desde fecha - Campo: ${dateField} (basado en estados), Start: ${start.toISOString()}`);
         where[dateField] = { [Op.gte]: start };
     } else if (endDate) {
         const end = new Date(endDate + 'T23:59:59.999-03:00');
@@ -99,7 +92,6 @@ router.get('/', asyncHandler(async (req, res) => {
             dateField = 'closed';
         }
         
-        console.log(`[DEBUG] Filtro automático hasta fecha - Campo: ${dateField} (basado en estados), End: ${end.toISOString()}`);
         where[dateField] = { [Op.lte]: end };
     }
     if (search && search.trim() !== '') {
@@ -156,62 +148,7 @@ router.get('/', asyncHandler(async (req, res) => {
         distinct: true
     });
     
-    console.log(`[DEBUG] Consulta completada - Total encontrados: ${count}, Devolviendo: ${rows.length}`);
-    if (rows.length > 0) {
-        console.log(`[DEBUG] Primer ticket encontrado:`, {
-            id: rows[0].ticket_id,
-            number: rows[0].number,
-            status: rows[0].status?.name,
-            status_id: rows[0].status_id,
-            sla_id: rows[0].sla_id,
-            sla: rows[0].sla ? {
-                id: rows[0].sla.id,
-                name: rows[0].sla.name,
-                grace_period: rows[0].sla.grace_period,
-            } : null,
-            created: rows[0].created
-        });
-    }
-    
-    // LOG TEMPORAL: Si estamos filtrando por fechas pero no por estado, mostrar todos los status_id de hoy
-    if ((startDate || endDate) && !status && !statuses) {
-        console.log(`[DEBUG TEMPORAL] Tickets de hoy por status_id (campo 'created'):`);
-        const statusCounts = {};
-        rows.forEach(ticket => {
-            const statusId = ticket.status_id;
-            const statusName = ticket.status?.name || 'Sin nombre';
-            const key = `${statusId} (${statusName})`;
-            statusCounts[key] = (statusCounts[key] || 0) + 1;
-        });
-        console.log(statusCounts);
-        
-        // INVESTIGACIÓN ADICIONAL: Buscar tickets cerrados hoy usando el campo 'closed'
-        if (startDate && endDate && startDate === endDate) {
-            console.log(`[DEBUG TEMPORAL] Investigando tickets cerrados hoy usando campo 'closed'...`);
-            const closedStart = new Date(startDate + 'T00:00:00.000-03:00');
-            const closedEnd = new Date(endDate + 'T23:59:59.999-03:00');
-            
-            Ticket.findAll({
-                where: {
-                    closed: { [Op.between]: [closedStart, closedEnd] }
-                },
-                include: [{ model: TicketStatus, as: 'status', attributes: ['name'] }],
-                attributes: ['ticket_id', 'number', 'status_id', 'created', 'closed']
-            }).then(closedTickets => {
-                console.log(`[DEBUG TEMPORAL] Tickets cerrados hoy (campo 'closed'): ${closedTickets.length}`);
-                const closedStatusCounts = {};
-                closedTickets.forEach(ticket => {
-                    const statusId = ticket.status_id;
-                    const statusName = ticket.status?.name || 'Sin nombre';
-                    const key = `${statusId} (${statusName})`;
-                    closedStatusCounts[key] = (closedStatusCounts[key] || 0) + 1;
-                });
-                console.log('[DEBUG TEMPORAL] Distribución por status_id (cerrados hoy):', closedStatusCounts);
-            }).catch(err => {
-                console.log('[DEBUG TEMPORAL] Error investigando tickets cerrados:', err.message);
-            });
-        }
-    }
+    logger.debug(`Consulta completada - Total: ${count}, Devolviendo: ${rows.length}`);
     
     res.json({
         tickets: rows,
@@ -226,8 +163,7 @@ router.get('/', asyncHandler(async (req, res) => {
 
 // GET /api/tickets/reports - Obtener tickets para reportes con filtros y paginación
 router.get('/reports', async (req, res) => {
-  console.log('✅✅✅ /api/tickets/reports endpoint hit! ✅✅✅');
-    logger.info('--- INICIO PETICIÓN GET /api/tickets ---');
+    logger.info('GET /api/tickets/reports');
     logger.info(`Query recibido: ${JSON.stringify(req.query)}`);
 
     const { page = 1, limit = 10, search, month, year, status, priority, department, sla, team, topic, location, staff, sector, transporte, startDate, endDate } = req.query;
@@ -398,43 +334,8 @@ router.get('/stats', asyncHandler(async (req, res) => {
     res.json(stats);
 }));
 
-// GET /api/tickets/stats/by-transport
-router.get('/stats/by-transport', asyncHandler(async (req, res) => {
-    const { month, year } = req.query;
-    let where = {};
-
-    if (year && year !== 'all') {
-        const yearNum = parseInt(year, 10);
-        let startDate, endDate;
-        if (month && month !== 'all') {
-            const monthNum = parseInt(month, 10);
-            startDate = new Date(yearNum, monthNum - 1, 1);
-            endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
-        } else {
-            startDate = new Date(yearNum, 0, 1);
-            endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
-        }
-        where.created = { [Op.between]: [startDate, endDate] };
-    }
-
-    const transportData = await Ticket.findAll({
-        attributes: [
-            [Ticket.sequelize.col('location.id'), 'transportId'],
-            [Ticket.sequelize.col('location.name'), 'transportName'],
-            [Ticket.sequelize.fn('COUNT', Ticket.sequelize.col('Ticket.id')), 'count']
-        ],
-        include: [{
-            model: Location,
-            as: 'location',
-            attributes: []
-        }],
-        where,
-        group: ['location.id', 'location.name'],
-        order: [[Ticket.sequelize.fn('COUNT', Ticket.sequelize.col('Ticket.id')), 'DESC']]
-    });
-
-    res.json(transportData);
-}));
+// REMOVED: /stats/by-transport — referenced undefined Location model
+// Transport data is now served via /stats/tickets-by-transport in statsRoutes.js
 
 // GET /api/tickets/count - Obtener conteos de tickets para dashboard
 router.get('/count', asyncHandler(async (req, res) => {
@@ -598,67 +499,8 @@ router.get('/stats/by-agent', asyncHandler(async (req, res) => {
     res.json(formattedStats);
 }));
 
-// GET /api/tickets/export - Exportar tickets
-router.get('/export', asyncHandler(async (req, res) => {
-    console.log('🔄 GET /api/tickets/export - Iniciando exportación con query:', req.query);
-    const { search, month, year, status, priority, department, sla, team, topic, location } = req.query;
-
-    let where = {};
-    let include = [
-        { model: User, as: 'user', attributes: ['name'] },
-        { model: Department, as: 'department', attributes: ['name'] },
-        { model: SLA, as: 'sla', attributes: ['name'] },
-        { model: Team, as: 'team', attributes: ['name'] },
-        { model: Topic, as: 'topic', attributes: ['topic'] },
-        { model: Location, as: 'location', attributes: ['name'] },
-    ];
-
-    if (search && search.trim() !== '') {
-        const searchTerm = `%${search.trim()}%`;
-        const searchCondition = {
-            [Op.or]: [
-                { '$user.name$': { [Op.like]: searchTerm } },
-                { '$department.name$': { [Op.like]: searchTerm } },
-                { '$location.name$': { [Op.like]: searchTerm } },
-                { 'number': { [Op.like]: searchTerm } }
-            ]
-        };
-        where = { ...where, ...searchCondition };
-    }
-
-    if (department && department !== 'all') where.dept_id = department;
-    if (sla && sla !== 'all') where.sla_id = sla;
-    if (team && team !== 'all') where.team_id = team;
-    if (topic && topic !== 'all') where.topic_id = topic;
-    if (location && location !== 'all') where.location_id = location;
-    if (status && status !== 'all') where.status_id = status;
-    if (priority && priority !== 'all') where.priority_id = priority;
-
-    if (year && year !== 'all') {
-        const yearNum = parseInt(year, 10);
-        let startDate, endDate;
-        if (month && month !== 'all') {
-            const monthNum = parseInt(month, 10);
-            startDate = new Date(yearNum, monthNum - 1, 1);
-            endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
-        } else {
-            startDate = new Date(yearNum, 0, 1);
-            endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);
-        }
-        where.created = { [Op.between]: [startDate, endDate] };
-    }
-
-    const tickets = await Ticket.findAll({
-        where,
-        include,
-        order: [['created', 'DESC']]
-    });
-
-    console.log(`✅ GET /api/tickets/export - Encontrados ${tickets.length} tickets para exportar.`);
-    res.json(tickets);
-}));
-
-module.exports = router;
+// REMOVED: /export route — referenced undefined Team, Location, Topic models
+// Export functionality should be reimplemented using existing models
 
 // GET ticket statistics by organization (for charts)
 router.get('/stats/by-organization', async (req, res, next) => {
@@ -771,18 +613,7 @@ router.get('/stats/by-organization', async (req, res, next) => {
       ticket_count: parseInt(stat.ticket_count, 10)
     }));
 
-    // Si aún no hay datos, usar datos de ejemplo como último recurso
-    if (formattedStats.length === 0) {
-      logger.info('No se encontraron datos reales. Devolviendo datos de ejemplo...');
-      res.json([
-        { organization_id: 1, name: "Empresa A", ticket_count: 35 },
-        { organization_id: 2, name: "Soporte General", ticket_count: 22 },
-        { organization_id: 3, name: "Sector Finanzas", ticket_count: 18 },
-      ]);
-      return;
-    }
-
-    logger.info(`Se encontraron ${formattedStats.length} sectores con tickets:`, formattedStats);
+    logger.info(`Se encontraron ${formattedStats.length} sectores con tickets`);
     res.json(formattedStats);
   } catch (error) {
     logger.error('Error en /stats/by-organization:', error);
@@ -1013,12 +844,8 @@ router.get('/:id', asyncHandler(async (req, res) => {
     const ticketId = req.params.id;
     const sequelize = require('../models').sequelize; // Obtener instancia de sequelize
 
-    console.log(`[DEBUG] /api/tickets/:id - INICIO para ticketId: ${ticketId}`);
-
     try {
-        // Iniciar log de la petición
-        logger.info(`🚀 INICIANDO consulta detalle para ticket ID: ${ticketId}`);
-        console.log(`[DEBUG] /api/tickets/:id - Buscando ticket principal...`);
+        logger.info(`Consultando detalle para ticket ID: ${ticketId}`);
 
         // 1. Obtener el ticket principal
         const ticket = await Ticket.findOne({ 
@@ -1032,7 +859,6 @@ router.get('/:id', asyncHandler(async (req, res) => {
                 }
             ]
         });
-        console.log(`[DEBUG] /api/tickets/:id - Ticket principal encontrado: ${ticket ? 'Sí' : 'No'}`);
 
         if (!ticket) {
             logger.warn(`Ticket ${ticketId} no encontrado`);
@@ -1072,7 +898,6 @@ router.get('/:id', asyncHandler(async (req, res) => {
         // Obtener respuestas/threads del ticket - Estructura osTicket correcta
         let ticketThreads = [];
         try {
-            console.log(`[DEBUG] /api/tickets/:id - 🔍 BUSCANDO THREADS para ticket ${ticketId}...`);
             
             const threadEntries = await sequelize.query(`
                 SELECT 
@@ -1101,16 +926,10 @@ router.get('/:id', asyncHandler(async (req, res) => {
             });
             
             ticketThreads = threadEntries;
-            console.log(`[DEBUG] /api/tickets/:id - ✅ THREADS ENCONTRADOS: ${ticketThreads.length}`);
-            if (ticketThreads.length > 0) {
-                console.log('[DEBUG] /api/tickets/:id - Primer thread:', JSON.stringify(ticketThreads[0], null, 2));
-            }
-
+            logger.debug(`Threads encontrados para ticket ${ticketId}: ${ticketThreads.length}`);
             
         } catch (threadError) {
-            console.error(`❌ ERROR CRÍTICO obteniendo threads para ticket ${ticketId}:`, threadError);
-            console.error(`❌ Stack trace:`, threadError.stack);
-            console.error(`❌ SQL Error details:`, threadError.sql || 'No SQL info');
+            logger.error(`Error obteniendo threads para ticket ${ticketId}:`, threadError.message);
             ticketThreads = [];
         }
 

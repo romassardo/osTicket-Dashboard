@@ -67,19 +67,6 @@ export const getOrganizations = async (year?: number, month?: number) => {
 };
 
 /**
- * Debug: Obtiene información detallada de organizaciones
- */
-export const getOrganizationsDebug = async () => {
-  try {
-    const response = await apiClient.get('/organizations/debug');
-    return response.data;
-  } catch (error) {
-    logger.error('Error al obtener debug de organizaciones:', error);
-    throw error;
-  }
-};
-
-/**
  * Obtiene todos los miembros del staff/agentes.
  */
 export const getStaff = async () => {

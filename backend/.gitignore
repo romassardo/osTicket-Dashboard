@@ -26,4 +26,14 @@ Thumbs.db
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
+
+# Environment files
+config/.env
+config/.env.local
+config/.env.*.local
+
+# Debug scripts
+debug-*.js
+investigate-*.js
+query-*.js

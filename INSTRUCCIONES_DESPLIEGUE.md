@@ -11,14 +11,14 @@
 
 1. **Conectar al servidor**:
 ```bash
-ssh soporte@***REDACTED_SERVER_IP***
-# Contraseña: ***REDACTED_SSH_PASSWORD***
+ssh soporte@<SERVER_IP>
+# Usar credenciales almacenadas en el gestor de contraseñas del equipo
 ```
 
 2. **Subir el script de despliegue**:
 Desde tu PC Windows en otra terminal:
 ```bash
-scp c:\Proyectos\OsTickets\dashboard-osticket\deploy-production.sh soporte@***REDACTED_SERVER_IP***:/tmp/
+scp deploy-production.sh soporte@<SERVER_IP>:/tmp/
 ```
 
 3. **Ejecutar el script en el servidor**:
@@ -33,7 +33,7 @@ Si prefieres ejecutar los comandos manualmente:
 
 ```bash
 # 1. Conectar al servidor
-ssh soporte@***REDACTED_SERVER_IP***
+ssh soporte@<SERVER_IP>
 
 # 2. Ir al directorio del proyecto
 cd /var/www/dashboardsop/dashboard-osticket
@@ -98,8 +98,8 @@ pm2 list
 
 Una vez completado el despliegue, verificar:
 
-1. **Frontend carga**: https://***REDACTED_DOMAIN***/dashboard/
-2. **API responde**: https://***REDACTED_DOMAIN***/api/tickets
+1. **Frontend carga**: https://<DOMAIN>/dashboard/
+2. **API responde**: https://<DOMAIN>/api/tickets
 3. **Dashboard SLA**: Click en "Dashboard SLA" en el sidebar
 4. **Vista Monitoreo**: Click en "Monitoreo SLA"
 5. **Vista Análisis**: Click en "Análisis SLA"
