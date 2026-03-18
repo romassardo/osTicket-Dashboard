@@ -1,49 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AlertTriangle, Clock, RefreshCw, XCircle, AlertOctagon, Filter, Info } from 'lucide-react';
+import { AlertTriangle, Clock, RefreshCw, XCircle, AlertOctagon, Filter } from 'lucide-react';
 import { getSLAAlerts } from '../services/api';
 import logger from '../utils/logger';
 import type { SLAAlerts, TicketEnRiesgo } from '../types';
 import TicketDetailModal from '../components/modals/TicketDetailModal';
+import { Tooltip } from '../components/ui/Tooltip';
 
 type Categoria = 'todos' | 'vencido' | 'critico' | 'riesgo';
-
-const Tooltip = ({ text, children, position = 'above' }: { text: string; children: React.ReactNode; position?: 'above' | 'below' }) => {
-  const [show, setShow] = useState(false);
-  return (
-    <div className="relative inline-flex items-center gap-1">
-      {children}
-      <button
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-        onClick={() => setShow(prev => !prev)}
-        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-        type="button"
-      >
-        <Info className="w-3.5 h-3.5" />
-      </button>
-      {show && (
-        <div className="fixed z-[9999] px-3 py-2 text-[11px] font-normal normal-case tracking-normal text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg whitespace-normal leading-relaxed pointer-events-none"
-          style={{ maxWidth: 260, width: 'max-content', transform: 'translateX(-50%)' }}
-          ref={(el) => {
-            if (!el) return;
-            const btn = el.parentElement?.querySelector('button');
-            if (!btn) return;
-            const rect = btn.getBoundingClientRect();
-            if (position === 'below') {
-              el.style.top = `${rect.bottom + 8}px`;
-              el.style.left = `${rect.left + rect.width / 2}px`;
-            } else {
-              el.style.top = `${rect.top - el.offsetHeight - 8}px`;
-              el.style.left = `${rect.left + rect.width / 2}px`;
-            }
-          }}
-        >
-          {text}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const SLAAlertView: React.FC = () => {
   const [alerts, setAlerts] = useState<SLAAlerts | null>(null);

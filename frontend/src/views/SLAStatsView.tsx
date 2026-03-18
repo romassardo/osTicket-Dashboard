@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BarChart3, Download, Calendar, TrendingUp, TrendingDown, Clock, RefreshCw, CheckCircle, XCircle, ArrowUpDown, Info, Filter } from 'lucide-react';
+import { BarChart3, Download, Calendar, TrendingUp, TrendingDown, Clock, RefreshCw, CheckCircle, XCircle, ArrowUpDown, Filter } from 'lucide-react';
 import { getSLAStats } from '../services/api';
 import logger from '../utils/logger';
+import { Tooltip } from '../components/ui/Tooltip';
 
 interface SLAStat {
   agente: string;
@@ -15,53 +16,6 @@ interface SLAStat {
   diferencia_sla_promedio: string;
   diferencia_sla_horas: number;
 }
-
-// Tooltip component
-const Tooltip = ({ text, children, position = 'above' }: { text: string; children: React.ReactNode; position?: 'above' | 'below' }) => {
-  const [show, setShow] = useState(false);
-
-  const posClass = position === 'below'
-    ? 'top-full mt-2'
-    : 'bottom-full mb-2';
-  const arrowClass = position === 'below'
-    ? 'absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-gray-900 dark:border-b-gray-700'
-    : 'absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700';
-
-  return (
-    <div className="relative inline-flex items-center gap-1">
-      {children}
-      <button
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-        onClick={() => setShow(prev => !prev)}
-        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-        type="button"
-      >
-        <Info className="w-3.5 h-3.5" />
-      </button>
-      {show && (
-        <div className={`fixed z-[9999] px-3 py-2 text-[11px] font-normal normal-case tracking-normal text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg whitespace-normal leading-relaxed pointer-events-none`}
-          style={{ maxWidth: 260, width: 'max-content', transform: 'translateX(-50%)' }}
-          ref={(el) => {
-            if (!el) return;
-            const btn = el.parentElement?.querySelector('button');
-            if (!btn) return;
-            const rect = btn.getBoundingClientRect();
-            if (position === 'below') {
-              el.style.top = `${rect.bottom + 8}px`;
-              el.style.left = `${rect.left + rect.width / 2}px`;
-            } else {
-              el.style.top = `${rect.top - el.offsetHeight - 8}px`;
-              el.style.left = `${rect.left + rect.width / 2}px`;
-            }
-          }}
-        >
-          {text}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const SLAStatsView: React.FC = () => {
   const [stats, setStats] = useState<SLAStat[]>([]);
