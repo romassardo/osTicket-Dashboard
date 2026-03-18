@@ -1,5 +1,5 @@
 // frontend/src/components/analytics/FilterPanel.tsx
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, useEffect, useRef, memo } from 'react';
 import { FunnelIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import logger from '../../utils/logger';
 
@@ -66,6 +66,7 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedSlaStatus, setSelectedSlaStatus] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Memoizar función handleApply para evitar recreaciones
   const handleApply = useCallback(() => {
@@ -183,8 +184,29 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
           <input
             type="text"
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleApply(); }}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSearchText(val);
+              if (debounceRef.current) clearTimeout(debounceRef.current);
+              debounceRef.current = setTimeout(() => {
+                const filters: AppliedFilters = {};
+                if (val.trim() !== '') filters.search = val.trim();
+                if (selectedSla !== '') filters.sla = parseInt(selectedSla, 10);
+                if (selectedStaff !== '') filters.staff = parseInt(selectedStaff, 10);
+                if (selectedSector !== '') filters.sector = parseInt(selectedSector, 10);
+                if (selectedStatus !== '') filters.status = parseInt(selectedStatus, 10);
+                if (startDate !== '') filters.startDate = startDate;
+                if (endDate !== '') filters.endDate = endDate;
+                if (selectedSlaStatus !== '') filters.slaStatus = selectedSlaStatus as AppliedFilters['slaStatus'];
+                onApplyFilters(filters);
+              }, 500);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                handleApply();
+              }
+            }}
             placeholder="Buscar por N° ticket, asunto, usuario o agente..."
             className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500 focus:border-blue-500 dark:focus:border-cyan-400 transition-colors duration-200"
           />

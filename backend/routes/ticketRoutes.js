@@ -304,6 +304,8 @@ router.get('/reports', async (req, res) => {
             limit: parseInt(limit, 10),
             offset,
             order: [['created', 'DESC']],
+            subQuery: false,
+            distinct: true,
         });
 
         logger.info(`[REPORTS_LOG] ✅ Consulta exitosa. Tickets encontrados: ${count}.`);
