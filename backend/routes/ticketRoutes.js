@@ -230,11 +230,12 @@ router.get('/reports', async (req, res) => {
         }
     ];
 
-    // Habilitar búsqueda ampliada por número, usuario y staff
+    // Habilitar búsqueda ampliada por número, asunto, usuario y staff
     if (search && search.trim() !== '') {
         const searchTerm = `%${search.trim()}%`;
         where[Op.or] = [
             { number: { [Op.like]: searchTerm } },
+            { '$cdata.subject$': { [Op.like]: searchTerm } },
             { '$user.name$': { [Op.like]: searchTerm } },
             { '$AssignedStaff.firstname$': { [Op.like]: searchTerm } },
             { '$AssignedStaff.lastname$': { [Op.like]: searchTerm } }

@@ -1,6 +1,6 @@
 // frontend/src/components/analytics/FilterPanel.tsx
 import React, { useState, useCallback, memo } from 'react';
-import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { FunnelIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import logger from '../../utils/logger';
 
 // Define los tipos para las opciones de los filtros
@@ -27,6 +27,7 @@ interface SLAOption {
 
 // Define el tipo para los filtros aplicados
 interface AppliedFilters {
+  search?: string;
   sla?: number;
   staff?: number;
   sector?: number;
@@ -57,6 +58,7 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
   onApplyFilters 
 }) => {
   // Estados para los filtros seleccionados
+  const [searchText, setSearchText] = useState('');
   const [selectedSla, setSelectedSla] = useState('');
   const [selectedStaff, setSelectedStaff] = useState('');
   const [selectedSector, setSelectedSector] = useState('');
@@ -85,10 +87,11 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
     });
     
     const filters: AppliedFilters = {};
+    if (searchText.trim() !== '') filters.search = searchText.trim();
     if (selectedSla !== '') filters.sla = parseInt(selectedSla, 10);
     if (selectedStaff !== '') filters.staff = parseInt(selectedStaff, 10);
-    if (selectedSector !== '') filters.sector = parseInt(selectedSector, 10); // El backend espera 'sector'
-    if (selectedStatus !== '') filters.status = parseInt(selectedStatus, 10); // El backend espera 'status'
+    if (selectedSector !== '') filters.sector = parseInt(selectedSector, 10);
+    if (selectedStatus !== '') filters.status = parseInt(selectedStatus, 10);
     if (startDate !== '') filters.startDate = startDate;
     if (endDate !== '') filters.endDate = endDate;
     if (selectedSlaStatus !== '') filters.slaStatus = selectedSlaStatus as AppliedFilters['slaStatus'];
@@ -96,6 +99,7 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
     console.log('🔍 FILTERPANEL - Filtros construidos:', filters);
     onApplyFilters(filters);
   }, [
+    searchText,
     selectedSla,
     selectedStaff,
     selectedSector,
@@ -112,6 +116,7 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
 
   // Memoizar función handleReset para evitar recreaciones
   const handleReset = useCallback(() => {
+    setSearchText('');
     setSelectedSla('');
     setSelectedStaff('');
     setSelectedSector('');
@@ -171,6 +176,21 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
           Limpiar
         </button>
       </div>
+      {/* Buscador global */}
+      <div className="mb-4">
+        <div className="relative">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+          <input
+            type="text"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleApply(); }}
+            placeholder="Buscar por N° ticket, asunto, usuario o agente..."
+            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500 focus:border-blue-500 dark:focus:border-cyan-400 transition-colors duration-200"
+          />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-4">
         
         {/* Filtro por Agente */}

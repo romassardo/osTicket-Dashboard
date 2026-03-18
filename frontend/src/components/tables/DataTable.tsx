@@ -16,8 +16,8 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
     'Asunto',
     'Estado SLA',
     'Agente',
+    'Usuario',
     'Sector',
-    'Transporte',
     'Creación',
   ];
 
@@ -132,17 +132,13 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
                       <div className="text-sm text-gray-700 dark:text-gray-300">{ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}`.trim() : '-'}</div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-xs text-gray-700 dark:text-gray-300">{ticket.user?.name ?? '-'}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className="text-xs text-gray-700 dark:text-gray-300">
                         {ticket.cdata?.dataValues?.sectorName
                           ?? ticket.cdata?.SectorName?.value
                           ?? (ticket.cdata?.sector ? `ID: ${ticket.cdata.sector}` : '-')}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-xs text-gray-700 dark:text-gray-300">
-                        {ticket.cdata?.dataValues?.transporteName
-                          ?? ticket.cdata?.TransporteName?.value
-                          ?? (ticket.cdata?.transporte ? `ID: ${ticket.cdata.transporte}` : '-')}
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">

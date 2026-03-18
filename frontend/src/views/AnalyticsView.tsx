@@ -171,6 +171,7 @@ const AnalyticsView: React.FC = memo(() => {
       params.append('limit', config.defaultTableSize.toString()); // Usar límite configurable
 
       // Añadir parámetros de filtro si existen
+      if (currentFilters.search) params.append('search', currentFilters.search);
       if (currentFilters.sla) params.append('sla', currentFilters.sla);
       if (currentFilters.staff) params.append('staff', currentFilters.staff);
       if (currentFilters.sector) params.append('sector', currentFilters.sector);
@@ -207,6 +208,7 @@ const AnalyticsView: React.FC = memo(() => {
       params.append('page', '1'); // Especificar página 1
 
       // Añadir parámetros de filtro si existen
+      if (currentFilters.search) params.append('search', currentFilters.search);
       if (currentFilters.sla) params.append('sla', currentFilters.sla);
       if (currentFilters.staff) params.append('staff', currentFilters.staff);
       if (currentFilters.sector) params.append('sector', currentFilters.sector);
