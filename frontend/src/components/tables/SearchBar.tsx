@@ -8,13 +8,15 @@ interface SearchBarProps {
   onApplyFilters: (filters: AdvancedFilters) => void;
   loading?: boolean;
   activeFilters?: boolean;
+  showSlaStatus?: boolean;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({ 
   onSearch, 
   onApplyFilters, 
   loading = false,
-  activeFilters = false 
+  activeFilters = false,
+  showSlaStatus = false 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -135,6 +137,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
           onApplyFilters(filters);
           setIsModalOpen(false);
         }}
+        showSlaStatus={showSlaStatus}
       />
     </div>
   );

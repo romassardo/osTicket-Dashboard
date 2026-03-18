@@ -138,6 +138,7 @@ export interface AdvancedFilters {
   selectedSector?: string;
   selectedStaff?: string;
   selectedSla?: string;
+  slaStatus?: 'cumplido' | 'no_cumplido' | 'en_curso';
 }
 
 // ==================== SLA TYPES ====================

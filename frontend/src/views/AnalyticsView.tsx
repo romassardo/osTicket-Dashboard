@@ -1,21 +1,13 @@
-import React, { useState, useEffect, useCallback, memo } from 'react';
-import type { Ticket, PaginationInfo } from '../types'; // Corregido para apuntar al directorio types/index.ts
-import FilterPanel from '../components/analytics/FilterPanel.tsx';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import type { Ticket, PaginationInfo, AdvancedFilters } from '../types';
 import { DataTable } from '../components/tables/DataTable.tsx';
-
-import Pagination from '../components/tables/Pagination.tsx'; // Importar el componente de paginación
-// Importamos íconos para mejorar la UI según la guía de diseño
+import SearchBar from '../components/tables/SearchBar.tsx';
+import Pagination from '../components/tables/Pagination.tsx';
 import { ArrowPathIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
-// Importar utilidades de exportación seguras
 import { exportTicketsToExcel, exportTicketsToCSV } from '../utils/exportUtils';
 import { useConfig } from '../context/ConfigContext';
+import { useDebounce } from '../lib/hooks';
 import logger from '../utils/logger';
-
-// Definir interfaces para las opciones de filtro
-interface SLAOption {
-  id: number;
-  name: string;
-}
 
 const getSlaStatusCode = (
   ticket: Ticket
@@ -66,101 +58,11 @@ const AnalyticsView: React.FC = memo(() => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isExporting, setIsExporting] = useState<boolean>(false); // Nuevo estado para exportación
+  const [isExporting, setIsExporting] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [filters, setFilters] = useState({});
-  
-  // Estados para opciones de filtro
-  const [slaOptions, setSlaOptions] = useState<SLAOption[]>([]);
-  const [staffOptions, setStaffOptions] = useState<any[]>([]);
-  const [sectorOptions, setSectorOptions] = useState<any[]>([]);
-  const [statusOptions, setStatusOptions] = useState<any[]>([]);
-
-  // Memoizar función fetchFilterOptions para evitar recreaciones
-  const fetchFilterOptions = useCallback(async () => {
-    try {
-      logger.info('Fetching filter options...');
-      const [slaRes, staffRes, sectorRes, statusRes] = await Promise.all([
-        fetch('/api/tickets/options/sla'),
-        fetch('/api/staff/simple'),
-        fetch('/api/tickets/options/sector'),
-        fetch('/api/statuses/simple'),
-      ]);
-
-      // Procesar opciones de SLA
-      if (slaRes.ok) {
-        try {
-          const slaData = await slaRes.json();
-          logger.info('SLA data:', slaData);
-          if (Array.isArray(slaData) && slaData.length > 0) {
-            setSlaOptions(slaData);
-          } else {
-            logger.warn('SLA data is empty');
-            setSlaOptions([]);
-          }
-        } catch (e) {
-          logger.error('Error parsing SLA data:', e);
-          setSlaOptions([]);
-        }
-      } else {
-        logger.warn('SLA response not OK');
-        setSlaOptions([]);
-      }
-      
-      // Procesar opciones de staff
-      if (staffRes.ok) {
-        try {
-          const staffData = await staffRes.json();
-          logger.info('Staff data:', staffData);
-          setStaffOptions(Array.isArray(staffData) ? staffData : []);
-        } catch (e) {
-          logger.error('Error parsing staff data:', e);
-          setStaffOptions([]);
-        }
-      } else {
-        setStaffOptions([]);
-      }
-      
-      // Procesar opciones de sector
-      if (sectorRes.ok) {
-        try {
-          const sectorData = await sectorRes.json();
-          logger.info('Sector data:', sectorData);
-          setSectorOptions(Array.isArray(sectorData) ? sectorData : []);
-        } catch (e) {
-          logger.error('Error parsing sector data:', e);
-          setSectorOptions([]);
-        }
-      } else {
-        setSectorOptions([]);
-      }
-      
-      // Procesar opciones de status
-      if (statusRes.ok) {
-        try {
-          const statusData = await statusRes.json();
-          logger.info('Status data:', statusData);
-          setStatusOptions(Array.isArray(statusData) ? statusData : []);
-        } catch (e) {
-          logger.error('Error parsing status data:', e);
-          setStatusOptions([]);
-        }
-      } else {
-        setStatusOptions([]);
-      }
-    } catch (error) {
-      logger.error('Error fetching filter options:', error);
-      setSlaOptions([]);
-      setStaffOptions([]);
-      setSectorOptions([]);
-      setStatusOptions([]);
-    }
-  }, []); // Sin dependencias ya que solo configura estados internos
-
-  // useEffect para cargar las opciones de filtro al montar el componente
-  useEffect(() => {
-    fetchFilterOptions();
-  }, [fetchFilterOptions]);
+  const [filters, setFilters] = useState<any>({});
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
   // Memoizar función fetchTickets para evitar recreaciones
   const fetchTickets = useCallback(async (currentFilters: any = {}, page: number = 1) => {
@@ -232,28 +134,60 @@ const AnalyticsView: React.FC = memo(() => {
     }
   }, []); // Sin dependencias externas ya que usa parámetros
 
-  // Memoizar applyFilters para evitar recreaciones
-  const applyFilters = useCallback((newFilters: any) => {
-    logger.info('Aplicando filtros:', newFilters);
+  // Handler: búsqueda por texto desde SearchBar
+  const handleSearch = useCallback((newSearchTerm: string) => {
+    setSearchTerm(newSearchTerm);
+    setCurrentPage(1);
+  }, []);
+
+  // Handler: filtros avanzados desde AdvancedSearchModal
+  const handleApplyFilters = useCallback((advancedFilters: AdvancedFilters) => {
+    const newFilters: any = {};
+    if (advancedFilters.selectedSla) newFilters.sla = advancedFilters.selectedSla;
+    if (advancedFilters.selectedStaff) newFilters.staff = advancedFilters.selectedStaff;
+    if (advancedFilters.selectedSector) newFilters.sector = advancedFilters.selectedSector;
+    if (advancedFilters.selectedStatuses && advancedFilters.selectedStatuses.length > 0) {
+      newFilters.status = advancedFilters.selectedStatuses[0];
+    }
+    if (advancedFilters.dateRange) {
+      if (advancedFilters.dateRange[0]) newFilters.startDate = advancedFilters.dateRange[0].toISOString().split('T')[0];
+      if (advancedFilters.dateRange[1]) newFilters.endDate = advancedFilters.dateRange[1].toISOString().split('T')[0];
+    }
+    if (advancedFilters.slaStatus) newFilters.slaStatus = advancedFilters.slaStatus;
+    logger.info('Aplicando filtros avanzados:', newFilters);
     setFilters(newFilters);
-    setCurrentPage(1); // Resetear a la primera página al aplicar filtros
+    setCurrentPage(1);
   }, []);
 
   // Memoizar handlePageChange para evitar recreaciones
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
-    fetchTickets(filters, page);
-  }, [fetchTickets, filters]);
+  }, []);
 
-  // Cargar opciones de filtro solo al montar el componente
-  useEffect(() => {
-    fetchFilterOptions();
-  }, [fetchFilterOptions]); // Ejecutar solo cuando fetchFilterOptions cambie
+  // Construir filtros combinados (search + modal filters)
+  const combinedFilters = useMemo(() => {
+    const combined = { ...filters };
+    if (debouncedSearchTerm) combined.search = debouncedSearchTerm;
+    return combined;
+  }, [filters, debouncedSearchTerm]);
 
-  // Cargar tickets cuando cambien filters o currentPage
+  // Cargar tickets cuando cambien filtros combinados o currentPage
   useEffect(() => {
-    fetchTickets(filters, currentPage);
-  }, [fetchTickets, filters, currentPage]); // Dependencias correctas
+    fetchTickets(combinedFilters, currentPage);
+  }, [fetchTickets, combinedFilters, currentPage]);
+
+  // Contar filtros activos para indicador visual
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (searchTerm) count++;
+    if (filters.sla) count++;
+    if (filters.staff) count++;
+    if (filters.sector) count++;
+    if (filters.status) count++;
+    if (filters.startDate || filters.endDate) count++;
+    if (filters.slaStatus) count++;
+    return count;
+  }, [searchTerm, filters]);
 
   // Memoizar exportToExcel para evitar recreaciones
   const exportToExcel = useCallback(async () => {
@@ -424,13 +358,13 @@ const AnalyticsView: React.FC = memo(() => {
         </div>
       </div>
       
-      {/* Panel de filtros con estilos actualizados */}
-      <FilterPanel 
-        slaOptions={slaOptions}
-        staffOptions={staffOptions}
-        sectorOptions={sectorOptions}
-        statusOptions={statusOptions}
-        onApplyFilters={applyFilters}
+      {/* Barra de búsqueda y filtros (mismo estilo que Tickets) */}
+      <SearchBar
+        onSearch={handleSearch}
+        onApplyFilters={handleApplyFilters}
+        loading={isLoading}
+        activeFilters={activeFilterCount > 0}
+        showSlaStatus
       />
       
       {/* Estado de carga con animación mejorada según guía */}

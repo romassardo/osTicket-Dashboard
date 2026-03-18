@@ -29,9 +29,10 @@ interface AdvancedSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApplyFilters: (filters: any) => void;
+  showSlaStatus?: boolean;
 }
 
-const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClose, onApplyFilters }) => {
+const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClose, onApplyFilters, showSlaStatus = false }) => {
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -44,6 +45,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
   const [selectedOrg, setSelectedOrg] = useState<string>('');
   const [selectedStaff, setSelectedStaff] = useState<string>('');
   const [selectedSla, setSelectedSla] = useState<string>('');
+  const [selectedSlaStatus, setSelectedSlaStatus] = useState<string>('');
 
 
   // DEBUG: Monitorear cambios en selectedStatuses
@@ -101,13 +103,14 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
   };
 
   const handleApply = () => {
-    const filtersToApply = {
+    const filtersToApply: any = {
       selectedStatuses: selectedStatuses,
       dateRange: [startDate, endDate],
       selectedSector: selectedOrg,
       selectedStaff: selectedStaff,
       selectedSla: selectedSla,
     };
+    if (selectedSlaStatus) filtersToApply.slaStatus = selectedSlaStatus;
     logger.debug('Modal: Aplicando filtros:', filtersToApply);
     onApplyFilters(filtersToApply);
     onClose();
@@ -120,6 +123,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
     setSelectedOrg('');
     setSelectedStaff('');
     setSelectedSla('');
+    setSelectedSlaStatus('');
     logger.debug('Modal: Filtros limpiados');
   };
 
@@ -197,6 +201,33 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
               </div>
             </div>
           </div>
+
+          {/* Estado SLA (solo para Analytics) */}
+          {showSlaStatus && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Estado SLA</label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'cumplido', label: 'Cumplido', color: 'emerald' },
+                  { value: 'no_cumplido', label: 'No cumplido', color: 'red' },
+                  { value: 'en_curso', label: 'En curso', color: 'blue' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setSelectedSlaStatus(prev => prev === opt.value ? '' : opt.value)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                      selectedSlaStatus === opt.value
+                        ? 'bg-blue-500 dark:bg-cyan-500 text-white shadow-lg shadow-blue-500/20 dark:shadow-cyan-500/20'
+                        : 'bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white ring-1 ring-gray-200 dark:ring-slate-600'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Sector, Agente y SLA */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
