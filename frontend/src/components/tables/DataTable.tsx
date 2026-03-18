@@ -14,13 +14,11 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
   const tableHeaders = [
     'Número',
     'Asunto',
-    'SLA',
     'Estado SLA',
     'Agente',
     'Sector',
-    'Usuario',
     'Transporte',
-    'Fecha Creación',
+    'Creación',
   ];
 
   const getSLAStatus = (ticket: Ticket): { label: string; className: string } => {
@@ -90,7 +88,7 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
                 <th
                   key={header}
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider group"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider group"
                 >
                   <div className="flex items-center">
                     {header}
@@ -114,47 +112,41 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
                       onTicketClick?.(ticket.ticket_id);
                     }}
                   >
-                    <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 font-medium">
-                      <span className="text-blue-600 dark:text-cyan-400 group-hover:text-blue-700 dark:group-hover:text-cyan-300 transition-colors duration-150 inline-flex items-center">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-cyan-400 mr-2 group-hover:bg-blue-600 dark:group-hover:bg-cyan-300 group-hover:animate-pulse"></span>
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 font-medium whitespace-nowrap">
+                      <span className="text-blue-600 dark:text-cyan-400 inline-flex items-center">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-cyan-400 mr-1.5"></span>
                         #{ticket.number}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-700 dark:text-gray-300">{ticket.cdata?.subject ?? '-'}</div>
+                    <td className="px-4 py-3 max-w-[250px]">
+                      <div className="text-sm text-gray-700 dark:text-gray-300 truncate" title={ticket.cdata?.subject ?? '-'}>
+                        {ticket.cdata?.subject ?? '-'}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2.5 py-1 text-xs font-medium bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white">
-                        {ticket.sla?.name ?? 'Sin SLA'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm ${slaStatus.className}`}>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded border border-gray-200 dark:border-slate-600 ${slaStatus.className}`}>
                         {slaStatus.label}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm text-gray-700 dark:text-gray-300">{ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}`.trim() : '-'}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2.5 py-1 text-xs font-medium bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-xs text-gray-700 dark:text-gray-300">
                         {ticket.cdata?.dataValues?.sectorName
                           ?? ticket.cdata?.SectorName?.value
                           ?? (ticket.cdata?.sector ? `ID: ${ticket.cdata.sector}` : '-')}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-700 dark:text-gray-300">{ticket.user?.name ?? '-'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2.5 py-1 text-xs font-medium bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-xs text-gray-700 dark:text-gray-300">
                         {ticket.cdata?.dataValues?.transporteName
                           ?? ticket.cdata?.TransporteName?.value
                           ?? (ticket.cdata?.transporte ? `ID: ${ticket.cdata.transporte}` : '-')}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         {ticket.created ? formatDate(ticket.created) : '-'}
                       </div>
                     </td>

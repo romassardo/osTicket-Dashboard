@@ -209,6 +209,20 @@ export const getTicketsByTransport = async ({ year, month }: { year: number; mon
 };
 
 /**
+ * Obtiene las estadísticas de TPSolicitud (Tipo de Solicitud) desde el backend.
+ * Campo personalizado que categoriza el tipo de problema del ticket.
+ */
+export const getTicketsByRequestType = async ({ year, month }: { year: number; month: number }) => {
+  try {
+    const response = await apiClient.get('/stats/tickets-by-request-type', { params: { year, month } });
+    return response.data;
+  } catch (error) {
+    logger.error('Error al obtener estadísticas de tipo de solicitud:', error);
+    throw error;
+  }
+};
+
+/**
  * Obtiene el análisis de flujo de tickets entre dos meses específicos.
  * Analiza tickets creados, cerrados y pendientes, incluye flujo entre meses.
  * @param month1 - Mes del primer período (1-12)

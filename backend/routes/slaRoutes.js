@@ -71,7 +71,9 @@ router.get('/stats', async (req, res, next) => {
         GROUP BY th.object_id
       ) fr ON fr.ticket_id = t.ticket_id
       WHERE t.closed IS NOT NULL
-        AND d.name = 'Soporte IT'
+        AND d.name IN ('Soporte Informatico', 'Soporte IT')
+        AND t.staff_id IS NOT NULL
+        AND t.staff_id > 0
         ${dateFilter}
         ${agentFilter}
       ORDER BY t.closed DESC
@@ -82,7 +84,7 @@ router.get('/stats', async (req, res, next) => {
       type: sequelize.QueryTypes.SELECT
     });
 
-    logger.info(`📊 SLA Stats: Procesando ${tickets.length} tickets con horas hábiles...`);
+    logger.info(`SLA Stats: Procesando ${tickets.length} tickets con horas hábiles...`);
 
     // Calcular horas hábiles para cada ticket
     const ticketsConHorasHabiles = await Promise.all(
@@ -92,7 +94,6 @@ router.get('/stats', async (req, res, next) => {
         const cumplido = horasHabiles <= gracePeriod;
         const diferencia = gracePeriod - horasHabiles;
         
-        // Calcular tiempo primera respuesta en horas hábiles
         let horasPrimeraRespuesta = null;
         if (ticket.first_response) {
           horasPrimeraRespuesta = await calcularHorasHabiles(ticket.created, ticket.first_response);
@@ -108,21 +109,15 @@ router.get('/stats', async (req, res, next) => {
       })
     );
 
-    // Agrupar por agente, año, mes, nombre_sla
-    const grupos = {};
+    // Agrupar directamente por agente (consolidado, sin subdividir por SLA)
+    const agentes = {};
     for (const ticket of ticketsConHorasHabiles) {
-      const key = `${ticket.staff_id}-${ticket.anio}-${ticket.mes}-${ticket.nombre_sla || 'Sin SLA'}`;
+      const key = `${ticket.staff_id}`;
       
-      if (!grupos[key]) {
-        grupos[key] = {
-          departamento: ticket.departamento,
+      if (!agentes[key]) {
+        agentes[key] = {
           agente: ticket.agente,
           staff_id: ticket.staff_id,
-          nombre_sla: ticket.nombre_sla || 'Sin SLA',
-          anio: ticket.anio,
-          mes: ticket.mes,
-          mes_nombre: ticket.mes_nombre,
-          tickets: [],
           total_tickets: 0,
           tickets_sla_cumplido: 0,
           tickets_sla_vencido: 0,
@@ -133,74 +128,57 @@ router.get('/stats', async (req, res, next) => {
         };
       }
       
-      grupos[key].tickets.push(ticket);
-      grupos[key].total_tickets++;
+      agentes[key].total_tickets++;
       
       if (ticket.cumplido_sla) {
-        grupos[key].tickets_sla_cumplido++;
+        agentes[key].tickets_sla_cumplido++;
       } else {
-        grupos[key].tickets_sla_vencido++;
+        agentes[key].tickets_sla_vencido++;
       }
       
-      grupos[key].suma_horas_resolucion += ticket.horas_habiles_resolucion;
-      grupos[key].suma_diferencia_sla += ticket.diferencia_sla;
+      agentes[key].suma_horas_resolucion += ticket.horas_habiles_resolucion;
+      agentes[key].suma_diferencia_sla += ticket.diferencia_sla;
       
       if (ticket.horas_primera_respuesta !== null) {
-        grupos[key].suma_horas_primera_respuesta += ticket.horas_primera_respuesta;
-        grupos[key].cuenta_primera_respuesta++;
+        agentes[key].suma_horas_primera_respuesta += ticket.horas_primera_respuesta;
+        agentes[key].cuenta_primera_respuesta++;
       }
     }
 
     // Convertir a array y calcular promedios
-    const formattedResults = Object.values(grupos).map(grupo => {
-      const porcentaje_sla_cumplido = grupo.total_tickets > 0 
-        ? Math.round((grupo.tickets_sla_cumplido / grupo.total_tickets) * 100 * 100) / 100
+    const formattedResults = Object.values(agentes).map(ag => {
+      const porcentaje_sla_cumplido = ag.total_tickets > 0 
+        ? Math.round((ag.tickets_sla_cumplido / ag.total_tickets) * 100 * 100) / 100
         : 0;
       
-      const tiempo_promedio_resolucion_horas = grupo.total_tickets > 0
-        ? grupo.suma_horas_resolucion / grupo.total_tickets
-        : 0;
+      const avgResolucionHoras = ag.total_tickets > 0
+        ? ag.suma_horas_resolucion / ag.total_tickets : 0;
       
-      const tiempo_promedio_primera_respuesta_horas = grupo.cuenta_primera_respuesta > 0
-        ? grupo.suma_horas_primera_respuesta / grupo.cuenta_primera_respuesta
-        : 0;
+      const avgPrimeraRespuestaHoras = ag.cuenta_primera_respuesta > 0
+        ? ag.suma_horas_primera_respuesta / ag.cuenta_primera_respuesta : 0;
       
-      const diferencia_sla_horas = grupo.total_tickets > 0
-        ? grupo.suma_diferencia_sla / grupo.total_tickets
-        : 0;
+      const avgDiferencia = ag.total_tickets > 0
+        ? ag.suma_diferencia_sla / ag.total_tickets : 0;
 
       return {
-        departamento: grupo.departamento,
-        agente: grupo.agente,
-        staff_id: grupo.staff_id,
-        nombre_sla: grupo.nombre_sla,
-        anio: grupo.anio,
-        mes: grupo.mes,
-        mes_nombre: grupo.mes_nombre,
-        total_tickets: grupo.total_tickets,
-        tickets_sla_cumplido: grupo.tickets_sla_cumplido,
-        tickets_sla_vencido: grupo.tickets_sla_vencido,
+        agente: ag.agente,
+        staff_id: ag.staff_id,
+        total_tickets: ag.total_tickets,
+        tickets_sla_cumplido: ag.tickets_sla_cumplido,
+        tickets_sla_vencido: ag.tickets_sla_vencido,
         porcentaje_sla_cumplido,
-        tiempo_promedio_primera_respuesta: formatHorasHabiles(tiempo_promedio_primera_respuesta_horas),
-        tiempo_promedio_resolucion: formatHorasHabiles(tiempo_promedio_resolucion_horas),
-        diferencia_sla_promedio: formatDiferenciaSLA(diferencia_sla_horas),
-        // Valores numéricos para cálculos del frontend
-        tiempo_primera_respuesta_segundos: tiempo_promedio_primera_respuesta_horas * 3600,
-        tiempo_resolucion_segundos: tiempo_promedio_resolucion_horas * 3600,
-        diferencia_sla_horas: diferencia_sla_horas,
-        // Nuevo: indicador de que usa horas hábiles
+        tiempo_promedio_primera_respuesta: formatHorasHabiles(avgPrimeraRespuestaHoras),
+        tiempo_promedio_resolucion: formatHorasHabiles(avgResolucionHoras),
+        diferencia_sla_promedio: formatDiferenciaSLA(avgDiferencia),
+        diferencia_sla_horas: avgDiferencia,
         usa_horas_habiles: true
       };
     });
 
-    // Ordenar por año desc, mes desc
-    formattedResults.sort((a, b) => {
-      if (b.anio !== a.anio) return b.anio - a.anio;
-      if (b.mes !== a.mes) return b.mes - a.mes;
-      return (a.agente || '').localeCompare(b.agente || '');
-    });
+    // Ordenar por % cumplimiento desc
+    formattedResults.sort((a, b) => b.porcentaje_sla_cumplido - a.porcentaje_sla_cumplido);
 
-    logger.info(`📊 SLA Stats (Horas Hábiles): ${formattedResults.length} registros agrupados`);
+    logger.info(`SLA Stats: ${formattedResults.length} agentes, ${tickets.length} tickets procesados`);
     res.json(formattedResults);
 
   } catch (error) {
@@ -254,7 +232,7 @@ router.get('/alerts', async (req, res, next) => {
       LEFT JOIN ost_help_topic h ON h.topic_id = t.topic_id
       LEFT JOIN ost_ticket_priority p ON p.priority_id = h.priority_id
       WHERE t.closed IS NULL
-        AND d.name = 'Soporte IT'
+        AND d.name IN ('Soporte Informatico', 'Soporte IT')
         AND COALESCE(NULLIF(s_sla.grace_period, 0), 24) > 0
       ORDER BY t.created ASC
     `;
@@ -412,7 +390,7 @@ router.get('/tickets', async (req, res, next) => {
       LEFT JOIN ost_staff s ON s.staff_id = t.staff_id
       LEFT JOIN ost_sla s_sla ON s_sla.id = t.sla_id
       WHERE t.closed IS NOT NULL
-        AND d.name = 'Soporte IT'
+        AND d.name IN ('Soporte Informatico', 'Soporte IT')
         ${dateFilter}
         ${agentFilter}
         ${statusFilter}
@@ -460,7 +438,7 @@ router.get('/tickets', async (req, res, next) => {
         GROUP BY th.object_id
       ) fr ON fr.ticket_id = t.ticket_id
       WHERE t.closed IS NOT NULL
-        AND d.name = 'Soporte IT'
+        AND d.name IN ('Soporte Informatico', 'Soporte IT')
         ${dateFilter}
         ${agentFilter}
         ${statusFilter}
@@ -557,8 +535,7 @@ router.get('/summary', async (req, res, next) => {
         GROUP BY th.object_id
       ) fr ON fr.ticket_id = t.ticket_id
       WHERE t.closed IS NOT NULL
-        AND d.name = 'Soporte IT'
-        AND s_sla.id IS NOT NULL
+        AND d.name IN ('Soporte Informatico', 'Soporte IT')
         ${dateFilter}
     `, {
       replacements,

@@ -1,9 +1,49 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AlertTriangle, Clock, RefreshCw, XCircle, AlertOctagon, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, Clock, RefreshCw, XCircle, AlertOctagon, Filter, Info } from 'lucide-react';
 import { getSLAAlerts } from '../services/api';
 import logger from '../utils/logger';
 import type { SLAAlerts, TicketEnRiesgo } from '../types';
 import TicketDetailModal from '../components/modals/TicketDetailModal';
+
+type Categoria = 'todos' | 'vencido' | 'critico' | 'riesgo';
+
+const Tooltip = ({ text, children, position = 'above' }: { text: string; children: React.ReactNode; position?: 'above' | 'below' }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative inline-flex items-center gap-1">
+      {children}
+      <button
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        onClick={() => setShow(prev => !prev)}
+        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        type="button"
+      >
+        <Info className="w-3.5 h-3.5" />
+      </button>
+      {show && (
+        <div className="fixed z-[9999] px-3 py-2 text-[11px] font-normal normal-case tracking-normal text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg whitespace-normal leading-relaxed pointer-events-none"
+          style={{ maxWidth: 260, width: 'max-content', transform: 'translateX(-50%)' }}
+          ref={(el) => {
+            if (!el) return;
+            const btn = el.parentElement?.querySelector('button');
+            if (!btn) return;
+            const rect = btn.getBoundingClientRect();
+            if (position === 'below') {
+              el.style.top = `${rect.bottom + 8}px`;
+              el.style.left = `${rect.left + rect.width / 2}px`;
+            } else {
+              el.style.top = `${rect.top - el.offsetHeight - 8}px`;
+              el.style.left = `${rect.left + rect.width / 2}px`;
+            }
+          }}
+        >
+          {text}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const SLAAlertView: React.FC = () => {
   const [alerts, setAlerts] = useState<SLAAlerts | null>(null);
@@ -11,85 +51,28 @@ const SLAAlertView: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [expandedSections, setExpandedSections] = useState({
-    vencidos: true,
-    criticos: true,
-    enRiesgo: false
-  });
 
-  // Filtros por columna para las tablas de tickets SLA en tiempo real
+  const [filterCategoria, setFilterCategoria] = useState<Categoria>('todos');
   const [filterTicket, setFilterTicket] = useState('');
   const [filterAgent, setFilterAgent] = useState('');
-  const [filterSla, setFilterSla] = useState('');
-  const [filterMinPercent, setFilterMinPercent] = useState('');
-  const [filterMaxHorasUltAct, setFilterMaxHorasUltAct] = useState('');
-  const [filterPriority, setFilterPriority] = useState('');
 
-  // Opciones únicas para selects de Agente y SLA (derivadas de las alertas actuales)
-  const allTickets = useMemo(() => {
-    if (!alerts) return [] as TicketEnRiesgo[];
-    return [
-      ...alerts.tickets_vencidos,
-      ...alerts.tickets_criticos,
-      ...alerts.tickets_en_riesgo,
-    ];
-  }, [alerts]);
-
-  const agentOptions = useMemo(() => {
-    const set = new Set<string>();
-    allTickets.forEach((ticket) => {
-      if (ticket.agente_asignado) {
-        set.add(ticket.agente_asignado);
-      }
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [allTickets]);
-
-  const slaOptions = useMemo(() => {
-    const set = new Set<string>();
-    allTickets.forEach((ticket) => {
-      if (ticket.nombre_sla) {
-        set.add(ticket.nombre_sla);
-      }
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [allTickets]);
-
-  const handleTicketClick = (ticketId: number) => {
-    setSelectedTicketId(ticketId);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedTicketId(null);
-  };
-
-  const toggleSection = (section: 'vencidos' | 'criticos' | 'enRiesgo') => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
+  const normalizeTicket = (ticket: any): TicketEnRiesgo => ({
+    ...ticket,
+    sla_horas: Number(ticket.sla_horas) || 0,
+    horas_transcurridas: Number(ticket.horas_transcurridas) || 0,
+    horas_restantes: Number(ticket.horas_restantes) || 0,
+    priority_id: Number(ticket.priority_id) || 2,
+    prioridad_nombre: ticket.prioridad_nombre || 'Normal',
+    horas_desde_ultima_actividad: Number(ticket.horas_desde_ultima_actividad) || 0,
+    porcentaje_consumido: Number(ticket.porcentaje_consumido) || 0
+  });
 
   const fetchAlerts = async (showRefreshing = false) => {
     try {
-      if (showRefreshing) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+      if (showRefreshing) setRefreshing(true);
+      else setLoading(true);
 
       const data = await getSLAAlerts();
-      
-      // DEBUG: Ver qué datos llegan del backend
-      console.log('🔍 Datos recibidos del backend:', {
-        resumen: data?.resumen,
-        vencidos_count: data?.tickets_vencidos?.length,
-        criticos_count: data?.tickets_criticos?.length,
-        enRiesgo_count: data?.tickets_en_riesgo?.length,
-        vencidos_sample: data?.tickets_vencidos?.[0],
-        criticos_sample: data?.tickets_criticos?.[0],
-        enRiesgo_sample: data?.tickets_en_riesgo?.[0]
-      });
-
       const normalized: SLAAlerts = {
         resumen: {
           total_tickets_abiertos: Number(data?.resumen?.total_tickets_abiertos) || 0,
@@ -97,51 +80,14 @@ const SLAAlertView: React.FC = () => {
           tickets_criticos: Number(data?.resumen?.tickets_criticos) || 0,
           tickets_en_riesgo: Number(data?.resumen?.tickets_en_riesgo) || 0
         },
-        tickets_vencidos: (data?.tickets_vencidos || []).map((ticket) => ({
-          ...ticket,
-          sla_horas: Number(ticket.sla_horas) || 0,
-          horas_transcurridas: Number(ticket.horas_transcurridas) || 0,
-          horas_restantes: Number(ticket.horas_restantes) || 0,
-          priority_id: Number(ticket.priority_id) || 2,
-          prioridad_nombre: ticket.prioridad_nombre || 'Normal',
-          horas_desde_ultima_actividad: Number(ticket.horas_desde_ultima_actividad) || 0,
-          porcentaje_consumido: Number(ticket.porcentaje_consumido) || 0
-        })),
-        tickets_criticos: (data?.tickets_criticos || []).map((ticket) => ({
-          ...ticket,
-          sla_horas: Number(ticket.sla_horas) || 0,
-          horas_transcurridas: Number(ticket.horas_transcurridas) || 0,
-          horas_restantes: Number(ticket.horas_restantes) || 0,
-          priority_id: Number(ticket.priority_id) || 2,
-          prioridad_nombre: ticket.prioridad_nombre || 'Normal',
-          horas_desde_ultima_actividad: Number(ticket.horas_desde_ultima_actividad) || 0,
-          porcentaje_consumido: Number(ticket.porcentaje_consumido) || 0
-        })),
-        tickets_en_riesgo: (data?.tickets_en_riesgo || []).map((ticket) => ({
-          ...ticket,
-          sla_horas: Number(ticket.sla_horas) || 0,
-          horas_transcurridas: Number(ticket.horas_transcurridas) || 0,
-          horas_restantes: Number(ticket.horas_restantes) || 0,
-          priority_id: Number(ticket.priority_id) || 2,
-          prioridad_nombre: ticket.prioridad_nombre || 'Normal',
-          horas_desde_ultima_actividad: Number(ticket.horas_desde_ultima_actividad) || 0,
-          porcentaje_consumido: Number(ticket.porcentaje_consumido) || 0
-        })),
-        agentes_bajo_rendimiento: (data?.agentes_bajo_rendimiento || []).map((agente) => ({
-          ...agente,
-          total_tickets: Number(agente.total_tickets) || 0,
-          tickets_cumplidos: Number(agente.tickets_cumplidos) || 0,
-          tickets_vencidos: Number(agente.tickets_vencidos) || 0,
-          porcentaje_cumplimiento:
-            typeof agente.porcentaje_cumplimiento === 'number'
-              ? agente.porcentaje_cumplimiento
-              : parseFloat(agente.porcentaje_cumplimiento as any) || 0
-        })),
+        tickets_vencidos: (data?.tickets_vencidos || []).map(normalizeTicket),
+        tickets_criticos: (data?.tickets_criticos || []).map(normalizeTicket),
+        tickets_en_riesgo: (data?.tickets_en_riesgo || []).map(normalizeTicket),
+        agentes_bajo_rendimiento: data?.agentes_bajo_rendimiento || [],
         tendencias_negativas: data?.tendencias_negativas || []
       };
-
       setAlerts(normalized);
-      logger.info('🚨 Alertas SLA cargadas:', normalized.resumen);
+      logger.info('Alertas SLA cargadas:', normalized.resumen);
     } catch (error) {
       logger.error('Error al cargar alertas SLA:', error);
     } finally {
@@ -152,270 +98,71 @@ const SLAAlertView: React.FC = () => {
 
   useEffect(() => {
     fetchAlerts();
-    // Auto-refresh cada 5 minutos
     const interval = setInterval(() => fetchAlerts(true), 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  const handleRefresh = () => {
-    fetchAlerts(true);
-  };
+  // Unificar todos los tickets con su categoría
+  const allTickets = useMemo(() => {
+    if (!alerts) return [];
+    return [
+      ...alerts.tickets_vencidos.map(t => ({ ...t, _cat: 'vencido' as const })),
+      ...alerts.tickets_criticos.map(t => ({ ...t, _cat: 'critico' as const })),
+      ...alerts.tickets_en_riesgo.map(t => ({ ...t, _cat: 'riesgo' as const })),
+    ];
+  }, [alerts]);
 
-  // Función para renderizar tabla de tickets
-  const renderTicketTable = (tickets: TicketEnRiesgo[], tipo: 'vencido' | 'critico' | 'riesgo') => {
-    const getPriorityBadge = (priorityId: number, priorityName: string) => {
-      const configs = {
-        1: { bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-200', icon: '🔴' },
-        2: { bg: 'bg-orange-100 dark:bg-orange-900', text: 'text-orange-800 dark:text-orange-200', icon: '🟠' },
-        3: { bg: 'bg-yellow-100 dark:bg-yellow-900', text: 'text-yellow-800 dark:text-yellow-200', icon: '🟡' },
-        4: { bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-200', icon: '🟢' }
-      };
-      const config = configs[priorityId as keyof typeof configs] || configs[2];
-      return (
-        <span className={`px-2 py-1 ${config.bg} ${config.text} rounded-full text-xs font-medium inline-flex items-center gap-1`}>
-          <span>{config.icon}</span>
-          {priorityName}
-        </span>
-      );
-    };
+  const agentOptions = useMemo(() => {
+    const set = new Set<string>();
+    allTickets.forEach(t => { if (t.agente_asignado) set.add(t.agente_asignado); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [allTickets]);
 
-    const formatTiempo = (horas: number) => {
-      if (horas < 1) return 'Hace < 1h';
-      if (horas < 24) return `Hace ${Math.floor(horas)}h`;
-      const dias = Math.floor(horas / 24);
-      const horasRestantes = Math.floor(horas % 24);
-      return `Hace ${dias}d ${horasRestantes}h`;
-    };
-
-    const formatHorasRestantes = (horas: number, tipo: string) => {
-      const abs = Math.abs(horas);
-      if (tipo === 'vencido') {
-        if (abs >= 48) {
-          const dias = Math.floor(abs / 24);
-          const hrs = Math.floor(abs % 24);
-          return `Vencido: ${dias}d ${hrs}h`;
-        }
-        return `Vencido: ${Math.floor(abs)}h`;
-      }
-      if (abs >= 24) {
-        const dias = Math.floor(abs / 24);
-        const hrs = Math.floor(abs % 24);
-        return `${dias}d ${hrs}h`;
-      }
-      return `${Math.floor(abs)}h`;
-    };
-
-    // Aplicar filtros en memoria sobre el conjunto de tickets recibido
-    const filteredTickets = tickets.filter((ticket) => {
-      if (filterTicket && !ticket.number.toLowerCase().includes(filterTicket.toLowerCase())) {
-        return false;
-      }
-
-      const agente = ticket.agente_asignado || '';
-      if (filterAgent && agente !== filterAgent) {
-        return false;
-      }
-
-      const slaName = ticket.nombre_sla || '';
-      if (filterSla && slaName !== filterSla) {
-        return false;
-      }
-
-      if (filterMinPercent) {
-        const minPercent = Number(filterMinPercent);
-        if (!Number.isNaN(minPercent) && ticket.porcentaje_consumido < minPercent) {
-          return false;
-        }
-      }
-
-      if (filterMaxHorasUltAct) {
-        const maxHoras = Number(filterMaxHorasUltAct);
-        if (!Number.isNaN(maxHoras) && ticket.horas_desde_ultima_actividad > maxHoras) {
-          return false;
-        }
-      }
-
-      const prioridad = ticket.prioridad_nombre || '';
-      if (filterPriority && !prioridad.toLowerCase().includes(filterPriority.toLowerCase())) {
-        return false;
-      }
-
+  const filteredTickets = useMemo(() => {
+    return allTickets.filter(t => {
+      if (filterCategoria !== 'todos' && t._cat !== filterCategoria) return false;
+      if (filterTicket && !t.number.toLowerCase().includes(filterTicket.toLowerCase())) return false;
+      if (filterAgent && t.agente_asignado !== filterAgent) return false;
       return true;
     });
+  }, [allTickets, filterCategoria, filterTicket, filterAgent]);
 
+  const catBadge = (cat: 'vencido' | 'critico' | 'riesgo') => {
+    const cfg = {
+      vencido: { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300', label: 'Vencido' },
+      critico: { bg: 'bg-orange-100 dark:bg-orange-900/40', text: 'text-orange-700 dark:text-orange-300', label: 'Crítico' },
+      riesgo: { bg: 'bg-yellow-100 dark:bg-yellow-900/40', text: 'text-yellow-700 dark:text-yellow-300', label: 'En Riesgo' },
+    }[cat];
+    return <span className={`px-2 py-0.5 rounded text-xs font-semibold ${cfg.bg} ${cfg.text}`}>{cfg.label}</span>;
+  };
+
+  const priorityBadge = (id: number, name: string) => {
+    const colors: Record<number, string> = {
+      1: 'bg-red-500', 2: 'bg-orange-500', 3: 'bg-yellow-500', 4: 'bg-green-500'
+    };
     return (
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-900">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Ticket
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Agente
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                SLA
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                % Consumido
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Tiempo Restante
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Prioridad
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Última Actividad
-              </th>
-            </tr>
-            <tr className="border-t border-gray-200 dark:border-gray-700">
-              <th className="px-4 py-2">
-                <input
-                  type="text"
-                  value={filterTicket}
-                  onChange={(e) => setFilterTicket(e.target.value)}
-                  placeholder="# Ticket"
-                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </th>
-              <th className="px-4 py-2">
-                <select
-                  value={filterAgent}
-                  onChange={(e) => setFilterAgent(e.target.value)}
-                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="">Todos los agentes</option>
-                  {agentOptions.map((agent) => (
-                    <option key={agent} value={agent}>
-                      {agent}
-                    </option>
-                  ))}
-                </select>
-              </th>
-              <th className="px-4 py-2">
-                <select
-                  value={filterSla}
-                  onChange={(e) => setFilterSla(e.target.value)}
-                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="">Todos los SLA</option>
-                  {slaOptions.map((sla) => (
-                    <option key={sla} value={sla}>
-                      {sla}
-                    </option>
-                  ))}
-                </select>
-              </th>
-              <th className="px-4 py-2">
-                <input
-                  type="number"
-                  min={0}
-                  max={200}
-                  value={filterMinPercent}
-                  onChange={(e) => setFilterMinPercent(e.target.value)}
-                  placeholder="% mín."
-                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </th>
-              <th className="px-4 py-2">
-                {/* Filtro opcional por tiempo restante: lo dejamos sin input para mantenerlo simple */}
-              </th>
-              <th className="px-4 py-2">
-                <input
-                  type="text"
-                  value={filterPriority}
-                  onChange={(e) => setFilterPriority(e.target.value)}
-                  placeholder="Prioridad"
-                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </th>
-              <th className="px-4 py-2">
-                <input
-                  type="number"
-                  min={0}
-                  value={filterMaxHorasUltAct}
-                  onChange={(e) => setFilterMaxHorasUltAct(e.target.value)}
-                  placeholder="Máx horas"
-                  className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {filteredTickets.map((ticket, idx) => (
-              <tr key={ticket.ticket_id || `ticket-${idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => handleTicketClick(ticket.ticket_id)}
-                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
-                  >
-                    #{ticket.number}
-                  </button>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
-                  {ticket.agente_asignado || 'Sin asignar'}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm">
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-xs font-medium">
-                    {ticket.nombre_sla || 'Sin SLA'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${
-                          ticket.porcentaje_consumido >= 100 ? 'bg-red-500' :
-                          ticket.porcentaje_consumido >= 90 ? 'bg-orange-500' :
-                          'bg-yellow-500'
-                        }`}
-                        style={{ width: `${Math.min(ticket.porcentaje_consumido, 100)}%` }}
-                      />
-                    </div>
-                    <span className={`text-xs font-medium ${
-                      ticket.porcentaje_consumido >= 100 ? 'text-red-600' :
-                      ticket.porcentaje_consumido >= 90 ? 'text-orange-600' :
-                      'text-yellow-600'
-                    }`}>
-                      {ticket.porcentaje_consumido.toFixed(0)}%
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm">
-                  <span className={
-                    tipo === 'vencido' ? 'text-red-600 font-bold' :
-                    tipo === 'critico' ? 'text-orange-600 font-semibold' :
-                    'text-yellow-600'
-                  }>
-                    {formatHorasRestantes(ticket.horas_restantes, tipo)}
-                  </span>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm">
-                  {getPriorityBadge(ticket.priority_id, ticket.prioridad_nombre)}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                  {formatTiempo(ticket.horas_desde_ultima_actividad)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <span className="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300">
+        <span className={`w-2 h-2 rounded-full ${colors[id] || 'bg-gray-400'}`} />
+        {name}
+      </span>
     );
+  };
+
+  const fmtTiempo = (horas: number) => {
+    if (horas < 1) return '< 1h';
+    if (horas < 24) return `${Math.floor(horas)}h`;
+    return `${Math.floor(horas / 24)}d ${Math.floor(horas % 24)}h`;
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
         <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
-            ))}
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+            {[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded-xl" />)}
           </div>
+          <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded-xl" />
         </div>
       </div>
     );
@@ -423,196 +170,216 @@ const SLAAlertView: React.FC = () => {
 
   if (!alerts) return null;
 
+  const { resumen } = alerts;
+  const totalConProblema = resumen.tickets_vencidos + resumen.tickets_criticos + resumen.tickets_en_riesgo;
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 space-y-6">
       {/* Header */}
-      <div className="mb-8 flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            🚨 Monitoreo SLA en Tiempo Real
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Tickets activos categorizados por nivel de urgencia - Actualización automática cada 5 min
-          </p>
-        </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400
-                   text-white rounded-lg transition-colors flex items-center gap-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Actualizando...' : 'Actualizar'}
-        </button>
-      </div>
-
-      {/* Tarjetas de Resumen - 4 categorías */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Abiertos</h3>
-            <Clock className="w-5 h-5 text-blue-600" />
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <AlertTriangle className="w-6 h-6 text-orange-500" />
+              Monitoreo SLA
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Tickets abiertos con riesgo de incumplimiento (horas hábiles Lun-Vie 8:30-17:30)
+            </p>
           </div>
-          <div className="text-3xl font-bold text-blue-600">
-            {alerts.resumen.total_tickets_abiertos}
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Tickets activos
-          </p>
-        </div>
-
-        <div className="bg-red-50 dark:bg-red-900/20 rounded-lg shadow-md p-6 border-l-4 border-red-500">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Vencidos</h3>
-            <XCircle className="w-5 h-5 text-red-600" />
-          </div>
-          <div className="text-3xl font-bold text-red-600">
-            {alerts.resumen.tickets_vencidos}
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            &gt;100% SLA consumido
-          </p>
-        </div>
-
-        <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg shadow-md p-6 border-l-4 border-orange-500">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Críticos</h3>
-            <AlertOctagon className="w-5 h-5 text-orange-600" />
-          </div>
-          <div className="text-3xl font-bold text-orange-600">
-            {alerts.resumen.tickets_criticos}
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            90-100% SLA consumido
-          </p>
-        </div>
-
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">En Riesgo</h3>
-            <AlertTriangle className="w-5 h-5 text-yellow-600" />
-          </div>
-          <div className="text-3xl font-bold text-yellow-600">
-            {alerts.resumen.tickets_en_riesgo}
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            70-90% SLA consumido
-          </p>
+          <button
+            onClick={() => fetchAlerts(true)}
+            disabled={refreshing}
+            className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center gap-1.5 self-start"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Actualizando...' : 'Actualizar'}
+          </button>
         </div>
       </div>
 
-      {/* Sección 1: Tickets Vencidos */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md mb-6 overflow-hidden">
-        <button
-          onClick={() => toggleSection('vencidos')}
-          className="w-full px-6 py-4 flex items-center justify-between bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <XCircle className="w-5 h-5 text-red-600" />
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-              Tickets Vencidos ({alerts.tickets_vencidos.length})
-            </h3>
-            <span className="text-sm text-red-600 dark:text-red-400 font-medium">
-              ⚠️ Requieren acción inmediata
-            </span>
+      {/* 4 KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <button onClick={() => setFilterCategoria('todos')}
+          className={`rounded-xl shadow-sm p-4 text-left transition-all ${filterCategoria === 'todos' ? 'ring-2 ring-blue-500' : ''} bg-white dark:bg-gray-800`}>
+          <div className="flex items-center gap-2 mb-2">
+            <Clock className="w-4 h-4 text-blue-600" />
+            <Tooltip text="Total de tickets abiertos en el departamento Soporte IT. Incluye tickets con y sin SLA asignado.">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Abiertos</span>
+            </Tooltip>
           </div>
-          {expandedSections.vencidos ? <ChevronUp className="w-5 h-5 text-gray-600" /> : <ChevronDown className="w-5 h-5 text-gray-600" />}
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">{resumen.total_tickets_abiertos}</div>
+          <p className="text-xs text-gray-400 mt-1">{totalConProblema} con alertas</p>
         </button>
-        {expandedSections.vencidos && (
-          <div className="p-6">
-            {alerts.tickets_vencidos.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                ✅ No hay tickets vencidos
-              </div>
-            ) : (
-              renderTicketTable(alerts.tickets_vencidos, 'vencido')
-            )}
+
+        <button onClick={() => setFilterCategoria('vencido')}
+          className={`rounded-xl shadow-sm p-4 text-left transition-all border-l-4 border-red-500 ${filterCategoria === 'vencido' ? 'ring-2 ring-red-500' : ''} bg-white dark:bg-gray-800`}>
+          <div className="flex items-center gap-2 mb-2">
+            <XCircle className="w-4 h-4 text-red-600" />
+            <Tooltip text="Tickets cuyo tiempo de resolución en horas hábiles superó el 100% del SLA asignado. Requieren atención inmediata.">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Vencidos</span>
+            </Tooltip>
+          </div>
+          <div className="text-2xl font-bold text-red-600">{resumen.tickets_vencidos}</div>
+          <p className="text-xs text-gray-400 mt-1">&gt;100% consumido</p>
+        </button>
+
+        <button onClick={() => setFilterCategoria('critico')}
+          className={`rounded-xl shadow-sm p-4 text-left transition-all border-l-4 border-orange-500 ${filterCategoria === 'critico' ? 'ring-2 ring-orange-500' : ''} bg-white dark:bg-gray-800`}>
+          <div className="flex items-center gap-2 mb-2">
+            <AlertOctagon className="w-4 h-4 text-orange-600" />
+            <Tooltip text="Tickets que consumieron entre 90% y 100% de su SLA en horas hábiles. Están por vencer.">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Críticos</span>
+            </Tooltip>
+          </div>
+          <div className="text-2xl font-bold text-orange-600">{resumen.tickets_criticos}</div>
+          <p className="text-xs text-gray-400 mt-1">90-100% consumido</p>
+        </button>
+
+        <button onClick={() => setFilterCategoria('riesgo')}
+          className={`rounded-xl shadow-sm p-4 text-left transition-all border-l-4 border-yellow-500 ${filterCategoria === 'riesgo' ? 'ring-2 ring-yellow-500' : ''} bg-white dark:bg-gray-800`}>
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-4 h-4 text-yellow-600" />
+            <Tooltip text="Tickets que consumieron entre 70% y 90% de su SLA en horas hábiles. Necesitan seguimiento.">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">En Riesgo</span>
+            </Tooltip>
+          </div>
+          <div className="text-2xl font-bold text-yellow-600">{resumen.tickets_en_riesgo}</div>
+          <p className="text-xs text-gray-400 mt-1">70-90% consumido</p>
+        </button>
+      </div>
+
+      {/* Filtros + Tabla unificada */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+        {/* Barra de filtros */}
+        <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center gap-3">
+          <Filter className="w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={filterTicket}
+            onChange={(e) => setFilterTicket(e.target.value)}
+            placeholder="Buscar # ticket..."
+            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-40 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+          />
+          <select
+            value={filterAgent}
+            onChange={(e) => setFilterAgent(e.target.value)}
+            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+          >
+            <option value="">Todos los agentes</option>
+            {agentOptions.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+          {(filterTicket || filterAgent || filterCategoria !== 'todos') && (
+            <button onClick={() => { setFilterTicket(''); setFilterAgent(''); setFilterCategoria('todos'); }}
+              className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 font-medium">
+              Limpiar filtros
+            </button>
+          )}
+          <span className="ml-auto text-xs text-gray-400">{filteredTickets.length} tickets</span>
+        </div>
+
+        {/* Tabla */}
+        {filteredTickets.length === 0 ? (
+          <div className="text-center py-16 text-gray-400">
+            <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p>No hay tickets que coincidan con los filtros</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100 dark:border-gray-700">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip text="Número de ticket en osTicket. Click para ver detalle." position="below"><span>Ticket</span></Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip text="Categoría de alerta: Vencido (>100% SLA), Crítico (90-100%), En Riesgo (70-90%)." position="below"><span>Estado</span></Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip text="Agente de Soporte IT asignado al ticket." position="below"><span>Agente</span></Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip text="Nombre del SLA asignado al ticket. Define el tiempo máximo de resolución." position="below"><span>SLA</span></Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip text="Porcentaje del tiempo SLA ya consumido en horas hábiles (Lun-Vie 8:30-17:30, sin feriados)." position="below"><span>% Consumido</span></Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip text="Horas hábiles restantes antes de vencer el SLA. Si es negativo, indica cuánto se excedió." position="below"><span>Restante</span></Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip text="Prioridad asignada al ticket según el Help Topic." position="below"><span>Prioridad</span></Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip text="Tiempo transcurrido en horas hábiles desde la última actividad en el ticket." position="below"><span>Últ. Actividad</span></Tooltip>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                {filteredTickets.map((ticket) => {
+                  const pct = ticket.porcentaje_consumido;
+                  const barColor = pct >= 100 ? 'bg-red-500' : pct >= 90 ? 'bg-orange-500' : 'bg-yellow-500';
+                  const pctTextColor = pct >= 100 ? 'text-red-600' : pct >= 90 ? 'text-orange-600' : 'text-yellow-600';
+
+                  return (
+                    <tr key={ticket.ticket_id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => { setSelectedTicketId(ticket.ticket_id); setIsModalOpen(true); }}
+                          className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          #{ticket.number}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">{catBadge(ticket._cat)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                        {ticket.agente_asignado || <span className="text-gray-400 italic">Sin asignar</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">
+                          {ticket.nombre_sla || 'Sin SLA'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full">
+                            <div className={`h-1.5 rounded-full ${barColor}`}
+                              style={{ width: `${Math.min(pct, 100)}%` }} />
+                          </div>
+                          <span className={`text-xs font-semibold ${pctTextColor}`}>{pct.toFixed(0)}%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-sm font-medium ${
+                          ticket._cat === 'vencido' ? 'text-red-600' : ticket._cat === 'critico' ? 'text-orange-600' : 'text-yellow-600'
+                        }`}>
+                          {ticket._cat === 'vencido' ? `−${fmtTiempo(Math.abs(ticket.horas_restantes))}` : fmtTiempo(ticket.horas_restantes)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{priorityBadge(ticket.priority_id, ticket.prioridad_nombre)}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
+                        {fmtTiempo(ticket.horas_desde_ultima_actividad)} atrás
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
-      </div>
-
-      {/* Sección 2: Tickets Críticos */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md mb-6 overflow-hidden">
-        <button
-          onClick={() => toggleSection('criticos')}
-          className="w-full px-6 py-4 flex items-center justify-between bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <AlertOctagon className="w-5 h-5 text-orange-600" />
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-              Tickets Críticos ({alerts.tickets_criticos.length})
-            </h3>
-            <span className="text-sm text-orange-600 dark:text-orange-400 font-medium">
-              ⏰ Vencen muy pronto
-            </span>
-          </div>
-          {expandedSections.criticos ? <ChevronUp className="w-5 h-5 text-gray-600" /> : <ChevronDown className="w-5 h-5 text-gray-600" />}
-        </button>
-        {expandedSections.criticos && (
-          <div className="p-6">
-            {alerts.tickets_criticos.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                ✅ No hay tickets críticos
-              </div>
-            ) : (
-              renderTicketTable(alerts.tickets_criticos, 'critico')
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Sección 3: Tickets En Riesgo */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md mb-6 overflow-hidden">
-        <button
-          onClick={() => toggleSection('enRiesgo')}
-          className="w-full px-6 py-4 flex items-center justify-between bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-yellow-600" />
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-              Tickets En Riesgo ({alerts.tickets_en_riesgo.length})
-            </h3>
-            <span className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">
-              📊 Monitorear
-            </span>
-          </div>
-          {expandedSections.enRiesgo ? <ChevronUp className="w-5 h-5 text-gray-600" /> : <ChevronDown className="w-5 h-5 text-gray-600" />}
-        </button>
-        {expandedSections.enRiesgo && (
-          <div className="p-6">
-            {alerts.tickets_en_riesgo.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                ✅ No hay tickets en riesgo
-              </div>
-            ) : (
-              renderTicketTable(alerts.tickets_en_riesgo, 'riesgo')
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Información adicional */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border-l-4 border-blue-500">
-        <p className="text-sm text-gray-700 dark:text-gray-300">
-          💡 <strong>Tip:</strong> Para análisis histórico de rendimiento por agente, revisa la vista 
-          <span className="font-semibold text-blue-600 dark:text-blue-400"> "Análisis Histórico SLA"</span> 
-          {' '}con filtros de fecha y gráficos de tendencias.
-        </p>
       </div>
 
       {/* Footer */}
-      <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-        <p>
-          Última actualización: {new Date().toLocaleString('es-AR')} • Actualización automática cada 5 minutos
-        </p>
-      </div>
+      <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+        Auto-actualización cada 5 min &middot; {new Date().toLocaleString('es-AR')}
+      </p>
 
       {/* Modal de detalle */}
       {isModalOpen && selectedTicketId && (
         <TicketDetailModal
           isOpen={isModalOpen}
           ticketId={selectedTicketId}
-          onClose={handleCloseModal}
+          onClose={() => { setIsModalOpen(false); setSelectedTicketId(null); }}
         />
       )}
     </div>

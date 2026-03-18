@@ -685,4 +685,101 @@ function getMonthName(monthNumber) {
   return months[monthNumber - 1];
 }
 
-module.exports = router; 
+/**
+ * GET /api/stats/tickets-by-request-type
+ * Devuelve un conteo de tickets agrupados por TPSolicitud (Tipo de Solicitud).
+ * Campo personalizado tipo lista asignado por el agente.
+ * Disponible a partir de marzo 2026.
+ */
+router.get('/tickets-by-request-type', async (req, res, next) => {
+  const { year, month } = req.query;
+
+  try {
+    // Paso 1: Buscar el field_id de TPSolicitud
+    let fieldRows;
+    try {
+      fieldRows = await sequelize.query(
+        "SELECT `id` AS field_id, `name`, `label`, `type` FROM `ost_form_field` WHERE `name` LIKE '%tpsolicitud%' OR `name` LIKE '%TPSolicitud%' OR `label` LIKE '%TPSolicitud%' OR `label` LIKE '%Tipo de Solicitud%' OR `label` LIKE '%tipo solicitud%' LIMIT 1",
+        { type: sequelize.QueryTypes.SELECT }
+      );
+    } catch (e1) {
+      logger.error('TPSolicitud paso 1 error:', e1.original?.sqlMessage || e1.message);
+      return res.json([]);
+    }
+
+    const fieldInfo = fieldRows && fieldRows.length > 0 ? fieldRows[0] : null;
+    if (!fieldInfo) {
+      logger.warn('TPSolicitud: Campo no encontrado en ost_form_field');
+      return res.json([]);
+    }
+
+    logger.info(`TPSolicitud: field_id=${fieldInfo.field_id}, name=${fieldInfo.name}, type=${fieldInfo.type}`);
+
+    // Paso 2: Construir filtro de fecha
+    let dateFilter = '';
+    const replacements = { fieldId: fieldInfo.field_id };
+    if (year && month) {
+      const y = parseInt(year, 10);
+      const m = parseInt(month, 10);
+      const startDate = new Date(y, m - 1, 1);
+      const endDate = new Date(y, m, 0, 23, 59, 59);
+      dateFilter = 'AND t.created BETWEEN :startDate AND :endDate';
+      replacements.startDate = startDate;
+      replacements.endDate = endDate;
+    }
+
+    // Paso 3: Obtener valores agrupados (raw values, parseamos JSON después)
+    const dataQuery = "SELECT fev.`value` AS raw_val, COUNT(*) AS cnt" +
+      " FROM ost_form_entry_values fev" +
+      " INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id" +
+      " INNER JOIN ost_ticket t ON fe.object_id = t.ticket_id" +
+      " INNER JOIN ost_department d ON t.dept_id = d.id" +
+      " WHERE fe.object_type = 'T'" +
+      "   AND fev.field_id = :fieldId" +
+      "   AND fev.`value` IS NOT NULL AND fev.`value` != ''" +
+      "   AND d.`name` IN ('Soporte Informatico', 'Soporte IT')" +
+      "   " + dateFilter +
+      " GROUP BY fev.`value`" +
+      " ORDER BY cnt DESC";
+
+    const rows = await sequelize.query(dataQuery, {
+      replacements,
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    // Parsear valores: pueden ser JSON {"id":"nombre"} o texto plano
+    const parseValue = (raw) => {
+      if (!raw) return 'Sin Especificar';
+      try {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed === 'object' && parsed !== null) {
+          const vals = Object.values(parsed);
+          return vals.length > 0 ? String(vals[0]) : 'Sin Especificar';
+        }
+        return String(parsed);
+      } catch (e) {
+        return String(raw);
+      }
+    };
+
+    // Agrupar por nombre parseado (varios JSON pueden mapear al mismo nombre)
+    const grouped = {};
+    for (const r of rows) {
+      const name = parseValue(r.raw_val);
+      grouped[name] = (grouped[name] || 0) + Number(r.cnt);
+    }
+
+    const result = Object.entries(grouped)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    logger.info(`TPSolicitud: ${result.length} categorías encontradas`);
+    res.json(result);
+
+  } catch (error) {
+    logger.error('TPSolicitud error:', error.original?.sqlMessage || error.message);
+    next(error);
+  }
+});
+
+module.exports = router;

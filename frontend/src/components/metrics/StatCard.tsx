@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/solid';
 import { TicketIcon, ClockIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { Tooltip } from '../ui/Tooltip';
 
 /**
  * Componente KPI Card siguiendo la guía de diseño DESIGN_GUIDE.md
@@ -15,6 +16,7 @@ interface StatCardProps {
   iconCustom?: React.ReactNode;
   trend?: string;
   className?: string;
+  tooltip?: string;
 }
 
 const StatCard: React.FC<StatCardProps> = ({ 
@@ -24,7 +26,8 @@ const StatCard: React.FC<StatCardProps> = ({
   icon, 
   iconCustom,
   trend,
-  className = '' 
+  className = '',
+  tooltip
 }) => {
   // Determinar si la tendencia es positiva o negativa
   const isTrendPositive = trend && trend.startsWith('+');
@@ -48,6 +51,13 @@ const StatCard: React.FC<StatCardProps> = ({
     }
   };
 
+  const titleContent = (
+    <div>
+      <h3 className="font-semibold text-[var(--text-primary)]">{title}</h3>
+      {subtitle && <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>}
+    </div>
+  );
+
   return (
     <div className={`group relative overflow-hidden bg-[var(--bg-secondary)] rounded-xl p-6 shadow-lg border border-[var(--bg-accent)]/10 hover:border-[var(--accent-primary)]/20 transition-all duration-300 ${className}`}>
       {/* Efecto decorativo en la tarjeta */}
@@ -61,10 +71,13 @@ const StatCard: React.FC<StatCardProps> = ({
               {renderIcon()}
             </div>
           )}
-          <div>
-            <h3 className="font-semibold text-[var(--text-primary)]">{title}</h3>
-            {subtitle && <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>}
-          </div>
+          {tooltip ? (
+            <Tooltip text={tooltip} position="below">
+              {titleContent}
+            </Tooltip>
+          ) : (
+            titleContent
+          )}
         </div>
 
         {/* Indicador de tendencia */}

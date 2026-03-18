@@ -8,9 +8,11 @@ import TicketStatusChart from '../components/charts/TicketStatusChart';
 import TicketTrendsChart from '../components/charts/TicketTrendsChart';
 import TicketsBySectorChart from '../components/charts/TicketsBySectorChart';
 import TicketsByAgentChart from '../components/charts/TicketsByAgentChart';
-import { TicketsByTransportChart } from '../components/charts/TicketsByTransportChart'; // <-- IMPORTAR NUEVO GRÁFICO
+import { TicketsByTransportChart } from '../components/charts/TicketsByTransportChart';
+import { TicketsByRequestTypeChart } from '../components/charts/TicketsByRequestTypeChart';
 import MonthlyComparisonChart from '../components/charts/MonthlyComparisonChart';
 import { SkeletonDashboard } from '../components/ui/Loading';
+import { Tooltip } from '../components/ui/Tooltip';
 
 /**
  * Vista principal del Dashboard OsTicket
@@ -146,6 +148,7 @@ const DashboardView: React.FC = () => {
             subtitle={fullMonthTitle}
             icon="total"
             trend="+5%"
+            tooltip="Todos los tickets creados durante este mes, sin importar su estado actual."
           />
           <StatCard 
             title="Tickets Abiertos" 
@@ -153,6 +156,7 @@ const DashboardView: React.FC = () => {
             subtitle={fullMonthTitle}
             icon="open"
             trend="-2%"
+            tooltip="Tickets creados este mes que aún no han sido resueltos ni cerrados."
           />
           <StatCard 
             title="Total Pendientes" 
@@ -160,6 +164,7 @@ const DashboardView: React.FC = () => {
             subtitle="Acumulado"
             icon="pending"
             trend="+8%"
+            tooltip="La suma histórica de todos los tickets abiertos y no resueltos, incluyendo meses anteriores."
           />
           <StatCard 
             title="Tickets Cerrados" 
@@ -167,6 +172,7 @@ const DashboardView: React.FC = () => {
             subtitle={fullMonthTitle}
             icon="closed"
             trend="+12%"
+            tooltip="Tickets que fueron marcados como 'Resuelto' o 'Cerrado' durante este mes."
           />
         </div>
 
@@ -175,7 +181,9 @@ const DashboardView: React.FC = () => {
           <div className="chart-card">
             <div className="chart-header">
               <span className="chart-indicator bg-[var(--info)]"></span>
-              <h2 className="chart-title">Distribución por Estado</h2>
+              <Tooltip text="Muestra la cantidad de tickets según su estado actual (abiertos, cerrados, resueltos) dentro del mes seleccionado." position="below">
+                <h2 className="chart-title inline-flex items-center">Distribución por Estado</h2>
+              </Tooltip>
             </div>
             <TicketStatusChart data={statusChartData} />
           </div>
@@ -183,7 +191,9 @@ const DashboardView: React.FC = () => {
           <div className="chart-card">
             <div className="chart-header">
               <span className="chart-indicator bg-[var(--accent-primary)]"></span>
-              <h2 className="chart-title">Tendencia de Tickets</h2>
+              <Tooltip text="Muestra la evolución diaria de tickets creados vs cerrados a lo largo del mes seleccionado." position="below">
+                <h2 className="chart-title inline-flex items-center">Tendencia de Tickets</h2>
+              </Tooltip>
             </div>
             <TicketTrendsChart year={selectedYear} month={selectedMonth + 1} />
           </div>
@@ -197,7 +207,9 @@ const DashboardView: React.FC = () => {
             <div className="chart-card">
               <div className="chart-header">
                 <span className="chart-indicator bg-[var(--accent-secondary)]"></span>
-                <h2 className="chart-title">Uso de Transporte</h2>
+                <Tooltip text="Cantidad de tickets categorizados por el medio de transporte asociado al problema reportado." position="below">
+                  <h2 className="chart-title inline-flex items-center">Uso de Transporte</h2>
+                </Tooltip>
               </div>
               <div className="h-[300px]">
                 <TicketsByTransportChart year={selectedYear} month={selectedMonth + 1} />
@@ -208,7 +220,9 @@ const DashboardView: React.FC = () => {
             <div className="chart-card">
               <div className="chart-header">
                 <span className="chart-indicator bg-[var(--warning)]"></span>
-                <h2 className="chart-title">Tickets por Agente</h2>
+                <Tooltip text="Rendimiento individual: cantidad de tickets asignados o resueltos por cada agente de Soporte IT en el mes." position="below">
+                  <h2 className="chart-title inline-flex items-center">Tickets por Agente</h2>
+                </Tooltip>
               </div>
               <TicketsByAgentChart year={selectedYear} month={selectedMonth + 1} />
             </div>
@@ -218,9 +232,29 @@ const DashboardView: React.FC = () => {
           <div className="chart-card">
             <div className="chart-header">
               <span className="chart-indicator bg-[var(--warning)]"></span>
-              <h2 className="chart-title">Tickets por Sector</h2>
+              <Tooltip text="Distribución de la demanda de soporte según el sector o área de la empresa que origina la solicitud." position="below">
+                <h2 className="chart-title inline-flex items-center">Tickets por Sector</h2>
+              </Tooltip>
             </div>
             <TicketsBySectorChart year={selectedYear} month={selectedMonth + 1} />
+          </div>
+        </div>
+
+        {/* Fila: Tipo de Solicitud (TPSolicitud) - Fallas más comunes */}
+        <div className="col-span-12">
+          <div className="chart-card">
+            <div className="chart-header">
+              <span className="chart-indicator bg-[var(--warning)]"></span>
+              <Tooltip text="Clasificación detallada de los problemas reportados, permitiendo identificar las fallas técnicas más frecuentes en la operación." position="below">
+                <h2 className="chart-title inline-flex items-center">Tipo de Solicitud - Fallas más Comunes</h2>
+              </Tooltip>
+              <p className="text-sm text-[var(--text-muted)] mt-1">
+                Categorización de problemas asignada por el agente (disponible desde marzo 2026)
+              </p>
+            </div>
+            <div className="py-4">
+              <TicketsByRequestTypeChart year={selectedYear} month={selectedMonth + 1} />
+            </div>
           </div>
         </div>
 
@@ -229,7 +263,9 @@ const DashboardView: React.FC = () => {
           <div className="chart-card">
             <div className="chart-header">
               <span className="chart-indicator bg-[var(--success)]"></span>
-              <h2 className="chart-title">Análisis de Flujo Mensual</h2>
+              <Tooltip text="Análisis comparativo de la demanda actual versus el mes anterior, mostrando si el equipo está absorbiendo o acumulando trabajo." position="below">
+                <h2 className="chart-title inline-flex items-center">Análisis de Flujo Mensual</h2>
+              </Tooltip>
               <p className="text-sm text-[var(--text-muted)] mt-1">
                 Analiza creados, cerrados y pendientes entre meses, incluye flujo de tickets
               </p>

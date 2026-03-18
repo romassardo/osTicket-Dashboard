@@ -1,16 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BarChart3, Download, Calendar, Users, TrendingUp, TrendingDown, Clock, RefreshCw } from 'lucide-react';
+import { BarChart3, Download, Calendar, TrendingUp, TrendingDown, Clock, RefreshCw, CheckCircle, XCircle, ArrowUpDown, Info, Filter } from 'lucide-react';
 import { getSLAStats } from '../services/api';
 import logger from '../utils/logger';
 
 interface SLAStat {
-  departamento: string;
   agente: string;
   staff_id: number;
-  nombre_sla: string;
-  anio: number;
-  mes: number;
-  mes_nombre: string;
   total_tickets: number;
   tickets_sla_cumplido: number;
   tickets_sla_vencido: number;
@@ -21,39 +16,78 @@ interface SLAStat {
   diferencia_sla_horas: number;
 }
 
+// Tooltip component
+const Tooltip = ({ text, children, position = 'above' }: { text: string; children: React.ReactNode; position?: 'above' | 'below' }) => {
+  const [show, setShow] = useState(false);
+
+  const posClass = position === 'below'
+    ? 'top-full mt-2'
+    : 'bottom-full mb-2';
+  const arrowClass = position === 'below'
+    ? 'absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-gray-900 dark:border-b-gray-700'
+    : 'absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700';
+
+  return (
+    <div className="relative inline-flex items-center gap-1">
+      {children}
+      <button
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        onClick={() => setShow(prev => !prev)}
+        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        type="button"
+      >
+        <Info className="w-3.5 h-3.5" />
+      </button>
+      {show && (
+        <div className={`fixed z-[9999] px-3 py-2 text-[11px] font-normal normal-case tracking-normal text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg whitespace-normal leading-relaxed pointer-events-none`}
+          style={{ maxWidth: 260, width: 'max-content', transform: 'translateX(-50%)' }}
+          ref={(el) => {
+            if (!el) return;
+            const btn = el.parentElement?.querySelector('button');
+            if (!btn) return;
+            const rect = btn.getBoundingClientRect();
+            if (position === 'below') {
+              el.style.top = `${rect.bottom + 8}px`;
+              el.style.left = `${rect.left + rect.width / 2}px`;
+            } else {
+              el.style.top = `${rect.top - el.offsetHeight - 8}px`;
+              el.style.left = `${rect.left + rect.width / 2}px`;
+            }
+          }}
+        >
+          {text}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SLAStatsView: React.FC = () => {
   const [stats, setStats] = useState<SLAStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
-  // Filtros
   const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<number | ''>('');
   
-  // Sorting
   const [sortBy, setSortBy] = useState<keyof SLAStat>('porcentaje_sla_cumplido');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
+  // Table filters
+  const [filterAgente, setFilterAgente] = useState('');
+
   const fetchStats = async (showRefreshing = false) => {
     try {
-      if (showRefreshing) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+      if (showRefreshing) setRefreshing(true);
+      else setLoading(true);
 
-      const params: any = {
-        year: selectedYear
-      };
-      if (selectedMonth !== '') {
-        params.month = selectedMonth;
-      }
+      const params: any = { year: selectedYear };
+      if (selectedMonth !== '') params.month = selectedMonth;
 
       const data = await getSLAStats(params);
-      // Normalizar porcentaje_sla_cumplido a número
-      const normalizedData = (data || []).map(stat => ({
+      const normalized = (data || []).map((stat: any) => ({
         ...stat,
         porcentaje_sla_cumplido: Number(stat.porcentaje_sla_cumplido) || 0,
         total_tickets: Number(stat.total_tickets) || 0,
@@ -62,48 +96,8 @@ const SLAStatsView: React.FC = () => {
         diferencia_sla_horas: Number(stat.diferencia_sla_horas) || 0
       }));
 
-      // Consolidar por agente (puede haber múltiples registros por mes/año/SLA)
-      const agentMap = new Map<number, SLAStat>();
-      normalizedData.forEach(stat => {
-        const existing = agentMap.get(stat.staff_id);
-        if (existing) {
-          // Consolidar datos
-          existing.total_tickets += stat.total_tickets;
-          existing.tickets_sla_cumplido += stat.tickets_sla_cumplido;
-          existing.tickets_sla_vencido += stat.tickets_sla_vencido;
-          // Recalcular porcentaje
-          existing.porcentaje_sla_cumplido = existing.total_tickets > 0
-            ? (existing.tickets_sla_cumplido / existing.total_tickets) * 100
-            : 0;
-          // Promedio ponderado de diferencia SLA
-          const totalRecords = (existing as any)._recordCount || 1;
-          existing.diferencia_sla_horas = 
-            (existing.diferencia_sla_horas * totalRecords + stat.diferencia_sla_horas) / (totalRecords + 1);
-          (existing as any)._recordCount = totalRecords + 1;
-        } else {
-          agentMap.set(stat.staff_id, { ...stat, _recordCount: 1 } as any);
-        }
-      });
-
-      // Regenerar el texto de diferencia promedio y convertir map a array
-      const consolidatedStats = Array.from(agentMap.values()).map(stat => {
-        const horasAbs = Math.abs(stat.diferencia_sla_horas);
-        let diferenciaTexto = '';
-        if (stat.diferencia_sla_horas >= 0) {
-          diferenciaTexto = `Cumplió ${horasAbs.toFixed(1)}h antes`;
-        } else {
-          diferenciaTexto = `Se pasó ${horasAbs.toFixed(1)}h`;
-        }
-        return {
-          ...stat,
-          // Luego de consolidar por agente, las métricas son sobre todos los SLA
-          nombre_sla: 'Todos los SLA',
-          diferencia_sla_promedio: diferenciaTexto
-        };
-      });
-
-      setStats(consolidatedStats);
-      logger.info(`📊 Estadísticas SLA cargadas: ${consolidatedStats.length} agentes únicos (de ${normalizedData.length} registros)`);
+      setStats(normalized);
+      logger.info(`SLA Stats cargadas: ${normalized.length} agentes`);
     } catch (error) {
       logger.error('Error al cargar estadísticas SLA:', error);
       setStats([]);
@@ -113,547 +107,325 @@ const SLAStatsView: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchStats();
-  }, [selectedYear, selectedMonth]);
-
-  const handleRefresh = () => {
-    fetchStats(true);
-  };
+  useEffect(() => { fetchStats(); }, [selectedYear, selectedMonth]);
 
   const handleSort = (column: keyof SLAStat) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(column);
-      setSortOrder('desc');
-    }
+    if (sortBy === column) setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(column); setSortOrder('desc'); }
   };
 
-  const sortedStats = useMemo(() => {
-    const data = [...stats];
+  // Filter out agents with empty/trimmed names (extra safety on frontend)
+  const validStats = useMemo(() => {
+    return stats.filter(s => s.agente && s.agente.trim().length > 0);
+  }, [stats]);
 
+  const filteredAndSorted = useMemo(() => {
+    let data = [...validStats];
+
+    // Apply table filters
+    if (filterAgente) {
+      const q = filterAgente.toLowerCase();
+      data = data.filter(s => s.agente.toLowerCase().includes(q));
+    }
+    // Sort
     data.sort((a, b) => {
       const aVal = a[sortBy];
       const bVal = b[sortBy];
-      
-      if (aVal === null || aVal === undefined) return 1;
-      if (bVal === null || bVal === undefined) return -1;
-  
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      if (typeof aVal === 'number' && typeof bVal === 'number')
         return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-      
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-      return sortOrder === 'asc' 
-        ? aStr.localeCompare(bStr) 
-        : bStr.localeCompare(aStr);
+      return sortOrder === 'asc'
+        ? String(aVal).localeCompare(String(bVal))
+        : String(bVal).localeCompare(String(aVal));
     });
 
     return data;
-  }, [stats, sortBy, sortOrder]);
+  }, [validStats, sortBy, sortOrder, filterAgente]);
 
-  // Calcular resumen general
-  const totalTickets = stats.reduce((sum, s) => sum + s.total_tickets, 0);
-  const totalCumplidos = stats.reduce((sum, s) => sum + s.tickets_sla_cumplido, 0);
-  const totalVencidos = stats.reduce((sum, s) => sum + s.tickets_sla_vencido, 0);
-  const promedioGeneral = totalTickets > 0 ? ((totalCumplidos / totalTickets) * 100).toFixed(1) : '0.0';
-  const porcentajeNoCumplido = totalTickets > 0 ? ((totalVencidos / totalTickets) * 100).toFixed(1) : '0.0';
+  const totalTickets = validStats.reduce((s, a) => s + a.total_tickets, 0);
+  const totalCumplidos = validStats.reduce((s, a) => s + a.tickets_sla_cumplido, 0);
+  const totalVencidos = validStats.reduce((s, a) => s + a.tickets_sla_vencido, 0);
+  const pctCumplimiento = totalTickets > 0 ? (totalCumplidos / totalTickets) * 100 : 0;
 
   const exportToExcel = () => {
-    logger.info('🔽 Exportando estadísticas SLA a Excel (XLS)...');
-
     try {
-      // Encabezados del archivo
-      const headers = [
-        'Agente',
-        'SLA',
-        'Año',
-        'Mes',
-        'Total Tickets',
-        'Cumplidos',
-        'Vencidos',
-        '% Cumplimiento',
-        'Diferencia SLA',
-        'T. Promedio Resolución'
-      ];
-
-      const escapeHtml = (value: any) => {
-        const str = value !== null && value !== undefined ? String(value) : '';
-        return str
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
-      };
-
-      const headerRow = `<tr>${headers
-        .map((h) => `<th style="background:#f3f4f6;font-weight:bold;">${escapeHtml(h)}</th>`)
-        .join('')}</tr>`;
-
-      const bodyRows = sortedStats
-        .map((stat) =>
-          `<tr>` +
-          `<td>${escapeHtml(stat.agente)}</td>` +
-          `<td>${escapeHtml(stat.nombre_sla)}</td>` +
-          `<td>${escapeHtml(stat.anio)}</td>` +
-          `<td>${escapeHtml(stat.mes_nombre)}</td>` +
-          `<td>${escapeHtml(stat.total_tickets)}</td>` +
-          `<td>${escapeHtml(stat.tickets_sla_cumplido)}</td>` +
-          `<td>${escapeHtml(stat.tickets_sla_vencido)}</td>` +
-          `<td>${escapeHtml(stat.porcentaje_sla_cumplido.toFixed(1))}%</td>` +
-          `<td>${escapeHtml(stat.diferencia_sla_promedio)}</td>` +
-          `<td>${escapeHtml(stat.tiempo_promedio_resolucion)}</td>` +
-          `</tr>`
-        )
-        .join('');
-
-      const tableHtml = `<!DOCTYPE html><html><head><meta charset="utf-8" /></head><body><table border="1">${headerRow}${bodyRows}</table></body></html>`;
-
-      const blob = new Blob(['\ufeff' + tableHtml], {
-        type: 'application/vnd.ms-excel;charset=utf-8;',
-      });
+      const headers = ['Agente', 'Total Tickets', 'Cumplidos', 'Vencidos', '% Cumplimiento', 'Diferencia SLA', 'T. Prom. Resolución'];
+      const esc = (v: any) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const headerRow = `<tr>${headers.map(h => `<th style="background:#f3f4f6;font-weight:bold;">${esc(h)}</th>`).join('')}</tr>`;
+      const bodyRows = filteredAndSorted.map((s: SLAStat) =>
+        `<tr><td>${esc(s.agente)}</td><td>${s.total_tickets}</td><td>${s.tickets_sla_cumplido}</td><td>${s.tickets_sla_vencido}</td><td>${s.porcentaje_sla_cumplido.toFixed(1)}%</td><td>${esc(s.diferencia_sla_promedio)}</td><td>${esc(s.tiempo_promedio_resolucion)}</td></tr>`
+      ).join('');
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body><table border="1">${headerRow}${bodyRows}</table></body></html>`;
+      const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      const fecha = new Date().toISOString().split('T')[0];
-
       link.href = url;
-      link.setAttribute('download', `sla_analisis_historico_${fecha}.xls`);
+      link.setAttribute('download', `sla_analisis_${new Date().toISOString().split('T')[0]}.xls`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      logger.error('❌ Error al exportar estadísticas SLA a XLS:', error);
-      alert('Ocurrió un error al exportar el archivo.');
+      logger.error('Error al exportar:', error);
     }
   };
+
+  const SortHeader = ({ column, children, tooltip }: { column: keyof SLAStat; children: React.ReactNode; tooltip: string }) => (
+    <th
+      onClick={() => handleSort(column)}
+      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 select-none"
+    >
+      <Tooltip text={tooltip} position="below">
+        <span className="inline-flex items-center gap-1" onClick={(e) => { e.stopPropagation(); handleSort(column); }}>
+          {children}
+          {sortBy === column ? (
+            sortOrder === 'asc' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />
+          ) : (
+            <ArrowUpDown className="w-3 h-3 opacity-30" />
+          )}
+        </span>
+      </Tooltip>
+    </th>
+  );
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
         <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
-            ))}
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map(i => <div key={i} className="h-28 bg-gray-200 dark:bg-gray-700 rounded-xl" />)}
           </div>
+          <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded-xl" />
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-      {/* Header */}
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-            <BarChart3 className="w-8 h-8 text-blue-600" />
-            Análisis Histórico SLA
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Estadísticas de cumplimiento SLA por agente, periodo y tendencias de rendimiento
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={exportToExcel}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700
-                     text-white rounded-lg transition-colors flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            Exportar Excel
-          </button>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400
-                     text-white rounded-lg transition-colors flex items-center gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Actualizando...' : 'Actualizar'}
-          </button>
-        </div>
-      </div>
+  const hasActiveFilters = !!filterAgente;
 
-      {/* Filtros */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
-          <Calendar className="w-4 h-4" />
-          Filtros
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 space-y-6">
+      {/* Header + Filtros en una barra */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Año
-            </label>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <BarChart3 className="w-6 h-6 text-blue-600" />
+              Análisis SLA
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Rendimiento por agente en tickets cerrados (horas hábiles Lun-Vie 8:30-17:30)
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
-              {[currentYear, currentYear - 1, currentYear - 2].map(year => (
-                <option key={year} value={year}>{year}</option>
+              {[currentYear, currentYear - 1, currentYear - 2].map(y => (
+                <option key={y} value={y}>{y}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Mes (opcional)
-            </label>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value === '' ? '' : parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="">Todos los meses</option>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-                <option key={month} value={month}>
-                  {new Date(2000, month - 1).toLocaleDateString('es-AR', { month: 'long' })}
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                <option key={m} value={m}>
+                  {new Date(2000, m - 1).toLocaleDateString('es-AR', { month: 'long' })}
                 </option>
               ))}
             </select>
+            <button
+              onClick={exportToExcel}
+              className="px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5 text-gray-700 dark:text-gray-200"
+            >
+              <Download className="w-4 h-4" /> Excel
+            </button>
+            <button
+              onClick={() => fetchStats(true)}
+              disabled={refreshing}
+              className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? '...' : 'Actualizar'}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Tarjetas de Resumen con indicadores de tendencia */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tickets</h3>
-            <Users className="w-5 h-5 text-blue-600" />
+      {/* 3 KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* Total tickets cerrados */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+              <BarChart3 className="w-5 h-5 text-blue-600" />
+            </div>
+            <Tooltip text="Cantidad total de tickets cerrados en el departamento Soporte IT para el período seleccionado. Solo incluye tickets con agente asignado.">
+              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Tickets Cerrados</span>
+            </Tooltip>
           </div>
-          <div className="text-3xl font-bold text-blue-600">
-            {totalTickets}
+          <div className="text-3xl font-bold text-gray-900 dark:text-white">{totalTickets}</div>
+          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <span className="flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5 text-green-500" /> {totalCumplidos} en tiempo</span>
+            <span className="flex items-center gap-1"><XCircle className="w-3.5 h-3.5 text-red-500" /> {totalVencidos} vencidos</span>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            {stats.length} agentes activos
-          </p>
         </div>
 
+        {/* % Cumplimiento con barra meta */}
         {(() => {
-          const pct = parseFloat(promedioGeneral);
-          const isGood = pct >= 90;
-          const isWarning = pct >= 70 && pct < 90;
-          const colorBg = isGood ? 'bg-green-50 dark:bg-green-900/20' : isWarning ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-red-50 dark:bg-red-900/20';
-          const colorBorder = isGood ? 'border-green-500' : isWarning ? 'border-yellow-500' : 'border-red-500';
-          const colorText = isGood ? 'text-green-600' : isWarning ? 'text-yellow-600' : 'text-red-600';
-          const statusLabel = isGood ? 'Excelente' : isWarning ? 'Requiere atención' : 'Crítico';
-          const TrendIcon = isGood ? TrendingUp : TrendingDown;
+          const isGood = pctCumplimiento >= 90;
+          const isWarn = pctCumplimiento >= 70 && pctCumplimiento < 90;
+          const accentColor = isGood ? 'green' : isWarn ? 'yellow' : 'red';
+          const label = isGood ? 'Excelente' : isWarn ? 'Atención' : 'Crítico';
           return (
-            <div className={`${colorBg} rounded-lg shadow-md p-6 border-l-4 ${colorBorder}`}>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">% Cumplimiento</h3>
-                <TrendIcon className={`w-5 h-5 ${colorText}`} />
+            <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 border-l-4 border-${accentColor}-500`}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`p-2 bg-${accentColor}-100 dark:bg-${accentColor}-900/40 rounded-lg`}>
+                  {isGood ? <TrendingUp className={`w-5 h-5 text-${accentColor}-600`} /> : <TrendingDown className={`w-5 h-5 text-${accentColor}-600`} />}
+                </div>
+                <Tooltip text="Porcentaje de tickets resueltos dentro del tiempo definido por su SLA. Se calcula en horas hábiles (Lun-Vie 8:30-17:30, excluyendo feriados). Fórmula: (tickets cumplidos / total tickets) x 100.">
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Cumplimiento SLA</span>
+                </Tooltip>
               </div>
-              <div className={`text-3xl font-bold ${colorText}`}>
-                {promedioGeneral}%
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                  isGood ? 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-300' :
-                  isWarning ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-300' :
-                  'bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-300'
-                }`}>
-                  {statusLabel}
+              <div className="flex items-baseline gap-2">
+                <span className={`text-3xl font-bold text-${accentColor}-600`}>{pctCumplimiento.toFixed(1)}%</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full bg-${accentColor}-100 text-${accentColor}-700 dark:bg-${accentColor}-900/40 dark:text-${accentColor}-300`}>
+                  {label}
                 </span>
-                <span className="text-xs text-gray-400">Meta: 90%</span>
               </div>
-              {/* Mini progress bar with goal line */}
-              <div className="relative mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-visible">
-                <div className={`h-2 rounded-full ${isGood ? 'bg-green-500' : isWarning ? 'bg-yellow-500' : 'bg-red-500'}`}
-                  style={{ width: `${Math.min(pct, 100)}%` }} />
-                <div className="absolute top-0 h-2 w-0.5 bg-gray-800 dark:bg-white" style={{ left: '90%' }}
-                  title="Meta 90%" />
+              <div className="relative mt-3 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
+                <div className={`h-2 rounded-full bg-${accentColor}-500 transition-all`}
+                  style={{ width: `${Math.min(pctCumplimiento, 100)}%` }} />
+                <div className="absolute top-0 h-2 w-0.5 bg-gray-800 dark:bg-white opacity-60" style={{ left: '90%' }} title="Meta 90%" />
               </div>
+              <p className="text-xs text-gray-400 mt-1.5">Meta organizacional: 90%</p>
             </div>
           );
         })()}
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Cumplidos / Vencidos</h3>
-            <BarChart3 className="w-5 h-5 text-indigo-600" />
+        {/* Agentes con tickets */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-purple-100 dark:bg-purple-900/40 rounded-lg">
+              <Clock className="w-5 h-5 text-purple-600" />
+            </div>
+            <Tooltip text="Cantidad de agentes de Soporte IT que cerraron al menos un ticket en el período seleccionado. Se excluyen tickets sin agente asignado.">
+              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Agentes con Tickets</span>
+            </Tooltip>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-green-600">{totalCumplidos}</span>
-            <span className="text-gray-400">/</span>
-            <span className="text-2xl font-bold text-red-600">{totalVencidos}</span>
-          </div>
-          <div className="relative mt-3 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
-            <div className="h-2 bg-green-500 rounded-l-full"
-              style={{ width: totalTickets > 0 ? `${(totalCumplidos / totalTickets) * 100}%` : '0%' }} />
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            {totalTickets} tickets analizados
-          </p>
-        </div>
-
-        <div className={`rounded-lg shadow-md p-6 border-l-4 ${
-          totalVencidos === 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-500' :
-          totalVencidos <= 5 ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-500' :
-          'bg-red-50 dark:bg-red-900/20 border-red-500'
-        }`}>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Vencidos</h3>
-            <Clock className={`w-5 h-5 ${
-              totalVencidos === 0 ? 'text-green-600' :
-              totalVencidos <= 5 ? 'text-orange-600' : 'text-red-600'
-            }`} />
-          </div>
-          <div className={`text-3xl font-bold ${
-            totalVencidos === 0 ? 'text-green-600' :
-            totalVencidos <= 5 ? 'text-orange-600' : 'text-red-600'
-          }`}>
-            {totalVencidos}
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            {totalTickets > 0 ? ((totalVencidos / totalTickets) * 100).toFixed(1) : '0.0'}% del total
-          </p>
-        </div>
-      </div>
-
-      {/* Gráficos de Tendencias */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Top 5 Agentes por Cumplimiento */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-green-600" />
-            Top 5 Agentes - Mayor Cumplimiento
-          </h3>
-          <div className="space-y-4">
-            {[...sortedStats]
-              .sort((a, b) => b.porcentaje_sla_cumplido - a.porcentaje_sla_cumplido)
-              .slice(0, 5)
-              .map((stat, idx) => (
-                <div key={`top-${stat.staff_id}-${idx}`} className="space-y-2">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="font-medium text-gray-700 dark:text-gray-300 truncate max-w-[60%]">
-                      {idx + 1}. {stat.agente}
-                    </span>
-                    <span className={`font-bold ${
-                      stat.porcentaje_sla_cumplido >= 90 ? 'text-green-600' :
-                      stat.porcentaje_sla_cumplido >= 70 ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                      {stat.porcentaje_sla_cumplido.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className={`absolute h-full rounded-full transition-all ${
-                        stat.porcentaje_sla_cumplido >= 90 ? 'bg-green-500' :
-                        stat.porcentaje_sla_cumplido >= 70 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${Math.min(stat.porcentaje_sla_cumplido, 100)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                    <span>{stat.total_tickets} tickets</span>
-                    <span>{stat.tickets_sla_cumplido} cumplidos</span>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-
-        {/* Distribución de Cumplimiento */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-blue-600" />
-            Distribución de Agentes por Cumplimiento
-          </h3>
-          <div className="space-y-4">
-            {(() => {
-              const excelente = sortedStats.filter(s => s.porcentaje_sla_cumplido >= 90).length;
-              const bueno = sortedStats.filter(s => s.porcentaje_sla_cumplido >= 70 && s.porcentaje_sla_cumplido < 90).length;
-              const regular = sortedStats.filter(s => s.porcentaje_sla_cumplido >= 50 && s.porcentaje_sla_cumplido < 70).length;
-              const bajo = sortedStats.filter(s => s.porcentaje_sla_cumplido < 50).length;
-              const total = sortedStats.length || 1;
-
-              return (
-                <>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Excelente (≥90%)</span>
-                      <span className="text-sm font-bold text-green-600">{excelente} agentes</span>
-                    </div>
-                    <div className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <div className="absolute h-full bg-green-500 rounded-full" style={{ width: `${(excelente / total) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Bueno (70-89%)</span>
-                      <span className="text-sm font-bold text-yellow-600">{bueno} agentes</span>
-                    </div>
-                    <div className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <div className="absolute h-full bg-yellow-500 rounded-full" style={{ width: `${(bueno / total) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Regular (50-69%)</span>
-                      <span className="text-sm font-bold text-orange-600">{regular} agentes</span>
-                    </div>
-                    <div className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <div className="absolute h-full bg-orange-500 rounded-full" style={{ width: `${(regular / total) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Bajo (&lt;50%)</span>
-                      <span className="text-sm font-bold text-red-600">{bajo} agentes</span>
-                    </div>
-                    <div className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                      <div className="absolute h-full bg-red-500 rounded-full" style={{ width: `${(bajo / total) * 100}%` }} />
-                    </div>
-                  </div>
-                </>
-              );
-            })()}
+          <div className="text-3xl font-bold text-gray-900 dark:text-white">{validStats.length}</div>
+          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+              {validStats.filter(s => s.porcentaje_sla_cumplido >= 90).length} sobre meta
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-red-500" />
+              {validStats.filter(s => s.porcentaje_sla_cumplido < 70).length} bajo 70%
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Tabla de Estadísticas */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Detalle por Agente
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Click en las columnas para ordenar
-          </p>
+      {/* Tabla principal de agentes */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+        {/* Filter bar */}
+        <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center gap-3">
+          <Filter className="w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={filterAgente}
+            onChange={(e) => setFilterAgente(e.target.value)}
+            placeholder="Buscar agente..."
+            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-48 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+          />
+          {hasActiveFilters && (
+            <button
+              onClick={() => setFilterAgente('')}
+              className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 font-medium"
+            >
+              Limpiar filtro
+            </button>
+          )}
+          <span className="ml-auto text-xs text-gray-400">
+            {filteredAndSorted.length}{filteredAndSorted.length !== validStats.length ? ` de ${validStats.length}` : ''} agente(s)
+          </span>
         </div>
 
-        {sortedStats.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-            <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-50" />
-            <p>No hay datos disponibles para el período seleccionado</p>
+        {filteredAndSorted.length === 0 ? (
+          <div className="text-center py-16 text-gray-400">
+            <Calendar className="w-12 h-12 mx-auto mb-3 opacity-40" />
+            <p>Sin datos para el período o filtros seleccionados</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                  <th 
-                    onClick={() => handleSort('agente')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    Agente {sortBy === 'agente' && (sortOrder === 'asc' ? '↑' : '↓')}
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100 dark:border-gray-700">
+                  <SortHeader column="agente" tooltip="Nombre del agente de Soporte IT que cerró los tickets. Se obtiene de la tabla ost_staff.">Agente</SortHeader>
+                  <SortHeader column="total_tickets" tooltip="Cantidad total de tickets cerrados por este agente en el período. Se filtra por fecha de cierre (t.closed).">Tickets</SortHeader>
+                  <SortHeader column="porcentaje_sla_cumplido" tooltip="Porcentaje de tickets resueltos dentro del plazo SLA asignado. Se calcula comparando las horas hábiles de resolución contra el grace_period del SLA del ticket.">Cumplimiento</SortHeader>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip text="Desglose: tickets cumplidos (verde) y vencidos (rojo). Un ticket se considera cumplido si sus horas hábiles de resolución son menores o iguales al grace_period del SLA." position="below">
+                      <span>Detalle</span>
+                    </Tooltip>
                   </th>
-                  <th 
-                    onClick={() => handleSort('nombre_sla')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    SLA {sortBy === 'nombre_sla' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    onClick={() => handleSort('total_tickets')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    Total {sortBy === 'total_tickets' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    onClick={() => handleSort('tickets_sla_cumplido')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    Cumplidos {sortBy === 'tickets_sla_cumplido' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    onClick={() => handleSort('tickets_sla_vencido')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    Vencidos {sortBy === 'tickets_sla_vencido' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    onClick={() => handleSort('porcentaje_sla_cumplido')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    % Cumplimiento {sortBy === 'porcentaje_sla_cumplido' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    onClick={() => handleSort('diferencia_sla_horas')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    Diferencia SLA {sortBy === 'diferencia_sla_horas' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    T. Promedio Resolución
+                  <SortHeader column="diferencia_sla_horas" tooltip="Diferencia promedio entre el tiempo SLA permitido y el tiempo real de resolución. Positivo = resolvió antes del límite. Negativo = se excedió del SLA.">Dif. SLA</SortHeader>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip text="Tiempo promedio que tarda el agente en resolver un ticket, medido en horas hábiles (Lun-Vie 8:30-17:30, sin feriados). Se calcula desde la creación hasta el cierre del ticket." position="below">
+                      <span>T. Resolución</span>
+                    </Tooltip>
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {sortedStats.map((stat, index) => {
-                  const cumplimientoColor = 
-                    stat.porcentaje_sla_cumplido >= 90 ? 'text-green-600 font-bold' :
-                    stat.porcentaje_sla_cumplido >= 70 ? 'text-yellow-600 font-semibold' :
-                    'text-red-600 font-bold';
-
-                  const diferenciaColor = 
-                    stat.diferencia_sla_horas >= 5 ? 'text-green-600 font-semibold' :
-                    stat.diferencia_sla_horas >= 0 ? 'text-yellow-600' :
-                    'text-red-600 font-bold';
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                {filteredAndSorted.map((stat) => {
+                  const pct = stat.porcentaje_sla_cumplido;
+                  const barColor = pct >= 90 ? 'bg-green-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-red-500';
+                  const textColor = pct >= 90 ? 'text-green-600' : pct >= 70 ? 'text-yellow-600' : 'text-red-600';
+                  const diffColor = stat.diferencia_sla_horas >= 0 ? 'text-green-600' : 'text-red-600';
 
                   return (
-                    <tr key={`${stat.staff_id}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {stat.agente}
-                          </span>
-                          {stat.mes_nombre && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {stat.mes_nombre} {stat.anio}
-                            </span>
-                          )}
-                        </div>
+                    <tr key={stat.staff_id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
+                      <td className="px-4 py-3.5">
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{stat.agente}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-xs font-medium">
-                          {stat.nombre_sla}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <td className="px-4 py-3.5 text-sm text-gray-700 dark:text-gray-300 font-medium">
                         {stat.total_tickets}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
-                        {stat.tickets_sla_cumplido}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400">
-                        {stat.tickets_sla_vencido}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-sm ${cumplimientoColor}`}>
-                            {stat.porcentaje_sla_cumplido.toFixed(1)}%
-                          </span>
-                          <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full ${
-                                stat.porcentaje_sla_cumplido >= 90 ? 'bg-green-500' :
-                                stat.porcentaje_sla_cumplido >= 70 ? 'bg-yellow-500' :
-                                'bg-red-500'
-                              }`}
-                              style={{ width: `${Math.min(stat.porcentaje_sla_cumplido, 100)}%` }}
-                            ></div>
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 max-w-[120px]">
+                            <div className="relative h-2 bg-gray-100 dark:bg-gray-700 rounded-full">
+                              <div className={`h-2 rounded-full ${barColor} transition-all`}
+                                style={{ width: `${Math.min(pct, 100)}%` }} />
+                            </div>
                           </div>
+                          <span className={`text-sm font-bold ${textColor} min-w-[50px]`}>
+                            {pct.toFixed(1)}%
+                          </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`text-sm ${diferenciaColor}`}>
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-green-600 dark:text-green-400 font-medium">{stat.tickets_sla_cumplido}</span>
+                          <span className="text-gray-300 dark:text-gray-600">/</span>
+                          <span className="text-red-600 dark:text-red-400 font-medium">{stat.tickets_sla_vencido}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className={`text-sm font-medium ${diffColor}`}>
                           {stat.diferencia_sla_promedio}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                      <td className="px-4 py-3.5 text-sm text-gray-600 dark:text-gray-400">
                         {stat.tiempo_promedio_resolucion}
                       </td>
                     </tr>
@@ -666,11 +438,9 @@ const SLAStatsView: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-        <p>
-          Mostrando {sortedStats.length} agente(s) • Última actualización: {new Date().toLocaleString('es-AR')}
-        </p>
-      </div>
+      <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+        {filteredAndSorted.length} agente(s) &middot; Solo tickets cerrados con agente asignado &middot; {new Date().toLocaleString('es-AR')}
+      </p>
     </div>
   );
 };
