@@ -19,26 +19,26 @@ const SettingsView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-subtle)' }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="py-8">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                <h1 className="font-display" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
                   Configuración
                 </h1>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                <p style={{ marginTop: '0.35rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
                   Personaliza tu experiencia en el dashboard de OsTicket.
                 </p>
               </div>
               {isDirty && (
-                <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center gap-2" style={{ background: 'var(--accent-primary-glow)', color: 'var(--accent-primary-light)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-active)' }}>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
-                  <span className="text-sm font-medium">Cambios sin guardar</span>
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 500 }}>Cambios sin guardar</span>
                 </div>
               )}
             </div>
@@ -51,18 +51,18 @@ const SettingsView: React.FC = () => {
         <div className="space-y-8">
           
           {/* Appearance Settings */}
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <Card className="" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}>
             <CardHeader>
-              <CardTitle className="text-lg font-medium text-gray-900 dark:text-white">
+              <CardTitle className="text-lg font-medium font-display">
                 Tema y Apariencia
               </CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-400">
+              <CardDescription style={{ color: 'var(--text-muted)' }}>
                 Configura el aspecto visual del dashboard
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <Label className="text-sm font-medium text-gray-900 dark:text-white mb-3 block">
+                <Label className="text-sm font-medium mb-3 block" style={{ color: 'var(--text-primary)' }}>
                   Selector de tema
                 </Label>
                 <div className="grid grid-cols-3 gap-3">
@@ -102,12 +102,12 @@ const SettingsView: React.FC = () => {
           </Card>
 
           {/* Dashboard Settings */}
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <Card className="" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}>
             <CardHeader>
-              <CardTitle className="text-lg font-medium text-gray-900 dark:text-white">
+              <CardTitle className="text-lg font-medium font-display">
                 Dashboard y Métricas
               </CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-400">
+              <CardDescription style={{ color: 'var(--text-muted)' }}>
                 Configura la visualización y actualización de datos
               </CardDescription>
             </CardHeader>
@@ -116,10 +116,10 @@ const SettingsView: React.FC = () => {
               {/* Auto Refresh */}
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <Label htmlFor="auto-refresh" className="text-sm font-medium text-gray-900 dark:text-white">
+                  <Label htmlFor="auto-refresh" className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                     Actualización automática
                   </Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     Actualizar datos del dashboard automáticamente
                   </p>
                 </div>
@@ -132,19 +132,19 @@ const SettingsView: React.FC = () => {
 
               {/* Refresh Interval */}
               {config.autoRefresh && (
-                <div className="pl-4 border-l-2 border-gray-200 dark:border-gray-600">
+                <div className="pl-4" style={{ borderLeft: '2px solid var(--border-default)' }}>
                   <div className="space-y-2">
-                    <Label htmlFor="refresh-interval" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Label htmlFor="refresh-interval" className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                       Intervalo de actualización
                     </Label>
                     <Select 
                       value={config.refreshInterval.toString()} 
                       onValueChange={(value) => updateConfig({ refreshInterval: parseInt(value) })}
                     >
-                      <SelectTrigger className="w-48 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+                      <SelectTrigger className="w-48" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600">
+                      <SelectContent style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}>
                         <SelectItem value="10">10 segundos</SelectItem>
                         <SelectItem value="30">30 segundos</SelectItem>
                         <SelectItem value="60">1 minuto</SelectItem>
@@ -158,10 +158,10 @@ const SettingsView: React.FC = () => {
               {/* Table Size */}
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <Label htmlFor="table-size" className="text-sm font-medium text-gray-900 dark:text-white">
+                  <Label htmlFor="table-size" className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                     Registros por página
                   </Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     Número predeterminado de tickets en tablas
                   </p>
                 </div>
@@ -169,10 +169,10 @@ const SettingsView: React.FC = () => {
                   value={config.defaultTableSize.toString()} 
                   onValueChange={(value) => updateConfig({ defaultTableSize: parseInt(value) })}
                 >
-                  <SelectTrigger className="w-48 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+                  <SelectTrigger className="w-48" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600">
+                  <SelectContent style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}>
                     <SelectItem value="25">25 registros</SelectItem>
                     <SelectItem value="50">50 registros</SelectItem>
                     <SelectItem value="100">100 registros</SelectItem>
@@ -184,22 +184,22 @@ const SettingsView: React.FC = () => {
           </Card>
 
           {/* Export Settings */}
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <Card className="" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}>
             <CardHeader>
-              <CardTitle className="text-lg font-medium text-gray-900 dark:text-white">
+              <CardTitle className="text-lg font-medium font-display">
                 Exportación de Datos
               </CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-400">
+              <CardDescription style={{ color: 'var(--text-muted)' }}>
                 Configura las opciones de exportación de reportes
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <Label htmlFor="export-format" className="text-sm font-medium text-gray-900 dark:text-white">
+                  <Label htmlFor="export-format" className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                     Formato de exportación
                   </Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     Formato predeterminado para descargar reportes
                   </p>
                 </div>
@@ -207,10 +207,10 @@ const SettingsView: React.FC = () => {
                   value={config.defaultExportFormat} 
                   onValueChange={(value) => updateConfig({ defaultExportFormat: value as 'xlsx' | 'csv' })}
                 >
-                  <SelectTrigger className="w-48 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+                  <SelectTrigger className="w-48" style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600">
+                  <SelectContent style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}>
                     <SelectItem value="xlsx">Excel (.xlsx)</SelectItem>
                     <SelectItem value="csv">CSV (.csv)</SelectItem>
                     <SelectItem value="pdf">PDF (.pdf)</SelectItem>
@@ -221,34 +221,34 @@ const SettingsView: React.FC = () => {
           </Card>
 
           {/* System Status */}
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <Card className="" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}>
             <CardHeader>
-              <CardTitle className="text-lg font-medium text-gray-900 dark:text-white">
+              <CardTitle className="text-lg font-medium font-display">
                 Estado del Sistema
               </CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-400">
+              <CardDescription style={{ color: 'var(--text-muted)' }}>
                 Información del estado actual del sistema
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Conexión a base de datos</span>
+                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Conexión a base de datos</span>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-green-600 dark:text-green-400">Conectado</span>
+                    <span className="text-sm font-medium" style={{ color: 'var(--success)' }}>Conectado</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">API del servidor</span>
+                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>API del servidor</span>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-green-600 dark:text-green-400">Operativo</span>
+                    <span className="text-sm font-medium" style={{ color: 'var(--success)' }}>Operativo</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Última sincronización</span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Hace 2 minutos</span>
+                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Última sincronización</span>
+                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Hace 2 minutos</span>
                 </div>
               </div>
             </CardContent>
@@ -258,7 +258,7 @@ const SettingsView: React.FC = () => {
           <div className="flex justify-end gap-3 pt-4">
             <Button 
               variant="outline" 
-              className="border-gray-300 dark:border-gray-600"
+              style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }}
               onClick={resetConfig}
             >
               Restablecer
@@ -273,12 +273,12 @@ const SettingsView: React.FC = () => {
             
             {/* Feedback de guardado exitoso */}
             {showSaveSuccess && (
-              <div className="fixed top-4 right-4 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg border border-green-200 dark:border-green-800 shadow-lg z-50">
+              <div className="fixed top-4 right-4 z-50" style={{ background: 'var(--bg-secondary)', color: 'var(--success)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', boxShadow: 'var(--shadow-lg)' }}>
                 <div className="flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="font-medium">Configuración guardada correctamente</span>
+                  <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>Configuración guardada correctamente</span>
                 </div>
               </div>
             )}

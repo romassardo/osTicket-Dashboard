@@ -606,9 +606,11 @@ router.get('/monthly-comparison', async (req, res, next) => {
       };
     };
 
-    // Obtener datos para ambos meses
-    const month1Data = await getMonthFlowData(year1, month1);
-    const month2Data = await getMonthFlowData(year2, month2);
+    // Obtener datos para ambos meses en paralelo (antes era secuencial)
+    const [month1Data, month2Data] = await Promise.all([
+      getMonthFlowData(year1, month1),
+      getMonthFlowData(year2, month2)
+    ]);
 
     // Calcular tickets pendientes que pasaron entre meses
     // Para esto necesitamos los tickets que estaban pendientes al final del mes1 

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { SoundProvider } from './context/SoundContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { SidebarProvider } from './context/SidebarContext';
+import { FilterProvider } from './context/FilterContext';
 import { Suspense, lazy } from 'react';
 
 // Lazy load components for code splitting
@@ -18,9 +19,9 @@ import './App.css'; // Mantendremos App.css por si queremos estilos globales ini
 
 // Loading component for Suspense fallback
 const LoadingSpinner = () => (
-  <div className="flex items-center justify-center min-h-screen bg-[#0a0e14]">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#00d9ff]"></div>
-    <span className="ml-3 text-[#b8c5d6]">Cargando...</span>
+  <div className="flex items-center justify-center min-h-screen" style={{ background: 'var(--bg-primary)' }}>
+    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2" style={{ borderColor: 'var(--accent-primary)' }}></div>
+    <span className="ml-3" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: '0.875rem' }}>Cargando...</span>
   </div>
 );
 
@@ -29,6 +30,7 @@ function App() {
     <SoundProvider>
       <NotificationProvider>
         <SidebarProvider>
+          <FilterProvider>
           <BrowserRouter basename="/dashboard">
             <Suspense fallback={<LoadingSpinner />}>
               <Routes>
@@ -44,6 +46,7 @@ function App() {
             </Routes>
           </Suspense>
         </BrowserRouter>
+          </FilterProvider>
         </SidebarProvider>
       </NotificationProvider>
     </SoundProvider>

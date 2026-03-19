@@ -1,6 +1,7 @@
 // Importar los módulos necesarios
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const dotenv = require('dotenv');
 const path = require('path');
 
@@ -50,6 +51,9 @@ app.use(express.json());
 
 // Middleware para habilitar CORS
 app.use(cors()); // Esto permitirá todas las solicitudes CORS por defecto
+
+// Compresión gzip/brotli para reducir tamaño de respuestas (~60-80% menos)
+app.use(compression());
 // Para configuraciones más específicas, consulta la documentación de CORS: https://www.npmjs.com/package/cors
 // Ejemplo: app.use(cors({ origin: 'http://localhost:5173' }));
 

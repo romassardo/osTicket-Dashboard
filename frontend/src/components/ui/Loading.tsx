@@ -56,7 +56,7 @@ export const SkeletonChartCard: React.FC<{ height?: string }> = ({ height = "h-6
 // Skeleton para Header del Dashboard
 export const SkeletonHeader: React.FC = () => {
   return (
-    <div className="col-span-12 backdrop-blur-md bg-[var(--bg-secondary)]/80 rounded-xl p-6 mb-8 shadow-lg border border-[var(--bg-accent)]/20">
+    <div className="col-span-12 rounded-xl mb-6" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)', padding: '1.25rem 1.75rem' }}>
       <div className="flex items-center w-full">
         <div className="flex-1">
           <div className="h-8 w-48 bg-[var(--bg-tertiary)] rounded loading-shimmer mb-2"></div>

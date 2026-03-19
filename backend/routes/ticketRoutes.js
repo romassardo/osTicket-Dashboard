@@ -12,7 +12,7 @@ const asyncHandler = fn => (req, res, next) => {
 
 // GET /api/tickets - Ruta principal para la tabla de tickets
 router.get('/', asyncHandler(async (req, res) => {
-    const { page = 1, limit = 100, search, status, statuses, staff, sector, transporte, sla, startDate, endDate } = req.query;
+    const { page = 1, limit = 100, search, status, statuses, staff, sector, transporte, sla, requestType, startDate, endDate } = req.query;
     const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
     
     let where = {};
@@ -42,6 +42,29 @@ router.get('/', asyncHandler(async (req, res) => {
         }
     }
     
+    // Filtro por tipo de solicitud (TPSolicitud) - usa subquery en ost_form_entry_values
+    if (requestType && requestType !== 'all') {
+        const sequelize = require('../models').sequelize;
+        const fieldRows = await sequelize.query(
+            "SELECT `id` AS field_id FROM `ost_form_field` WHERE `name` LIKE '%tpsolicitud%' OR `name` LIKE '%TPSolicitud%' OR `label` LIKE '%TPSolicitud%' LIMIT 1",
+            { type: sequelize.QueryTypes.SELECT }
+        );
+        if (fieldRows && fieldRows.length > 0) {
+            const matchingTickets = await sequelize.query(`
+                SELECT fe.object_id AS ticket_id
+                FROM ost_form_entry_values fev
+                INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
+                WHERE fe.object_type = 'T' AND fev.field_id = :fieldId
+                  AND fev.value LIKE :pattern
+            `, {
+                replacements: { fieldId: fieldRows[0].field_id, pattern: `%${requestType}%` },
+                type: sequelize.QueryTypes.SELECT
+            });
+            const ids = matchingTickets.map(r => r.ticket_id);
+            where.ticket_id = { ...(where.ticket_id || {}), [Op.in]: ids.length > 0 ? ids : [0] };
+        }
+    }
+
     // Filtro por rango de fechas (manejando zona horaria Argentina GMT-3)
     // NUEVO: Lógica automática inteligente según estado seleccionado
     if (startDate && endDate) {
@@ -151,8 +174,12 @@ router.get('/', asyncHandler(async (req, res) => {
     
     logger.debug(`Consulta completada - Total: ${count}, Devolviendo: ${rows.length}`);
     
+    // Enriquecer con Tipo de Solicitud (TPSolicitud)
+    const sequelizeInstance = require('../models').sequelize;
+    const enrichedRows = await enrichWithRequestType(rows, sequelizeInstance);
+
     res.json({
-        tickets: rows,
+        tickets: enrichedRows,
         pagination: {
             total_items: count,
             total_pages: Math.ceil(count / parseInt(limit, 10)),
@@ -167,7 +194,7 @@ router.get('/reports', async (req, res) => {
     logger.info('GET /api/tickets/reports');
     logger.info(`Query recibido: ${JSON.stringify(req.query)}`);
 
-    const { page = 1, limit = 10, search, month, year, status, priority, department, sla, team, topic, location, staff, sector, transporte, startDate, endDate } = req.query;
+    const { page = 1, limit = 10, search, month, year, status, priority, department, sla, team, topic, location, staff, sector, transporte, requestType, startDate, endDate } = req.query;
     logger.info('Paso 1: Parámetros extraídos.');
 
     const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
@@ -256,6 +283,28 @@ router.get('/reports', async (req, res) => {
             where.sla_id = slaId;
         }
     }
+    // Filtro por tipo de solicitud (TPSolicitud)
+    if (requestType && requestType !== 'all') {
+        const sequelizeInst = require('../models').sequelize;
+        const fieldRows = await sequelizeInst.query(
+            "SELECT `id` AS field_id FROM `ost_form_field` WHERE `name` LIKE '%tpsolicitud%' OR `name` LIKE '%TPSolicitud%' OR `label` LIKE '%TPSolicitud%' LIMIT 1",
+            { type: sequelizeInst.QueryTypes.SELECT }
+        );
+        if (fieldRows && fieldRows.length > 0) {
+            const matchingTickets = await sequelizeInst.query(`
+                SELECT fe.object_id AS ticket_id
+                FROM ost_form_entry_values fev
+                INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
+                WHERE fe.object_type = 'T' AND fev.field_id = :fieldId
+                  AND fev.value LIKE :pattern
+            `, {
+                replacements: { fieldId: fieldRows[0].field_id, pattern: `%${requestType}%` },
+                type: sequelizeInst.QueryTypes.SELECT
+            });
+            const ids = matchingTickets.map(r => r.ticket_id);
+            where.ticket_id = { ...(where.ticket_id || {}), [Op.in]: ids.length > 0 ? ids : [0] };
+        }
+    }
 
     // Filtro por rango de fechas para reportes
     if (startDate && endDate) {
@@ -311,8 +360,12 @@ router.get('/reports', async (req, res) => {
 
         logger.info(`[REPORTS_LOG] ✅ Consulta exitosa. Tickets encontrados: ${count}.`);
 
+        // Enriquecer con Tipo de Solicitud (TPSolicitud)
+        const sequelizeForEnrich = require('../models').sequelize;
+        const enrichedRows = await enrichWithRequestType(rows, sequelizeForEnrich);
+
         return res.status(200).json({
-            tickets: rows,
+            tickets: enrichedRows,
             pagination: {
                 total_items: count,
                 total_pages: Math.ceil(count / parseInt(limit, 10)),
@@ -841,6 +894,117 @@ router.get('/options/status', asyncHandler(async (req, res) => {
     logger.error('Error obteniendo opciones de status:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
+}));
+
+// Helper: Obtener TPSolicitud (Tipo de Solicitud) para un array de tickets
+// Hace un batch query y mergea el resultado en cada ticket
+async function enrichWithRequestType(tickets, sequelize) {
+    if (!tickets || tickets.length === 0) return tickets;
+
+    const ticketIds = tickets.map(t => t.ticket_id || t.dataValues?.ticket_id).filter(Boolean);
+    if (ticketIds.length === 0) return tickets;
+
+    try {
+        // Buscar field_id de TPSolicitud
+        const fieldRows = await sequelize.query(
+            "SELECT `id` AS field_id FROM `ost_form_field` WHERE `name` LIKE '%tpsolicitud%' OR `name` LIKE '%TPSolicitud%' OR `label` LIKE '%TPSolicitud%' OR `label` LIKE '%Tipo de Solicitud%' LIMIT 1",
+            { type: sequelize.QueryTypes.SELECT }
+        );
+        if (!fieldRows || fieldRows.length === 0) return tickets;
+        const fieldId = fieldRows[0].field_id;
+
+        // Batch query para todos los tickets de la página
+        const values = await sequelize.query(`
+            SELECT fe.object_id AS ticket_id, fev.value AS raw_val
+            FROM ost_form_entry_values fev
+            INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
+            WHERE fe.object_type = 'T'
+              AND fev.field_id = :fieldId
+              AND fe.object_id IN (:ticketIds)
+              AND fev.value IS NOT NULL AND fev.value != ''
+        `, {
+            replacements: { fieldId, ticketIds },
+            type: sequelize.QueryTypes.SELECT
+        });
+
+        // Parsear JSON values → mapa ticket_id → nombre
+        const parseValue = (raw) => {
+            if (!raw) return null;
+            try {
+                const parsed = JSON.parse(raw);
+                if (typeof parsed === 'object' && parsed !== null) {
+                    const vals = Object.values(parsed);
+                    return vals.length > 0 ? String(vals[0]) : null;
+                }
+                return String(parsed);
+            } catch { return String(raw); }
+        };
+
+        const map = {};
+        for (const v of values) {
+            map[v.ticket_id] = parseValue(v.raw_val);
+        }
+
+        // Mergear en tickets (funciona con objetos Sequelize y plain objects)
+        return tickets.map(t => {
+            const id = t.ticket_id || t.dataValues?.ticket_id;
+            const plain = typeof t.toJSON === 'function' ? t.toJSON() : t;
+            plain.requestType = map[id] || null;
+            return plain;
+        });
+    } catch (err) {
+        logger.error('Error enriching tickets with requestType:', err.message);
+        return tickets;
+    }
+}
+
+// GET /api/tickets/options/requestType - Obtener opciones de Tipo de Solicitud
+router.get('/options/requestType', asyncHandler(async (req, res) => {
+    const sequelize = require('../models').sequelize;
+    try {
+        const fieldRows = await sequelize.query(
+            "SELECT `id` AS field_id FROM `ost_form_field` WHERE `name` LIKE '%tpsolicitud%' OR `name` LIKE '%TPSolicitud%' OR `label` LIKE '%TPSolicitud%' OR `label` LIKE '%Tipo de Solicitud%' LIMIT 1",
+            { type: sequelize.QueryTypes.SELECT }
+        );
+        if (!fieldRows || fieldRows.length === 0) return res.json([]);
+
+        const rows = await sequelize.query(`
+            SELECT DISTINCT fev.value AS raw_val
+            FROM ost_form_entry_values fev
+            INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
+            INNER JOIN ost_ticket t ON fe.object_id = t.ticket_id
+            INNER JOIN ost_department d ON t.dept_id = d.id
+            WHERE fe.object_type = 'T'
+              AND fev.field_id = :fieldId
+              AND fev.value IS NOT NULL AND fev.value != ''
+              AND d.name IN ('Soporte Informatico', 'Soporte IT')
+        `, {
+            replacements: { fieldId: fieldRows[0].field_id },
+            type: sequelize.QueryTypes.SELECT
+        });
+
+        // Parsear y deduplicar
+        const seen = new Set();
+        const options = [];
+        for (const r of rows) {
+            let name = r.raw_val;
+            try {
+                const parsed = JSON.parse(name);
+                if (typeof parsed === 'object' && parsed !== null) {
+                    name = String(Object.values(parsed)[0] || '');
+                }
+            } catch { /* plain string */ }
+            if (name && !seen.has(name)) {
+                seen.add(name);
+                options.push({ id: name, name });
+            }
+        }
+        options.sort((a, b) => a.name.localeCompare(b.name));
+        res.json(options);
+    } catch (error) {
+        logger.error('Error obteniendo opciones de requestType:', error.message);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
 }));
 
 // GET /api/tickets/:id - Obtener detalle completo de un ticket específico

@@ -78,6 +78,7 @@ const AnalyticsView: React.FC = memo(() => {
       if (currentFilters.staff) params.append('staff', currentFilters.staff);
       if (currentFilters.sector) params.append('sector', currentFilters.sector);
       if (currentFilters.status) params.append('status', currentFilters.status);
+      if (currentFilters.requestType) params.append('requestType', currentFilters.requestType);
       if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
       if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
       // NOTA: slaStatus se maneja solo en frontend, no se envía al backend
@@ -115,6 +116,7 @@ const AnalyticsView: React.FC = memo(() => {
       if (currentFilters.staff) params.append('staff', currentFilters.staff);
       if (currentFilters.sector) params.append('sector', currentFilters.sector);
       if (currentFilters.status) params.append('status', currentFilters.status);
+      if (currentFilters.requestType) params.append('requestType', currentFilters.requestType);
       if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
       if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
 
@@ -146,6 +148,7 @@ const AnalyticsView: React.FC = memo(() => {
     if (advancedFilters.selectedSla) newFilters.sla = advancedFilters.selectedSla;
     if (advancedFilters.selectedStaff) newFilters.staff = advancedFilters.selectedStaff;
     if (advancedFilters.selectedSector) newFilters.sector = advancedFilters.selectedSector;
+    if (advancedFilters.selectedRequestType) newFilters.requestType = advancedFilters.selectedRequestType;
     if (advancedFilters.selectedStatuses && advancedFilters.selectedStatuses.length > 0) {
       newFilters.status = advancedFilters.selectedStatuses[0];
     }
@@ -184,6 +187,7 @@ const AnalyticsView: React.FC = memo(() => {
     if (filters.staff) count++;
     if (filters.sector) count++;
     if (filters.status) count++;
+    if (filters.requestType) count++;
     if (filters.startDate || filters.endDate) count++;
     if (filters.slaStatus) count++;
     return count;
@@ -310,49 +314,38 @@ const AnalyticsView: React.FC = memo(() => {
   );
 
   return (
-    <div className="max-w-1400 mx-auto px-8 py-12 bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-white">
-      {/* Header Dashboard según guía de diseño */}
-      <div className="dashboard-header flex justify-between items-center mb-8">
-        <div className="header-left">
-          <h1 className="text-h1 text-[1.875rem] leading-[1.3] font-semibold text-gray-900 dark:text-white mb-1">Análisis Avanzado de Tickets</h1>
-          <span className="text-small text-[0.75rem] leading-[1.4] text-gray-600 dark:text-gray-300">Última actualización: {new Date().toLocaleTimeString()}</span>
+    <div style={{ maxWidth: 1400, margin: '0 auto', padding: '1.5rem 2rem', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="font-display" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>Análisis Avanzado de Tickets</h1>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>Actualizado: {new Date().toLocaleTimeString()}</span>
         </div>
-        <div className="header-right flex space-x-4">
-          <div className="flex space-x-2">
-            <button 
-              onClick={exportToExcel}
-              disabled={isExporting || isLoading}
-              className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200 ${
-                isExporting || isLoading 
-                  ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-                  : 'bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300'
-              }`}
-              title="Exportar como Excel (.xlsx - archivo Excel nativo)"
-            >
-              <DocumentChartBarIcon className="w-5 h-5 mr-2" />
-              <span>{isExporting ? 'Exportando...' : 'Excel'}</span>
-            </button>
-            <button 
-              onClick={exportToCSV}
-              disabled={isExporting || isLoading}
-              className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200 ${
-                isExporting || isLoading 
-                  ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-                  : 'bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300'
-              }`}
-              title="Exportar como CSV (.csv)"
-            >
-              <DocumentChartBarIcon className="w-5 h-5 mr-2" />
-              <span>{isExporting ? 'Exportando...' : 'CSV'}</span>
-            </button>
-          </div>
-          
+        <div className="flex space-x-2">
+          <button 
+            onClick={exportToExcel}
+            disabled={isExporting || isLoading}
+            className="header-button"
+            title="Exportar como Excel (.xlsx)"
+          >
+            <DocumentChartBarIcon className="w-4 h-4" />
+            <span>{isExporting ? 'Exportando...' : 'Excel'}</span>
+          </button>
+          <button 
+            onClick={exportToCSV}
+            disabled={isExporting || isLoading}
+            className="header-button"
+            title="Exportar como CSV (.csv)"
+          >
+            <DocumentChartBarIcon className="w-4 h-4" />
+            <span>{isExporting ? 'Exportando...' : 'CSV'}</span>
+          </button>
           <button
             onClick={() => fetchTickets(filters, currentPage)}
             disabled={isLoading}
-            className="flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-all duration-200 text-gray-700 dark:text-gray-300 disabled:opacity-50"
+            className="header-button"
           >
-            <ArrowPathIcon className="w-5 h-5 mr-2" />
+            <ArrowPathIcon className="w-4 h-4" />
             <span>Actualizar</span>
           </button>
         </div>
@@ -369,9 +362,9 @@ const AnalyticsView: React.FC = memo(() => {
       
       {/* Estado de carga con animación mejorada según guía */}
       {isLoading ? (
-        <div className="flex flex-col justify-center items-center h-64 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-600 p-8 animate-fadeIn">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 dark:border-cyan-400 mb-4"></div>
-          <p className="text-gray-700 dark:text-gray-300 text-base">Cargando datos...</p>
+        <div className="flex flex-col justify-center items-center h-64" style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)', padding: '2rem' }}>
+          <div className="animate-spin rounded-full h-10 w-10 mb-4" style={{ borderWidth: 2, borderStyle: 'solid', borderColor: 'var(--border-subtle)', borderTopColor: 'var(--accent-primary)' }}></div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Cargando datos...</p>
         </div>
       ) : (
         <>
@@ -386,11 +379,11 @@ const AnalyticsView: React.FC = memo(() => {
 
       {/* Indicador de exportación */}
       {isExporting && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-8 border border-gray-200 dark:border-slate-600 flex flex-col items-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 dark:border-cyan-400 mb-4"></div>
-            <p className="text-gray-700 dark:text-gray-300 text-lg">Procesando exportación...</p>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">Obteniendo todos los registros filtrados</p>
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+          <div className="flex flex-col items-center" style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-xl)', padding: '2rem', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-xl)' }}>
+            <div className="animate-spin rounded-full h-10 w-10 mb-4" style={{ borderWidth: 2, borderStyle: 'solid', borderColor: 'var(--border-subtle)', borderTopColor: 'var(--accent-primary)' }}></div>
+            <p style={{ color: 'var(--text-primary)', fontSize: '1rem', fontWeight: 500 }}>Procesando exportación...</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginTop: '0.5rem' }}>Obteniendo todos los registros filtrados</p>
           </div>
         </div>
       )}

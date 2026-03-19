@@ -4,9 +4,8 @@ import { TicketIcon, ClockIcon, CheckCircleIcon, ExclamationTriangleIcon } from 
 import { Tooltip } from '../ui/Tooltip';
 
 /**
- * Componente KPI Card siguiendo la guía de diseño DESIGN_GUIDE.md
- * Implementa el sistema de tokens de diseño y microinteracciones
- * Con soporte para iconos, subtítulos y tendencias
+ * KPI Card — Obsidian Executive Design
+ * Premium metric cards with left accent border and refined hierarchy
  */
 interface StatCardProps {
   title: string;
@@ -19,6 +18,13 @@ interface StatCardProps {
   tooltip?: string;
 }
 
+const iconAccentMap: Record<string, string> = {
+  total: 'var(--accent-primary)',
+  open: 'var(--warning)',
+  pending: 'var(--info)',
+  closed: 'var(--success)',
+};
+
 const StatCard: React.FC<StatCardProps> = ({ 
   title, 
   value, 
@@ -29,21 +35,21 @@ const StatCard: React.FC<StatCardProps> = ({
   className = '',
   tooltip
 }) => {
-  // Determinar si la tendencia es positiva o negativa
   const isTrendPositive = trend && trend.startsWith('+');
   const isTrendNegative = trend && trend.startsWith('-');
+  const accentColor = icon ? iconAccentMap[icon] || 'var(--accent-primary)' : 'var(--accent-primary)';
   
-  // Seleccionar el icono apropiado basado en la prop icon
   const renderIcon = () => {
+    const iconClass = "h-5 w-5";
     switch (icon) {
       case 'total':
-        return <TicketIcon className="h-6 w-6 text-[var(--accent-primary)]" />;
+        return <TicketIcon className={iconClass} style={{ color: accentColor }} />;
       case 'open':
-        return <ExclamationTriangleIcon className="h-6 w-6 text-[var(--warning)]" />;
+        return <ExclamationTriangleIcon className={iconClass} style={{ color: accentColor }} />;
       case 'pending':
-        return <ClockIcon className="h-6 w-6 text-[var(--info)]" />;
+        return <ClockIcon className={iconClass} style={{ color: accentColor }} />;
       case 'closed':
-        return <CheckCircleIcon className="h-6 w-6 text-[var(--success)]" />;
+        return <CheckCircleIcon className={iconClass} style={{ color: accentColor }} />;
       case 'custom':
         return iconCustom;
       default:
@@ -53,21 +59,45 @@ const StatCard: React.FC<StatCardProps> = ({
 
   const titleContent = (
     <div>
-      <h3 className="font-semibold text-[var(--text-primary)]">{title}</h3>
-      {subtitle && <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>}
+      <h3 style={{ fontFamily: 'var(--font-body)', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>{title}</h3>
+      {subtitle && <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: '2px 0 0', fontWeight: 400 }}>{subtitle}</p>}
     </div>
   );
 
   return (
-    <div className={`group relative overflow-hidden bg-[var(--bg-secondary)] rounded-xl p-6 shadow-lg border border-[var(--bg-accent)]/10 hover:border-[var(--accent-primary)]/20 transition-all duration-300 ${className}`}>
-      {/* Efecto decorativo en la tarjeta */}
-      <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-gradient-to-br from-[var(--accent-primary)]/5 to-transparent transform -translate-y-16 translate-x-16 group-hover:translate-x-14 transition-all duration-500"></div>
-      
-      <div className="flex justify-between items-start mb-4">
-        {/* Encabezado con icono */}
-        <div className="flex items-center">
+    <div 
+      className={`group relative overflow-hidden transition-all duration-300 ${className}`}
+      style={{
+        background: 'var(--bg-secondary)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '1.25rem 1.5rem',
+        border: '1px solid var(--border-subtle)',
+        borderLeft: `3px solid ${accentColor}`,
+        boxShadow: 'var(--shadow-sm)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+        e.currentTarget.style.borderColor = 'var(--border-default)';
+        e.currentTarget.style.borderLeftColor = accentColor;
+        e.currentTarget.style.transform = 'translateY(-1px)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+        e.currentTarget.style.borderColor = 'var(--border-subtle)';
+        e.currentTarget.style.borderLeftColor = accentColor;
+        e.currentTarget.style.transform = 'translateY(0)';
+      }}
+    >
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex items-center gap-3">
           {renderIcon() && (
-            <div className="mr-3 flex-shrink-0 rounded-lg bg-[var(--bg-tertiary)] p-2 group-hover:scale-110 transition-transform duration-300">
+            <div 
+              className="flex-shrink-0 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform duration-300"
+              style={{ 
+                width: 36, height: 36,
+                background: `color-mix(in srgb, ${accentColor} 12%, transparent)`,
+              }}
+            >
               {renderIcon()}
             </div>
           )}
@@ -80,24 +110,36 @@ const StatCard: React.FC<StatCardProps> = ({
           )}
         </div>
 
-        {/* Indicador de tendencia */}
         {trend && (
           <span 
-            className={`flex items-center text-xs px-2 py-1 rounded-full 
-              ${isTrendPositive ? 'text-[var(--success)] bg-[var(--success)]/10' : ''}
-              ${isTrendNegative ? 'text-[var(--error)] bg-[var(--error)]/10' : ''}
-              ${!isTrendPositive && !isTrendNegative ? 'text-[var(--text-muted)] bg-[var(--bg-tertiary)]' : ''}
-            `}
+            className="flex items-center"
+            style={{
+              fontSize: '0.6875rem',
+              fontWeight: 600,
+              fontFamily: 'var(--font-body)',
+              padding: '0.2rem 0.5rem',
+              borderRadius: 'var(--radius-full)',
+              color: isTrendPositive ? 'var(--success)' : isTrendNegative ? 'var(--error)' : 'var(--text-muted)',
+              background: isTrendPositive ? 'color-mix(in srgb, var(--success) 10%, transparent)' : isTrendNegative ? 'color-mix(in srgb, var(--error) 10%, transparent)' : 'var(--bg-tertiary)',
+            }}
           >
-            {isTrendPositive && <ArrowUpIcon className="h-3 w-3 mr-1" />}
-            {isTrendNegative && <ArrowDownIcon className="h-3 w-3 mr-1" />}
+            {isTrendPositive && <ArrowUpIcon className="h-3 w-3 mr-0.5" />}
+            {isTrendNegative && <ArrowDownIcon className="h-3 w-3 mr-0.5" />}
             {trend}
           </span>
         )}
       </div>
 
-      {/* Valor principal con animación de entrada */}
-      <div className="text-2xl md:text-3xl font-bold text-[var(--text-primary)] group-hover:translate-y-0 transform transition-all duration-300">
+      <div 
+        className="font-display"
+        style={{ 
+          fontSize: '1.75rem', 
+          fontWeight: 800, 
+          color: 'var(--text-primary)', 
+          lineHeight: 1.1,
+          letterSpacing: '-0.03em',
+        }}
+      >
         {typeof value === 'number' ? value.toLocaleString() : value}
       </div>
     </div>

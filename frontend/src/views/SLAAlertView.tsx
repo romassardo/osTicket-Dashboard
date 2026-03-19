@@ -119,13 +119,13 @@ const SLAAlertView: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', padding: '1.5rem' }}>
         <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+          <div className="h-8 rounded w-1/3" style={{ background: 'var(--bg-tertiary)' }} />
           <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-            {[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded-xl" />)}
+            {[1, 2, 3, 4].map(i => <div key={i} className="h-24 rounded-xl" style={{ background: 'var(--bg-tertiary)' }} />)}
           </div>
-          <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+          <div className="h-96 rounded-xl" style={{ background: 'var(--bg-tertiary)' }} />
         </div>
       </div>
     );
@@ -137,23 +137,23 @@ const SLAAlertView: React.FC = () => {
   const totalConProblema = resumen.tickets_vencidos + resumen.tickets_criticos + resumen.tickets_en_riesgo;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 space-y-6">
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', padding: '1.5rem' }} className="space-y-6">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5">
+      <div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)', padding: '1.25rem' }}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <AlertTriangle className="w-6 h-6 text-orange-500" />
+            <h1 className="font-display flex items-center gap-2" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+              <AlertTriangle className="w-5 h-5" style={{ color: 'var(--warning)' }} />
               Monitoreo SLA
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
               Tickets abiertos con riesgo de incumplimiento (horas hábiles Lun-Vie 8:30-17:30)
             </p>
           </div>
           <button
             onClick={() => fetchAlerts(true)}
             disabled={refreshing}
-            className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center gap-1.5 self-start"
+            style={{ padding: '0.4rem 0.75rem', fontSize: '0.8125rem', background: 'var(--accent-primary)', color: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: 'none', cursor: refreshing ? 'not-allowed' : 'pointer', fontWeight: 600, fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: '0.375rem', alignSelf: 'flex-start', transition: 'all 150ms ease' }}
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? 'Actualizando...' : 'Actualizar'}

@@ -148,24 +148,25 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Overlay */}
         <div 
-          className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-80"
+          className="fixed inset-0 transition-opacity"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
           onClick={onClose}
         />
 
         {/* Modal - Versión simplificada para debugging */}
-        <div className="relative inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-slate-800 shadow-xl rounded-2xl z-50">
+        <div className="relative inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform z-50" style={{ background: 'var(--bg-secondary)', boxShadow: 'var(--shadow-xl)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border-subtle)' }}>
           {/* Header */}
-          <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-slate-600">
+          <div className="flex items-center justify-between pb-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                <DocumentTextIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              <div style={{ padding: '0.5rem', background: 'var(--accent-primary-glow)', borderRadius: 'var(--radius-md)' }}>
+                <DocumentTextIcon className="w-6 h-6" style={{ color: 'var(--accent-primary)' }} />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                <h2 className="font-display" style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                   Detalle del Ticket
                 </h2>
                 {ticketDetail && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
                     #{ticketDetail.number}
                   </p>
                 )}
@@ -173,9 +174,10 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700"
+              className="transition-colors"
+              style={{ padding: '0.5rem', color: 'var(--text-muted)', borderRadius: 'var(--radius-md)', border: 'none', background: 'transparent', cursor: 'pointer' }}
             >
-              <XMarkIcon className="w-6 h-6" />
+              <XMarkIcon className="w-5 h-5" />
             </button>
           </div>
 
@@ -183,20 +185,20 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
           <div className="mt-6">
             {loading && (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
-                <span className="ml-3 text-gray-600 dark:text-gray-300">Cargando detalle del ticket...</span>
+                <div className="animate-spin rounded-full h-8 w-8" style={{ borderWidth: 2, borderStyle: 'solid', borderColor: 'var(--border-subtle)', borderTopColor: 'var(--accent-primary)' }}></div>
+                <span className="ml-3" style={{ color: 'var(--text-secondary)' }}>Cargando detalle del ticket...</span>
               </div>
             )}
 
             {error && (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
-                  <ExclamationTriangleIcon className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                  <p className="text-red-600 dark:text-red-400 font-medium">Error al cargar el ticket</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{error}</p>
+                  <ExclamationTriangleIcon className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--error)' }} />
+                  <p style={{ color: 'var(--error)', fontWeight: 500 }}>Error al cargar el ticket</p>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>{error}</p>
                   <button
                     onClick={fetchTicketDetail}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: 'var(--accent-primary)', color: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'var(--font-body)' }}
                   >
                     Reintentar
                   </button>
@@ -207,8 +209,8 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
             {ticketDetail && !loading && !error && (
               <div className="space-y-6">
                 {/* Información General */}
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                  <h3 className="font-display flex items-center mb-4" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                     <InformationCircleIcon className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
                     Información General
                   </h3>
@@ -285,8 +287,8 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                 </div>
 
                 {/* Personas Involucradas */}
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                  <h3 className="font-display flex items-center mb-4" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                     <UserGroupIcon className="w-5 h-5 mr-2 text-purple-600 dark:text-purple-400" />
                     Personas Involucradas
                   </h3>
@@ -322,8 +324,8 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                 </div>
 
                 {/* Fechas */}
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                  <h3 className="font-display flex items-center mb-4" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                     <ClockIcon className="w-5 h-5 mr-2 text-green-600 dark:text-green-400" />
                     Fechas
                   </h3>
@@ -350,8 +352,8 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
                 {/* Threads/Respuestas */}
                 {ticketDetail.threads && ticketDetail.threads.length > 0 && (
-                  <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                  <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                    <h3 className="font-display flex items-center mb-4" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                       <ChatBubbleLeftRightIcon className="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400" />
                       Conversación ({ticketDetail.threads.length})
                     </h3>
@@ -412,10 +414,10 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end pt-6 mt-6 border-t border-gray-200 dark:border-slate-600">
+          <div className="flex justify-end pt-6 mt-6" style={{ borderTop: '1px solid var(--border-subtle)' }}>
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', cursor: 'pointer', fontFamily: 'var(--font-body)', transition: 'all 150ms ease' }}
             >
               Cerrar
             </button>

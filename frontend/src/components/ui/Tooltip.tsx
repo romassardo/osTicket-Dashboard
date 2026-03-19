@@ -62,7 +62,8 @@ export const Tooltip: React.FC<TooltipProps> = ({ text, children, position = 'ab
           e.stopPropagation();
           setShow(prev => !prev);
         }}
-        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-none"
+        className="transition-colors focus:outline-none"
+        style={{ color: 'var(--text-muted)' }}
         type="button"
       >
         <Info className="w-3.5 h-3.5" />
@@ -70,8 +71,8 @@ export const Tooltip: React.FC<TooltipProps> = ({ text, children, position = 'ab
       {show && createPortal(
         <div
           ref={tipRef}
-          className="fixed z-[9999] px-3 py-2 text-[11px] font-normal normal-case tracking-normal text-white bg-gray-900 dark:bg-gray-700 rounded-lg shadow-lg whitespace-normal leading-relaxed pointer-events-none"
-          style={{ maxWidth: 280 }}
+          className="fixed z-[9999] whitespace-normal leading-relaxed pointer-events-none"
+          style={{ maxWidth: 280, padding: '0.5rem 0.75rem', fontSize: '0.6875rem', fontWeight: 400, textTransform: 'none', letterSpacing: 'normal', color: 'var(--text-primary)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border-subtle)' }}
         >
           {text}
         </div>,

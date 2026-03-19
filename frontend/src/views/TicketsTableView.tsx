@@ -42,6 +42,7 @@ const TicketsTableView: React.FC = memo(() => {
   const [selectedSector, setSelectedSector] = useState<string>('');
   const [selectedStaff, setSelectedStaff] = useState<string>('');
   const [selectedSla, setSelectedSla] = useState<string>('');
+  const [selectedRequestType, setSelectedRequestType] = useState<string>('');
   
   // Estado para el modal de detalle de ticket
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -116,6 +117,10 @@ const TicketsTableView: React.FC = memo(() => {
         params.append('sla', selectedSla.toString());
         logger.debug('Frontend: enviando sla:', selectedSla);
       }
+      if (selectedRequestType) {
+        params.append('requestType', selectedRequestType);
+        logger.debug('Frontend: enviando requestType:', selectedRequestType);
+      }
 
       const url = `/api/tickets?${params.toString()}`;
       logger.debug('Frontend: URL completa:', url);
@@ -186,7 +191,7 @@ const TicketsTableView: React.FC = memo(() => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff, selectedSla]);
+  }, [currentPage, debouncedSearchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff, selectedSla, selectedRequestType]);
 
   useEffect(() => {
     fetchTickets();
@@ -223,6 +228,7 @@ const TicketsTableView: React.FC = memo(() => {
     setSelectedSector(appliedFilters.selectedSector || '');
     setSelectedStaff(appliedFilters.selectedStaff || '');
     setSelectedSla(appliedFilters.selectedSla || '');
+    setSelectedRequestType(appliedFilters.selectedRequestType || '');
   }, []);
 
   const handlePageChange = useCallback((page: number) => {
@@ -243,21 +249,20 @@ const TicketsTableView: React.FC = memo(() => {
     if (selectedSector) count++;
     if (selectedStaff) count++;
     if (selectedSla) count++;
+    if (selectedRequestType) count++;
     return count;
-  }, [searchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff, selectedSla]);
+  }, [searchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff, selectedSla, selectedRequestType]);
 
   return (
-    <div className="p-6 lg:p-8 bg-gray-50 dark:bg-slate-900 min-h-screen">
+    <div style={{ padding: '1.5rem 2rem', background: 'var(--bg-primary)', minHeight: '100vh' }}>
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Tickets</h1>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              Gestión de tickets de soporte para el departamento de Soporte IT
-            </p>
-          </div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="font-display" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>Tickets</h1>
+          <p style={{ marginTop: '0.35rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+            Gestión de tickets de soporte — Departamento IT
+          </p>
         </div>
       </div>
 
@@ -272,36 +277,36 @@ const TicketsTableView: React.FC = memo(() => {
       {/* Table Container */}
       <div className="mt-6">
         {loading ? (
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-10 text-center border border-gray-200 dark:border-slate-600 shadow-lg">
+          <div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', padding: '3rem', textAlign: 'center', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-sm)' }}>
             <div className="flex flex-col items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-cyan-400 mb-4"></div>
-              <p className="text-gray-700 dark:text-gray-300 font-medium">Cargando tickets...</p>
+              <div className="animate-spin rounded-full h-10 w-10 mb-4" style={{ borderWidth: 2, borderStyle: 'solid', borderColor: 'var(--border-subtle)', borderTopColor: 'var(--accent-primary)' }}></div>
+              <p style={{ color: 'var(--text-secondary)', fontWeight: 500, fontFamily: 'var(--font-body)' }}>Cargando tickets...</p>
             </div>
           </div>
         ) : error ? (
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-10 text-center border border-gray-200 dark:border-slate-600 shadow-lg">
+          <div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', padding: '3rem', textAlign: 'center', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-sm)' }}>
             <div className="flex flex-col items-center justify-center">
-              <svg className="w-12 h-12 text-red-500 dark:text-red-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-10 h-10 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--error)' }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
-              <p className="text-gray-700 dark:text-gray-300 font-medium mb-2">Error al cargar tickets</p>
-              <p className="text-gray-500 dark:text-gray-400 text-sm">{error}</p>
+              <p style={{ color: 'var(--text-primary)', fontWeight: 500, marginBottom: '0.5rem' }}>Error al cargar tickets</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>{error}</p>
               <button 
                 onClick={handleRetry}
-                className="mt-4 px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
+                style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.8125rem', transition: 'all 150ms ease' }}
               >
                 Reintentar
               </button>
             </div>
           </div>
         ) : tickets.length === 0 ? (
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-10 text-center border border-gray-200 dark:border-slate-600 shadow-lg">
+          <div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', padding: '3rem', textAlign: 'center', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-sm)' }}>
             <div className="flex flex-col items-center justify-center">
-              <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-10 h-10 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--text-muted)' }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
               </svg>
-              <p className="text-gray-700 dark:text-gray-300 font-medium">No se encontraron tickets</p>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">Intenta con otros filtros de búsqueda</p>
+              <p style={{ color: 'var(--text-primary)', fontWeight: 500 }}>No se encontraron tickets</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginTop: '0.35rem' }}>Intenta con otros filtros de búsqueda</p>
             </div>
           </div>
         ) : (

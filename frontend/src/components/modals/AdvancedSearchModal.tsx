@@ -25,6 +25,11 @@ interface SLAOption {
   name: string;
 }
 
+interface RequestTypeOption {
+  id: string;
+  name: string;
+}
+
 interface AdvancedSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -37,6 +42,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [slaOptions, setSlaOptions] = useState<SLAOption[]>([]);
+  const [requestTypeOptions, setRequestTypeOptions] = useState<RequestTypeOption[]>([]);
 
   // Filter states
   const [selectedStatuses, setSelectedStatuses] = useState<number[]>([]);
@@ -45,6 +51,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
   const [selectedOrg, setSelectedOrg] = useState<string>('');
   const [selectedStaff, setSelectedStaff] = useState<string>('');
   const [selectedSla, setSelectedSla] = useState<string>('');
+  const [selectedRequestType, setSelectedRequestType] = useState<string>('');
   const [selectedSlaStatus, setSelectedSlaStatus] = useState<string>('');
 
 
@@ -89,6 +96,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
         logger.debug('Modal: SLA options recibidas:', data);
         setSlaOptions(data);
       });
+      fetchData('/api/tickets/options/requestType', setRequestTypeOptions);
     }
   }, [isOpen]);
 
@@ -109,6 +117,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
       selectedSector: selectedOrg,
       selectedStaff: selectedStaff,
       selectedSla: selectedSla,
+      selectedRequestType: selectedRequestType,
     };
     if (selectedSlaStatus) filtersToApply.slaStatus = selectedSlaStatus;
     logger.debug('Modal: Aplicando filtros:', filtersToApply);
@@ -123,18 +132,45 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
     setSelectedOrg('');
     setSelectedStaff('');
     setSelectedSla('');
+    setSelectedRequestType('');
     setSelectedSlaStatus('');
     logger.debug('Modal: Filtros limpiados');
   };
 
+  const chipBase: React.CSSProperties = {
+    padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-full)', fontSize: '0.8125rem',
+    fontWeight: 500, cursor: 'pointer', border: '1px solid var(--border-default)',
+    background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', transition: 'all 150ms ease',
+    fontFamily: 'var(--font-body)',
+  };
+  const chipActive: React.CSSProperties = {
+    ...chipBase, background: 'var(--accent-primary)', color: 'var(--bg-primary)',
+    borderColor: 'var(--accent-primary)', boxShadow: '0 2px 8px rgba(212,149,44,0.25)',
+  };
+  const selectStyle: React.CSSProperties = {
+    width: '100%', appearance: 'none' as const, background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)',
+    padding: '0.625rem 2.5rem 0.625rem 0.75rem', color: 'var(--text-secondary)',
+    fontSize: '0.8125rem', fontFamily: 'var(--font-body)', outline: 'none', transition: 'all 150ms ease',
+  };
+  const labelStyle: React.CSSProperties = {
+    display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem',
+  };
+  const chevronStyle: React.CSSProperties = {
+    position: 'absolute' as const, inset: '0 0 0 auto', display: 'flex', alignItems: 'center',
+    paddingRight: '0.75rem', color: 'var(--text-muted)', pointerEvents: 'none' as const,
+  };
+
   return (
-    <div className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex justify-center items-center transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-      <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-600 p-6 w-full max-w-2xl transform transition-all duration-300 ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}>
-        <div className="flex items-center justify-between mb-6 border-b border-gray-200 dark:border-slate-600 pb-4">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Filtros avanzados</h2>
+    <div className={`fixed inset-0 z-50 flex justify-center items-center transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+      <div className={`w-full max-w-2xl transform transition-all duration-300 ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}
+        style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-xl)', border: '1px solid var(--border-subtle)', padding: '1.5rem' }}>
+        <div className="flex items-center justify-between mb-6 pb-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+          <h2 className="font-display" style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)' }}>Filtros avanzados</h2>
           <button 
             onClick={onClose}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors duration-200 rounded-full h-8 w-8 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-400 focus:ring-opacity-50"
+            style={{ color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer', borderRadius: 'var(--radius-md)', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             aria-label="Cerrar modal"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -146,7 +182,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
         <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
           {/* Estados */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Estado del Ticket</label>
+            <label style={{ ...labelStyle, color: 'var(--text-primary)' }}>Estado del Ticket</label>
             <div className="flex flex-wrap gap-2">
               {statuses
                 .filter(status => ['Abierto', 'Cerrado', 'Resuelto'].includes(status.name))
@@ -155,11 +191,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
                   key={status.id}
                   type="button"
                   onClick={() => handleStatusChange(status.id)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                    selectedStatuses.includes(status.id)
-                      ? 'bg-blue-500 dark:bg-cyan-500 text-white shadow-lg shadow-blue-500/20 dark:shadow-cyan-500/20'
-                      : 'bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white ring-1 ring-gray-200 dark:ring-slate-600'
-                  }`}
+                  style={selectedStatuses.includes(status.id) ? chipActive : chipBase}
                 >
                   {status.name}
                 </button>
@@ -169,8 +201,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
 
           {/* Rango de Fechas */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Rango de Fechas</label>
-            
+            <label style={{ ...labelStyle, color: 'var(--text-primary)' }}>Rango de Fechas</label>
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <DatePicker
@@ -181,11 +212,10 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
                   endDate={endDate}
                   placeholderText="Fecha inicial"
                   dateFormat="dd/MM/yyyy"
-                  className="w-full bg-[#252a35] border border-[#2d3441] rounded-lg p-2.5 text-[#b8c5d6] shadow-inner focus:ring-2 focus:ring-[#00d9ff] focus:border-transparent focus:outline-none transition-all duration-200"
-                  calendarClassName="bg-[#1a1f29] border-[#2d3441] shadow-xl"
+                  className="modal-datepicker-input"
                 />
               </div>
-              <span className="text-[#7a8394] font-medium">a</span>
+              <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>a</span>
               <div className="relative flex-1">
                 <DatePicker
                   selected={endDate}
@@ -196,7 +226,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
                   minDate={startDate}
                   placeholderText="Fecha final"
                   dateFormat="dd/MM/yyyy"
-                  className="w-full bg-[#252a35] border border-[#2d3441] rounded-lg p-2.5 text-[#b8c5d6] shadow-inner focus:ring-2 focus:ring-[#00d9ff] focus:border-transparent focus:outline-none transition-all duration-200"
+                  className="modal-datepicker-input"
                 />
               </div>
             </div>
@@ -205,22 +235,18 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
           {/* Estado SLA (solo para Analytics) */}
           {showSlaStatus && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Estado SLA</label>
+              <label style={{ ...labelStyle, color: 'var(--text-primary)' }}>Estado SLA</label>
               <div className="flex flex-wrap gap-2">
                 {[
-                  { value: 'cumplido', label: 'Cumplido', color: 'emerald' },
-                  { value: 'no_cumplido', label: 'No cumplido', color: 'red' },
-                  { value: 'en_curso', label: 'En curso', color: 'blue' },
+                  { value: 'cumplido', label: 'Cumplido' },
+                  { value: 'no_cumplido', label: 'No cumplido' },
+                  { value: 'en_curso', label: 'En curso' },
                 ].map(opt => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => setSelectedSlaStatus(prev => prev === opt.value ? '' : opt.value)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                      selectedSlaStatus === opt.value
-                        ? 'bg-blue-500 dark:bg-cyan-500 text-white shadow-lg shadow-blue-500/20 dark:shadow-cyan-500/20'
-                        : 'bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white ring-1 ring-gray-200 dark:ring-slate-600'
-                    }`}
+                    style={selectedSlaStatus === opt.value ? chipActive : chipBase}
                   >
                     {opt.label}
                   </button>
@@ -229,98 +255,71 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
             </div>
           )}
 
-          {/* Sector, Agente y SLA */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Sector (Organization) */}
+          {/* Sector, Agente, SLA y Tipo de Solicitud */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="sector" className="block text-sm font-medium text-[#b8c5d6] mb-2">Sector</label>
+              <label htmlFor="sector" style={labelStyle}>Sector</label>
               <div className="relative">
-                <select
-                  id="sector"
-                  value={selectedOrg}
-                  onChange={(e) => setSelectedOrg(e.target.value)}
-                  className="w-full appearance-none bg-[#252a35] border border-[#2d3441] rounded-lg p-2.5 pr-10 text-[#b8c5d6] shadow-inner focus:ring-2 focus:ring-[#00d9ff] focus:border-transparent focus:outline-none transition-all duration-200"
-                >
+                <select id="sector" value={selectedOrg} onChange={(e) => setSelectedOrg(e.target.value)} style={selectStyle}>
                   <option value="">Todos los sectores</option>
-                  {organizations.map(org => (
-                    <option key={org.id} value={org.id}>{org.name}</option>
-                  ))}
+                  {organizations.map(org => (<option key={org.id} value={org.id}>{org.name}</option>))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#7a8394]">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                <div style={chevronStyle}>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </div>
               </div>
             </div>
-
-            {/* Agente (Staff) */}
             <div>
-              <label htmlFor="agent" className="block text-sm font-medium text-[#b8c5d6] mb-2">Agente</label>
+              <label htmlFor="agent" style={labelStyle}>Agente</label>
               <div className="relative">
-                <select
-                  id="agent"
-                  value={selectedStaff}
-                  onChange={(e) => setSelectedStaff(e.target.value)}
-                  className="w-full appearance-none bg-[#252a35] border border-[#2d3441] rounded-lg p-2.5 pr-10 text-[#b8c5d6] shadow-inner focus:ring-2 focus:ring-[#00d9ff] focus:border-transparent focus:outline-none transition-all duration-200"
-                >
+                <select id="agent" value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)} style={selectStyle}>
                   <option value="">Todos los agentes</option>
-                  {staff.map(s => (
-                    <option key={s.staff_id} value={s.staff_id}>{s.fullname}</option>
-                  ))}
+                  {staff.map(s => (<option key={s.staff_id} value={s.staff_id}>{s.fullname}</option>))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#7a8394]">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                <div style={chevronStyle}>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </div>
               </div>
             </div>
-
-            {/* SLA */}
             <div>
-              <label htmlFor="sla" className="block text-sm font-medium text-[#b8c5d6] mb-2">SLA</label>
+              <label htmlFor="sla" style={labelStyle}>SLA</label>
               <div className="relative">
-                <select
-                  id="sla"
-                  value={selectedSla}
-                  onChange={(e) => setSelectedSla(e.target.value)}
-                  className="w-full appearance-none bg-[#252a35] border border-[#2d3441] rounded-lg p-2.5 pr-10 text-[#b8c5d6] shadow-inner focus:ring-2 focus:ring-[#00d9ff] focus:border-transparent focus:outline-none transition-all duration-200"
-                >
+                <select id="sla" value={selectedSla} onChange={(e) => setSelectedSla(e.target.value)} style={selectStyle}>
                   <option value="">Todos los SLA</option>
-                  {slaOptions.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
+                  {slaOptions.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#7a8394]">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                <div style={chevronStyle}>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="requestType" style={labelStyle}>Tipo de Solicitud</label>
+              <div className="relative">
+                <select id="requestType" value={selectedRequestType} onChange={(e) => setSelectedRequestType(e.target.value)} style={selectStyle}>
+                  <option value="">Todos los tipos</option>
+                  {requestTypeOptions.map(rt => (<option key={rt.id} value={rt.id}>{rt.name}</option>))}
+                </select>
+                <div style={chevronStyle}>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </div>
               </div>
             </div>
           </div>
-
         </form>
 
-        <div className="flex justify-between mt-8 pt-4 border-t border-gray-200 dark:border-slate-600">
-          <button 
-            onClick={handleClear} 
-            className="px-4 py-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 hover:text-red-900 dark:hover:text-red-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-300 dark:focus:ring-red-600 focus:ring-opacity-50 font-medium"
-          >
+        <div className="flex justify-between mt-8 pt-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          <button onClick={handleClear}
+            style={{ padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', cursor: 'pointer', fontWeight: 500, fontSize: '0.8125rem', fontFamily: 'var(--font-body)', transition: 'all 150ms ease' }}>
             Limpiar Filtros
           </button>
           <div className="flex gap-3">
-            <button 
-              onClick={onClose} 
-              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 hover:text-gray-900 dark:hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-slate-600 focus:ring-opacity-50 font-medium"
-            >
+            <button onClick={onClose}
+              style={{ padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', cursor: 'pointer', fontWeight: 500, fontSize: '0.8125rem', fontFamily: 'var(--font-body)', transition: 'all 150ms ease' }}>
               Cancelar
             </button>
-            <button 
-              onClick={handleApply} 
-              className="px-4 py-2 rounded-lg bg-blue-500 dark:bg-cyan-500 text-white hover:bg-blue-600 dark:hover:bg-cyan-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-cyan-500 focus:ring-opacity-50 font-medium shadow-lg shadow-blue-500/20 dark:shadow-cyan-500/20"
-            >
+            <button onClick={handleApply}
+              style={{ padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', background: 'var(--accent-primary)', color: 'var(--bg-primary)', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.8125rem', fontFamily: 'var(--font-body)', boxShadow: '0 2px 8px rgba(212,149,44,0.3)', transition: 'all 150ms ease' }}>
               Aplicar Filtros
             </button>
           </div>

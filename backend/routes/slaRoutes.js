@@ -22,10 +22,18 @@ router.get('/stats', async (req, res, next) => {
   const { year, month, agent } = req.query;
 
   try {
+    // Cache de 5 minutos para este endpoint costoso
+    const cacheKey = `sla:stats:${year || 'all'}:${month || 'all'}:${agent || 'all'}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      logger.debug('SLA Stats: sirviendo desde cache');
+      return res.json(cached);
+    }
+
     let dateFilter = '';
     const replacements = {};
 
-    // Construir filtros de fecha
+    // Construir filtros de fecha (por fecha de cierre, que es lo relevante para SLA)
     if (year && month) {
       dateFilter = 'AND YEAR(t.closed) = :year AND MONTH(t.closed) = :month';
       replacements.year = parseInt(year, 10);
@@ -177,6 +185,9 @@ router.get('/stats', async (req, res, next) => {
 
     // Ordenar por % cumplimiento desc
     formattedResults.sort((a, b) => b.porcentaje_sla_cumplido - a.porcentaje_sla_cumplido);
+
+    // Cachear resultado por 5 minutos (endpoint costoso)
+    cache.set(cacheKey, formattedResults, 300);
 
     logger.info(`SLA Stats: ${formattedResults.length} agentes, ${tickets.length} tickets procesados`);
     res.json(formattedResults);
@@ -502,6 +513,14 @@ router.get('/summary', async (req, res, next) => {
   const { year, month } = req.query;
 
   try {
+    // Cache de 5 minutos para este endpoint costoso
+    const cacheKey = `sla:summary:${year || 'all'}:${month || 'all'}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      logger.debug('SLA Summary: sirviendo desde cache');
+      return res.json(cached);
+    }
+
     let dateFilter = '';
     const replacements = {};
 
@@ -586,6 +605,9 @@ router.get('/summary', async (req, res, next) => {
       tiempo_promedio_resolucion: formatHorasHabiles(avgResolucionHoras),
       usa_horas_habiles: true
     };
+
+    // Cachear resultado por 5 minutos
+    cache.set(cacheKey, result, 300);
 
     logger.info(`SLA Summary generado: ${totalTickets} tickets, ${porcentajeCumplimiento}% cumplimiento`);
     res.json(result);

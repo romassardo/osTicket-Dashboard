@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart3, Download, Calendar, TrendingUp, TrendingDown, Clock, RefreshCw, CheckCircle, XCircle, ArrowUpDown, Filter } from 'lucide-react';
 import { getSLAStats } from '../services/api';
 import logger from '../utils/logger';
+import { useFilter } from '../context/FilterContext';
 import { Tooltip } from '../components/ui/Tooltip';
 
 interface SLAStat {
@@ -23,8 +24,12 @@ const SLAStatsView: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   
   const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [selectedMonth, setSelectedMonth] = useState<number | ''>('');
+  const { selectedYear, selectedMonth: contextMonth, setSelectedYear, setSelectedMonth: setContextMonth } = useFilter();
+  // SLA API uses 1-indexed months; context uses 0-indexed. '' means all months.
+  const selectedMonth: number | '' = contextMonth !== null ? contextMonth + 1 : '';
+  const setSelectedMonth = (val: number | '') => {
+    setContextMonth(val === '' ? null : val - 1);
+  };
   
   const [sortBy, setSortBy] = useState<keyof SLAStat>('porcentaje_sla_cumplido');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -145,13 +150,13 @@ const SLAStatsView: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', padding: '1.5rem' }}>
         <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+          <div className="h-8 rounded w-1/3" style={{ background: 'var(--bg-tertiary)' }} />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[1, 2, 3].map(i => <div key={i} className="h-28 bg-gray-200 dark:bg-gray-700 rounded-xl" />)}
+            {[1, 2, 3].map(i => <div key={i} className="h-28 rounded-xl" style={{ background: 'var(--bg-tertiary)' }} />)}
           </div>
-          <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+          <div className="h-96 rounded-xl" style={{ background: 'var(--bg-tertiary)' }} />
         </div>
       </div>
     );
@@ -160,24 +165,24 @@ const SLAStatsView: React.FC = () => {
   const hasActiveFilters = !!filterAgente;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 space-y-6">
-      {/* Header + Filtros en una barra */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5">
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', padding: '1.5rem' }} className="space-y-6">
+      {/* Header + Filtros */}
+      <div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)', padding: '1.25rem' }}>
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <BarChart3 className="w-6 h-6 text-blue-600" />
+            <h1 className="font-display flex items-center gap-2" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+              <BarChart3 className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
               Análisis SLA
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
               Rendimiento por agente en tickets cerrados (horas hábiles Lun-Vie 8:30-17:30)
             </p>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              style={{ padding: '0.4rem 0.65rem', fontSize: '0.8125rem', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
             >
               {[currentYear, currentYear - 1, currentYear - 2].map(y => (
                 <option key={y} value={y}>{y}</option>
@@ -186,7 +191,7 @@ const SLAStatsView: React.FC = () => {
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value === '' ? '' : parseInt(e.target.value))}
-              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              style={{ padding: '0.4rem 0.65rem', fontSize: '0.8125rem', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}
             >
               <option value="">Todos los meses</option>
               {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
@@ -197,14 +202,14 @@ const SLAStatsView: React.FC = () => {
             </select>
             <button
               onClick={exportToExcel}
-              className="px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5 text-gray-700 dark:text-gray-200"
+              className="header-button"
             >
               <Download className="w-4 h-4" /> Excel
             </button>
             <button
               onClick={() => fetchStats(true)}
               disabled={refreshing}
-              className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center gap-1.5"
+              style={{ padding: '0.4rem 0.75rem', fontSize: '0.8125rem', background: 'var(--accent-primary)', color: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: 'none', cursor: refreshing ? 'not-allowed' : 'pointer', fontWeight: 600, fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: '0.375rem', transition: 'all 150ms ease' }}
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               {refreshing ? '...' : 'Actualizar'}
@@ -221,7 +226,7 @@ const SLAStatsView: React.FC = () => {
             <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
               <BarChart3 className="w-5 h-5 text-blue-600" />
             </div>
-            <Tooltip text="Cantidad total de tickets cerrados en el departamento Soporte IT para el período seleccionado. Solo incluye tickets con agente asignado.">
+            <Tooltip text="Tickets cerrados/resueltos durante el período seleccionado (por fecha de cierre). Puede diferir del Dashboard que cuenta por fecha de creación. Solo incluye tickets con agente asignado.">
               <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Tickets Cerrados</span>
             </Tooltip>
           </div>

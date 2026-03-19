@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getTicketCounts } from '../services/api';
+import { useFilter } from '../context/FilterContext';
 
 // Importamos los componentes que hemos creado
 import StatCard from '../components/metrics/StatCard';
@@ -20,20 +21,18 @@ import { Tooltip } from '../components/ui/Tooltip';
  * métricas relevantes para el departamento de Soporte IT
  */
 const DashboardView: React.FC = () => {
-  const [selectedDate, setSelectedDate] = React.useState(new Date());
+  const { selectedYear, selectedMonth: contextMonth, setSelectedYear, setSelectedMonth: setContextMonth } = useFilter();
+  // Dashboard always needs a specific month (0-indexed). Default to current month if context has null.
+  const selectedMonth = contextMonth ?? new Date().getMonth();
+  const selectedDate = new Date(selectedYear, selectedMonth, 1);
 
   const handleMonthChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newMonth = parseInt(event.target.value, 10);
-    setSelectedDate(new Date(selectedDate.getFullYear(), newMonth, 1));
-  }, [selectedDate]);
+    setContextMonth(parseInt(event.target.value, 10));
+  }, [setContextMonth]);
 
   const handleYearChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newYear = parseInt(event.target.value, 10);
-    setSelectedDate(new Date(newYear, selectedDate.getMonth(), 1));
-  }, [selectedDate]);
-
-  const selectedYear = selectedDate.getFullYear();
-  const selectedMonth = selectedDate.getMonth();
+    setSelectedYear(parseInt(event.target.value, 10));
+  }, [setSelectedYear]);
 
   // Consulta unificada para obtener todas las métricas del mes seleccionado
   const { data: ticketCounts, isLoading: isLoadingCounts, isError: isErrorCounts } = useQuery({
@@ -76,9 +75,9 @@ const DashboardView: React.FC = () => {
   // Estado de error
   if (isErrorCounts) {
     return (
-      <div className="rounded-lg border border-[#ef4444] bg-[#1a1f29] p-6 text-center">
-        <p className="font-medium text-[#ef4444]">Error al cargar los datos del dashboard.</p>
-        <button className="mt-4 rounded-md bg-[#252a35] px-4 py-2 text-[#b8c5d6] hover:bg-[#2d3441]">
+      <div style={{ borderRadius: 'var(--radius-lg)', border: '1px solid var(--error)', background: 'var(--bg-secondary)', padding: '2rem', textAlign: 'center' }}>
+        <p style={{ fontWeight: 500, color: 'var(--error)' }}>Error al cargar los datos del dashboard.</p>
+        <button style={{ marginTop: '1rem', borderRadius: 'var(--radius-md)', background: 'var(--bg-tertiary)', padding: '0.5rem 1rem', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
           Reintentar
         </button>
       </div>
@@ -100,41 +99,41 @@ const DashboardView: React.FC = () => {
       {/* Dashboard Grid Principal - 12 columnas según DESIGN_GUIDE.md */}
       <div className="dashboard-grid">
         
-        {/* Header Dashboard - Ocupa todo el ancho */}
-        <div className="col-span-12 dashboard-header backdrop-blur-md bg-[var(--bg-secondary)]/80 rounded-xl p-6 mb-8 shadow-lg border border-[var(--bg-accent)]/20">
+        {/* Header Dashboard */}
+        <div className="col-span-12 rounded-xl mb-6" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)', padding: '1.25rem 1.75rem' }}>
           <div className="flex items-center w-full">
             <div className="flex-1">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] bg-clip-text text-transparent">Dashboard Soporte IT</h1>
-              <p className="text-[var(--text-secondary)] mt-1">Vista general de tickets - {fullMonthTitle}</p>
+              <h1 className="font-display" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>Dashboard Soporte IT</h1>
+              <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0', fontSize: '0.8125rem' }}>Vista general de tickets — <span style={{ color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'capitalize' }}>{fullMonthTitle}</span></p>
             </div>
             
-            <div className="flex items-center gap-4">
-              {/* Selector de fecha con estilo moderno */}
-              <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] rounded-lg p-1 border border-[var(--bg-accent)]/30">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1" style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '0.25rem', border: '1px solid var(--border-subtle)' }}>
                 <select
                   value={selectedMonth}
                   onChange={handleMonthChange}
-                  className="bg-transparent text-[var(--text-secondary)] px-3 py-2 border-none focus:ring-1 focus:ring-[var(--accent-primary)] rounded-md capitalize"
+                  className="capitalize"
+                  style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '0.4rem 0.65rem', border: 'none', fontSize: '0.8125rem', fontFamily: 'var(--font-body)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', outline: 'none' }}
                 >
                   {months.map(month => (
-                    <option key={month.value} value={month.value} className="bg-[var(--bg-tertiary)] capitalize">{month.name}</option>
+                    <option key={month.value} value={month.value} style={{ background: 'var(--bg-tertiary)' }} className="capitalize">{month.name}</option>
                   ))}
                 </select>
+                <div style={{ width: 1, height: 20, background: 'var(--border-subtle)' }}></div>
                 <select
                   value={selectedYear}
                   onChange={handleYearChange}
-                  className="bg-transparent text-[var(--text-secondary)] px-3 py-2 border-none focus:ring-1 focus:ring-[var(--accent-primary)] rounded-md"
+                  style={{ background: 'transparent', color: 'var(--text-secondary)', padding: '0.4rem 0.65rem', border: 'none', fontSize: '0.8125rem', fontFamily: 'var(--font-body)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', outline: 'none' }}
                 >
                   {years.map(year => (
-                    <option key={year} value={year} className="bg-[var(--bg-tertiary)]">{year}</option>
+                    <option key={year} value={year} style={{ background: 'var(--bg-tertiary)' }}>{year}</option>
                   ))}
                 </select>
               </div>
               
-              {/* Badge de última actualización con animación sutil */}
-              <div className="flex items-center gap-2 bg-[var(--bg-tertiary)]/40 rounded-full px-3 py-1 text-xs">
-                <span className="inline-block h-2 w-2 rounded-full bg-[var(--success)] animate-pulse"></span>
-                <span className="text-[var(--text-muted)]">Actualizado: {new Date().toLocaleTimeString()}</span>
+              <div className="flex items-center gap-2" style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-full)', padding: '0.35rem 0.75rem', border: '1px solid var(--border-subtle)', fontSize: '0.75rem' }}>
+                <span style={{ display: 'inline-block', height: 6, width: 6, borderRadius: '50%', background: 'var(--success)' }} className="animate-pulse"></span>
+                <span style={{ color: 'var(--text-muted)' }}>Actualizado: {new Date().toLocaleTimeString()}</span>
               </div>
             </div>
           </div>
@@ -172,7 +171,7 @@ const DashboardView: React.FC = () => {
             subtitle={fullMonthTitle}
             icon="closed"
             trend="+12%"
-            tooltip="Tickets que fueron marcados como 'Resuelto' o 'Cerrado' durante este mes."
+            tooltip="Tickets creados en este mes que actualmente tienen estado 'Resuelto' o 'Cerrado'."
           />
         </div>
 

@@ -1,14 +1,14 @@
 import React from 'react';
-import { useSound } from '../../context/SoundContext'; // Importar el hook
+import { useSound } from '../../context/SoundContext';
 import { ArrowPathIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '../../context/ThemeContext';
 
 /**
- * Header del Dashboard siguiendo DESIGN_GUIDE.md
- * Implementa la estructura de header con sistema de tokens y accesibilidad
+ * Header del Dashboard — Obsidian Executive Design
+ * Refined corporate header with premium controls
  */
 const Header: React.FC = () => {
-  const { isSoundEnabled, toggleSound } = useSound(); // Usar el contexto de sonido
+  const { isSoundEnabled, toggleSound } = useSound();
   const [lastUpdate, setLastUpdate] = React.useState(new Date());
   const [currentTime, setCurrentTime] = React.useState(new Date());
   const [isRefreshing, setIsRefreshing] = React.useState(false);
@@ -19,10 +19,8 @@ const Header: React.FC = () => {
     setLastUpdate(new Date());
     setCurrentTime(new Date());
     
-    // Simular tiempo de recarga mínimo para UX
     setTimeout(() => {
       setIsRefreshing(false);
-      // Aquí se podría disparar un evento global para refrescar datos
       window.location.reload();
     }, 500);
   };
@@ -41,28 +39,27 @@ const Header: React.FC = () => {
     return date.toLocaleDateString('es-ES');
   };
 
-  // Actualizar el tiempo cada minuto para mantener la información fresca
   React.useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // Actualizar cada minuto
+    }, 60000);
 
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <header className="dashboard-header" role="banner">
+    <header className="dashboard-header" role="banner" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
       <div className="header-left">
-        <h1 className="text-h1" style={{ color: 'var(--text-primary)' }}>
-          Dashboard OsTicket
+        <h1 className="font-display" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0, lineHeight: 1.3 }}>
+          Panel de Control
         </h1>
         <span 
           className="text-small" 
-          style={{ color: 'var(--text-muted)' }}
+          style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}
           role="status"
           aria-live="polite"
         >
-          Última actualización: {formatLastUpdate(lastUpdate)}
+          Actualizado {formatLastUpdate(lastUpdate)}
         </span>
       </div>
       
@@ -85,7 +82,7 @@ const Header: React.FC = () => {
           <span>{isRefreshing ? 'Actualizando...' : 'Refrescar'}</span>
         </button>
 
-        {/* Theme Toggle Button */}
+        {/* Theme Toggle */}
         <button 
           onClick={toggleTheme}
           className="header-button"
@@ -97,10 +94,10 @@ const Header: React.FC = () => {
           ) : (
             <MoonIcon className="header-button-icon" />
           )}
-          <span>{resolvedTheme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}</span>
+          <span>{resolvedTheme === 'dark' ? 'Claro' : 'Oscuro'}</span>
         </button>
 
-        {/* Botón de Sonido */}
+        {/* Sound Toggle */}
         <button 
           className="header-button" 
           title={isSoundEnabled ? 'Desactivar sonido' : 'Activar sonido'}
@@ -116,13 +113,12 @@ const Header: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l-2.25 2.25M19.5 12l2.25-2.25M12.75 6.036H12a14.25 14.25 0 0 0-6.38 1.242m6.38-1.242a14.25 14.25 0 0 1 6.38 1.242m-6.38-1.242a14.25 14.25 0 0 0-6.38-1.242m12.76 0a14.25 14.25 0 0 1 0 11.928M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
             </svg>
           )}
-          <span>{isSoundEnabled ? 'Sonido ON' : 'Sonido OFF'}</span>
         </button>
 
-        {/* Sistema Status Indicator */}
-        <div className="status-indicator-container" role="status" aria-label="Estado del sistema">
-          <div className="status-dot" aria-hidden="true"></div>
-          <span className="status-text">Soporte IT</span>
+        {/* Status */}
+        <div className="status-indicator-container" role="status" aria-label="Estado del sistema" style={{ background: 'var(--bg-tertiary)', padding: '0.375rem 0.75rem', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-subtle)' }}>
+          <div className="status-dot" aria-hidden="true" style={{ width: 6, height: 6 }}></div>
+          <span className="status-text" style={{ fontSize: '0.75rem', fontWeight: 500 }}>Soporte IT</span>
         </div>
       </div>
     </header>

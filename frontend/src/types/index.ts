@@ -80,6 +80,7 @@ export interface Ticket {
   AssignedStaff?: Staff; // Relación con el agente asignado (nombre usado en el backend)
   // department?: Department; // Eliminado, ya que 'sector' viene de cdata
   cdata: Cdata; // Estructura anidada para el asunto y sector
+  requestType?: string | null; // Tipo de Solicitud (TPSolicitud) - enriquecido por backend
 }
 
 export interface TicketDetail extends Ticket {
@@ -138,6 +139,7 @@ export interface AdvancedFilters {
   selectedSector?: string;
   selectedStaff?: string;
   selectedSla?: string;
+  selectedRequestType?: string;
   slaStatus?: 'cumplido' | 'no_cumplido' | 'en_curso';
 }
 

@@ -18,6 +18,7 @@ const HOURS_PER_DAY = 9; // 8:30 a 17:30 = 9 horas
 // Cache de feriados (se recarga cada hora)
 let feriadosCache = null;
 let feriadosCacheTime = null;
+let feriadosLoadingPromise = null; // Evita race condition en llamadas concurrentes
 const CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hora
 
 /**
@@ -31,6 +32,21 @@ async function cargarFeriados() {
     return feriadosCache;
   }
 
+  // Si ya hay una carga en curso, esperar esa misma promesa (evita N queries concurrentes)
+  if (feriadosLoadingPromise) {
+    return feriadosLoadingPromise;
+  }
+
+  feriadosLoadingPromise = _cargarFeriadosInterno();
+  try {
+    const result = await feriadosLoadingPromise;
+    return result;
+  } finally {
+    feriadosLoadingPromise = null;
+  }
+}
+
+async function _cargarFeriadosInterno() {
   try {
     const query = `
       SELECT 
@@ -197,7 +213,84 @@ function ajustarAHorarioHabil(fecha, feriados) {
 }
 
 /**
- * Calcula las horas hábiles entre dos fechas
+ * Compara si dos fechas son el mismo día calendario
+ */
+function _mismaFecha(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+         a.getMonth() === b.getMonth() &&
+         a.getDate() === b.getDate();
+}
+
+/**
+ * Construye un Set de strings "YYYY-MM-DD" con todos los feriados en el rango de años dado.
+ * Permite lookup O(1) en vez de iterar arrays.
+ */
+function _buildFeriadoSet(feriados, yearInicio, yearFin) {
+  const set = new Set();
+  for (let y = yearInicio; y <= yearFin; y++) {
+    for (const f of feriados.recurrentes) {
+      set.add(`${y}-${String(f.month).padStart(2, '0')}-${String(f.day).padStart(2, '0')}`);
+    }
+  }
+  for (const f of feriados.especificos) {
+    set.add(`${f.year}-${String(f.month).padStart(2, '0')}-${String(f.day).padStart(2, '0')}`);
+  }
+  return set;
+}
+
+/**
+ * Verifica si una fecha (a medianoche) es día hábil usando el Set de feriados (O(1)).
+ */
+function _esDiaHabilRapido(fecha, feriadoSet) {
+  const dow = fecha.getDay();
+  if (dow === 0 || dow === 6) return false;
+  const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+  return !feriadoSet.has(key);
+}
+
+/**
+ * Cuenta días hábiles entre dos fechas (ambas a medianoche, 'hasta' exclusivo).
+ * Usa matemática de semanas completas + solo itera los días restantes (0-6) y feriados (~24).
+ * O(1) para semanas + O(R) para remainder + O(F) para feriados, donde R<=6 y F~24.
+ */
+function _contarDiasHabiles(desde, hasta, feriadoSet) {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const totalDias = Math.round((hasta - desde) / msPerDay);
+  if (totalDias <= 0) return 0;
+
+  // Semanas completas: cada una tiene exactamente 5 días hábiles
+  const fullWeeks = Math.floor(totalDias / 7);
+  let weekdays = fullWeeks * 5;
+
+  // Días restantes (máximo 6 iteraciones)
+  const startDow = desde.getDay();
+  const remainDays = totalDias % 7;
+  for (let i = 0; i < remainDays; i++) {
+    const dow = (startDow + i) % 7;
+    if (dow !== 0 && dow !== 6) {
+      weekdays++;
+    }
+  }
+
+  // Restar feriados que caen en días hábiles dentro del rango (~24 iteraciones max)
+  for (const feriadoStr of feriadoSet) {
+    const parts = feriadoStr.split('-');
+    const fDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    if (fDate >= desde && fDate < hasta) {
+      const dow = fDate.getDay();
+      if (dow !== 0 && dow !== 6) {
+        weekdays--;
+      }
+    }
+  }
+
+  return Math.max(0, weekdays);
+}
+
+/**
+ * Calcula las horas hábiles entre dos fechas (OPTIMIZADO)
+ * En vez de iterar día por día, usa matemática de semanas completas.
+ * Complejidad: O(1) para el rango + O(F) para feriados (~24), vs O(D) anterior donde D=días.
  * @param {Date|string} fechaInicio - Fecha de inicio (created)
  * @param {Date|string} fechaFin - Fecha de fin (closed o NOW)
  * @returns {Promise<number>} - Horas hábiles transcurridas
@@ -226,44 +319,50 @@ async function calcularHorasHabiles(fechaInicio, fechaFin) {
     return 0;
   }
 
-  let horasHabiles = 0;
-  let fechaActual = new Date(inicio);
+  // Build Set de feriados para lookup O(1)
+  const feriadoSet = _buildFeriadoSet(feriados, inicio.getFullYear(), fin.getFullYear());
 
-  while (fechaActual < fin) {
-    // Si no es día hábil, saltar al próximo
-    if (!esDiaHabil(fechaActual, feriados)) {
-      fechaActual.setDate(fechaActual.getDate() + 1);
-      fechaActual.setHours(WORK_START_HOUR, WORK_START_MINUTE, 0, 0);
-      continue;
+  // --- Caso: mismo día ---
+  if (_mismaFecha(inicio, fin)) {
+    const finLaboral = getFinHorarioLaboral(inicio);
+    const finEfectivo = fin < finLaboral ? fin : finLaboral;
+    if (inicio < finEfectivo) {
+      return Math.round(((finEfectivo - inicio) / (1000 * 60 * 60)) * 100) / 100;
     }
-
-    const inicioLaboral = getInicioHorarioLaboral(fechaActual);
-    const finLaboral = getFinHorarioLaboral(fechaActual);
-
-    // Determinar inicio efectivo del día
-    let inicioEfectivo = fechaActual;
-    if (fechaActual < inicioLaboral) {
-      inicioEfectivo = inicioLaboral;
-    }
-
-    // Determinar fin efectivo del día
-    let finEfectivo = finLaboral;
-    if (fin < finLaboral) {
-      finEfectivo = fin;
-    }
-
-    // Calcular horas de este día
-    if (inicioEfectivo < finEfectivo) {
-      const horasDia = (finEfectivo - inicioEfectivo) / (1000 * 60 * 60);
-      horasHabiles += horasDia;
-    }
-
-    // Mover al siguiente día
-    fechaActual.setDate(fechaActual.getDate() + 1);
-    fechaActual.setHours(WORK_START_HOUR, WORK_START_MINUTE, 0, 0);
+    return 0;
   }
 
-  return Math.round(horasHabiles * 100) / 100; // Redondear a 2 decimales
+  let horasHabiles = 0;
+
+  // --- 1. Primer día (parcial): desde inicio hasta fin de jornada ---
+  const finDia1 = getFinHorarioLaboral(inicio);
+  if (inicio < finDia1) {
+    horasHabiles += (finDia1 - inicio) / (1000 * 60 * 60);
+  }
+
+  // --- 2. Días completos intermedios (optimizado con math de semanas) ---
+  const dia2 = new Date(inicio);
+  dia2.setDate(dia2.getDate() + 1);
+  dia2.setHours(0, 0, 0, 0);
+
+  const diaUltimo = new Date(fin);
+  diaUltimo.setHours(0, 0, 0, 0);
+
+  if (dia2 < diaUltimo) {
+    const diasHabiles = _contarDiasHabiles(dia2, diaUltimo, feriadoSet);
+    horasHabiles += diasHabiles * HOURS_PER_DAY;
+  }
+
+  // --- 3. Último día (parcial): desde inicio de jornada hasta fin ---
+  const inicioUltDia = getInicioHorarioLaboral(fin);
+  const finUltDia = getFinHorarioLaboral(fin);
+  const finEfectivoUlt = fin < finUltDia ? fin : finUltDia;
+
+  if (finEfectivoUlt > inicioUltDia && _esDiaHabilRapido(diaUltimo, feriadoSet)) {
+    horasHabiles += (finEfectivoUlt - inicioUltDia) / (1000 * 60 * 60);
+  }
+
+  return Math.round(horasHabiles * 100) / 100;
 }
 
 /**
@@ -275,7 +374,7 @@ async function calcularHorasHabiles(fechaInicio, fechaFin) {
 async function calcularEstadoSLA(fechaCreacion, gracePeriodHoras) {
   const ahora = new Date();
   const horasTranscurridas = await calcularHorasHabiles(fechaCreacion, ahora);
-  const horasRestantes = Math.max(0, gracePeriodHoras - horasTranscurridas);
+  const horasRestantes = gracePeriodHoras - horasTranscurridas; // Negativo = excedido
   const porcentajeConsumido = gracePeriodHoras > 0 
     ? Math.round((horasTranscurridas / gracePeriodHoras) * 100 * 10) / 10 
     : 0;
