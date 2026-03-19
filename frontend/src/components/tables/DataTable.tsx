@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import type { Ticket } from '../../types';
 import { formatDate } from '../../utils/formatters';
 import { DocumentTextIcon, ChevronUpIcon, ChevronDownIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
@@ -8,47 +8,13 @@ interface DataTableProps {
   tickets: Ticket[];
   totalCount?: number;
   onTicketClick?: (ticketId: number) => void;
+  sortField?: string | null;
+  sortDir?: 'asc' | 'desc';
+  onSort?: (field: string) => void;
 }
 
-type SortDir = 'asc' | 'desc';
 
-const getSortValue = (ticket: Ticket, field: string): string | number => {
-  switch (field) {
-    case 'Número':       return ticket.number ?? '';
-    case 'Asunto':       return ticket.cdata?.subject ?? '';
-    case 'Agente':       return ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}`.trim() : '';
-    case 'Usuario':      return ticket.user?.name ?? '';
-    case 'Sector':       return ticket.cdata?.SectorName?.value ?? ticket.cdata?.dataValues?.sectorName ?? '';
-    case 'Tipo Solicitud': return ticket.requestType ?? '';
-    case 'Creación':     return ticket.created ? new Date(ticket.created).getTime() : 0;
-    default:             return '';
-  }
-};
-
-const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicketClick }) => {
-  const [sortField, setSortField] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-
-  const handleSort = (header: string) => {
-    if (header === 'Estado SLA') return; // computed, skip
-    if (sortField === header) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(header);
-      setSortDir('asc');
-    }
-  };
-
-  const sortedTickets = useMemo(() => {
-    if (!sortField) return tickets;
-    return [...tickets].sort((a, b) => {
-      const av = getSortValue(a, sortField);
-      const bv = getSortValue(b, sortField);
-      if (av < bv) return sortDir === 'asc' ? -1 : 1;
-      if (av > bv) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [tickets, sortField, sortDir]);
+const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicketClick, sortField = null, sortDir = 'desc', onSort }) => {
 
   const tableHeaders = [
     'Número',
@@ -125,14 +91,14 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
           <thead>
             <tr style={{ background: 'var(--bg-tertiary)' }}>
               {tableHeaders.map((header) => {
-                const isSortable = header !== 'Estado SLA';
+                const isSortable = header !== 'Estado SLA' && header !== 'Sector' && header !== 'Tipo Solicitud' && !!onSort;
                 const isActive = sortField === header;
                 return (
                   <th
                     key={header}
                     scope="col"
                     className="group"
-                    onClick={() => isSortable && handleSort(header)}
+                    onClick={() => isSortable && onSort!(header)}
                     style={{ padding: '0.65rem 1rem', textAlign: 'left', fontSize: '0.6875rem', fontWeight: 600, color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border-subtle)', cursor: isSortable ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap' }}
                   >
                     <div className="flex items-center gap-1">
@@ -152,7 +118,7 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
           </thead>
           <tbody>
             {tickets && tickets.length > 0 ? (
-              sortedTickets.map((ticket, idx) => {
+              tickets.map((ticket, idx) => {
                 const slaStatus = getSLAStatus(ticket);
                 const isUnassigned = !ticket.AssignedStaff;
                 return (

@@ -43,6 +43,8 @@ const TicketsTableView: React.FC = memo(() => {
   const [selectedStaff, setSelectedStaff] = useState<string>('');
   const [selectedSla, setSelectedSla] = useState<string>('');
   const [selectedRequestType, setSelectedRequestType] = useState<string>('');
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   
   // Estado para el modal de detalle de ticket
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -121,6 +123,17 @@ const TicketsTableView: React.FC = memo(() => {
         params.append('requestType', selectedRequestType);
         logger.debug('Frontend: enviando requestType:', selectedRequestType);
       }
+      if (sortField) {
+        const colToKey: Record<string, string> = {
+          'Número': 'number', 'Asunto': 'subject', 'Agente': 'agente',
+          'Usuario': 'usuario', 'Creación': 'created',
+        };
+        const key = colToKey[sortField];
+        if (key) {
+          params.append('sortBy', key);
+          params.append('sortDir', sortDir);
+        }
+      }
 
       const url = `/api/tickets?${params.toString()}`;
       logger.debug('Frontend: URL completa:', url);
@@ -191,7 +204,7 @@ const TicketsTableView: React.FC = memo(() => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff, selectedSla, selectedRequestType]);
+  }, [currentPage, debouncedSearchTerm, selectedStatuses, dateRange, selectedSector, selectedStaff, selectedSla, selectedRequestType, sortField, sortDir]);
 
   useEffect(() => {
     fetchTickets();
@@ -229,6 +242,18 @@ const TicketsTableView: React.FC = memo(() => {
     setSelectedStaff(appliedFilters.selectedStaff || '');
     setSelectedSla(appliedFilters.selectedSla || '');
     setSelectedRequestType(appliedFilters.selectedRequestType || '');
+  }, []);
+
+  const handleSort = useCallback((header: string) => {
+    setSortField(prev => {
+      if (prev === header) {
+        setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        return prev;
+      }
+      setSortDir('asc');
+      return header;
+    });
+    setCurrentPage(1);
   }, []);
 
   const handlePageChange = useCallback((page: number) => {
@@ -314,6 +339,9 @@ const TicketsTableView: React.FC = memo(() => {
             tickets={tickets} 
             totalCount={pagination?.total_items || tickets.length}
             onTicketClick={handleTicketClick}
+            sortField={sortField}
+            sortDir={sortDir}
+            onSort={handleSort}
           />
         )}
       </div>

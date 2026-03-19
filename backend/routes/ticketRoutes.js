@@ -10,9 +10,23 @@ const asyncHandler = fn => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
 };
 
+// Helper: Construir ORDER BY para Sequelize a partir de params del frontend
+function buildOrder(sortBy, sortDir, models) {
+    const dir = sortDir === 'asc' ? 'ASC' : 'DESC';
+    const { Staff, User, TicketCdata } = models;
+    switch (sortBy) {
+        case 'number':  return [['number', dir]];
+        case 'created': return [['created', dir]];
+        case 'agente':  return [[{ model: Staff, as: 'AssignedStaff' }, 'firstname', dir], ['created', 'DESC']];
+        case 'usuario': return [[{ model: User, as: 'user' }, 'name', dir], ['created', 'DESC']];
+        case 'subject': return [[{ model: TicketCdata, as: 'cdata' }, 'subject', dir], ['created', 'DESC']];
+        default:        return [['created', 'DESC']];
+    }
+}
+
 // GET /api/tickets - Ruta principal para la tabla de tickets
 router.get('/', asyncHandler(async (req, res) => {
-    const { page = 1, limit = 100, search, status, statuses, staff, sector, transporte, sla, requestType, startDate, endDate } = req.query;
+    const { page = 1, limit = 100, search, status, statuses, staff, sector, transporte, sla, requestType, startDate, endDate, sortBy, sortDir } = req.query;
     const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
     
     let where = {};
@@ -167,7 +181,7 @@ router.get('/', asyncHandler(async (req, res) => {
         ],
         limit: parseInt(limit, 10),
         offset,
-        order: [['created', 'DESC']],
+        order: buildOrder(sortBy, sortDir, require('../models')),
         subQuery: false,
         distinct: true
     });
@@ -194,7 +208,7 @@ router.get('/reports', async (req, res) => {
     logger.info('GET /api/tickets/reports');
     logger.info(`Query recibido: ${JSON.stringify(req.query)}`);
 
-    const { page = 1, limit = 10, search, month, year, status, priority, department, sla, team, topic, location, staff, sector, transporte, requestType, startDate, endDate } = req.query;
+    const { page = 1, limit = 10, search, month, year, status, priority, department, sla, team, topic, location, staff, sector, transporte, requestType, startDate, endDate, sortBy, sortDir } = req.query;
     logger.info('Paso 1: Parámetros extraídos.');
 
     const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
@@ -353,7 +367,7 @@ router.get('/reports', async (req, res) => {
             include,
             limit: parseInt(limit, 10),
             offset,
-            order: [['created', 'DESC']],
+            order: buildOrder(sortBy, sortDir, require('../models')),
             subQuery: false,
             distinct: true,
         });

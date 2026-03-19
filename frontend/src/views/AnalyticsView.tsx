@@ -63,6 +63,8 @@ const AnalyticsView: React.FC = memo(() => {
   const [filters, setFilters] = useState<any>({});
   const [searchTerm, setSearchTerm] = useState<string>('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   // Memoizar función fetchTickets para evitar recreaciones
   const fetchTickets = useCallback(async (currentFilters: any = {}, page: number = 1) => {
@@ -82,6 +84,7 @@ const AnalyticsView: React.FC = memo(() => {
       if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
       if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
       // NOTA: slaStatus se maneja solo en frontend, no se envía al backend
+      if (currentFilters.sortBy) { params.append('sortBy', currentFilters.sortBy); params.append('sortDir', currentFilters.sortDir || 'desc'); }
 
       const url = `/api/tickets/reports?${params.toString()}`;
       logger.info('Fetching tickets with URL:', url);
@@ -178,6 +181,22 @@ const AnalyticsView: React.FC = memo(() => {
   useEffect(() => {
     fetchTickets(combinedFilters, currentPage);
   }, [fetchTickets, combinedFilters, currentPage]);
+
+  const handleSort = useCallback((header: string) => {
+    const colToKey: Record<string, string> = {
+      'Número': 'number', 'Asunto': 'subject', 'Agente': 'agente',
+      'Usuario': 'usuario', 'Creación': 'created',
+    };
+    const key = colToKey[header];
+    if (!key) return;
+    setSortField(prev => {
+      const newDir = prev === header ? (sortDir === 'asc' ? 'desc' : 'asc') : 'asc';
+      setSortDir(newDir);
+      setFilters((f: any) => ({ ...f, sortBy: key, sortDir: newDir }));
+      setCurrentPage(1);
+      return header;
+    });
+  }, [sortDir]);
 
   // Contar filtros activos para indicador visual
   const activeFilterCount = useMemo(() => {
@@ -368,7 +387,13 @@ const AnalyticsView: React.FC = memo(() => {
         </div>
       ) : (
         <>
-          <DataTable tickets={filteredTickets} totalCount={filteredTickets.length} />
+          <DataTable
+            tickets={filteredTickets}
+            totalCount={pagination?.total_items || filteredTickets.length}
+            sortField={sortField}
+            sortDir={sortDir}
+            onSort={handleSort}
+          />
           {pagination && pagination.total_pages > 1 && (
             <div className="mt-6 flex justify-end">
               <Pagination pagination={pagination} onPageChange={handlePageChange} />
