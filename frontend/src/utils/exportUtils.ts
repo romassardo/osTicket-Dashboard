@@ -1,340 +1,419 @@
-import { saveAs } from 'file-saver';
-import * as XLSX from 'xlsx';
-import type { Ticket } from '../types';
-
 /**
- * Export utilities usando SheetJS para generar archivos Excel reales
- * Reemplaza la implementación anterior que generaba HTML
+ * exportUtils.ts — Generación de Excel con diseño corporativo usando ExcelJS
+ * Todas las descargas del sistema pasan por este módulo.
  */
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+import type { Ticket } from '../types';
+import logger from './logger';
 
-interface ExportOptions {
+// ─── Paleta corporativa ───────────────────────────────────────────────────────
+const C = {
+  titleBg:    'FF0F172A', // Navy oscuro  — fondo título principal
+  headerBg:   'FF1E3A5F', // Azul corporativo — fondo encabezados de columna
+  accentBg:   'FFD4952C', // Dorado/ámbar — acento de la app
+  white:      'FFFFFFFF',
+  rowAlt:     'FFF8FAFC', // Gris muy suave — filas alternadas
+  totalsBg:   'FFE2E8F0', // Gris medio — fila de totales
+  greenBg:    'FFDCFCE7', // Verde claro — SLA cumplido
+  greenText:  'FF166534',
+  redBg:      'FFFEE2E2', // Rojo claro — SLA vencido
+  redText:    'FF991B1B',
+  yellowBg:   'FFFEF9C3', // Amarillo claro — en curso / pendiente
+  yellowText: 'FF854D0E',
+  border:     'FFE2E8F0',
+} as const;
+
+type ArgbColor = string;
+
+// ─── Helper: aplicar estilo a una celda ──────────────────────────────────────
+function styleCell(
+  cell: ExcelJS.Cell,
+  opts: {
+    bold?: boolean;
+    italic?: boolean;
+    fontSize?: number;
+    fontColor?: ArgbColor;
+    bgColor?: ArgbColor;
+    hAlign?: ExcelJS.Alignment['horizontal'];
+    vAlign?: ExcelJS.Alignment['vertical'];
+    wrapText?: boolean;
+    border?: boolean;
+    numFmt?: string;
+  }
+) {
+  cell.font = {
+    name: 'Calibri',
+    bold: opts.bold ?? false,
+    italic: opts.italic ?? false,
+    size: opts.fontSize ?? 11,
+    color: opts.fontColor ? { argb: opts.fontColor } : undefined,
+  };
+  if (opts.bgColor) {
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: opts.bgColor },
+    };
+  }
+  cell.alignment = {
+    horizontal: opts.hAlign ?? 'left',
+    vertical: opts.vAlign ?? 'middle',
+    wrapText: opts.wrapText ?? false,
+  };
+  if (opts.border) {
+    const side: ExcelJS.BorderStyle = 'thin';
+    const color = { argb: C.border };
+    cell.border = {
+      top: { style: side, color },
+      left: { style: side, color },
+      bottom: { style: side, color },
+      right: { style: side, color },
+    };
+  }
+  if (opts.numFmt) cell.numFmt = opts.numFmt;
+}
+
+// ─── Helper: agregar fila de título principal (merged) ───────────────────────
+function addTitleRow(
+  ws: ExcelJS.Worksheet,
+  text: string,
+  colCount: number
+): ExcelJS.Row {
+  const row = ws.addRow([text]);
+  row.height = 36;
+  ws.mergeCells(row.number, 1, row.number, colCount);
+  styleCell(row.getCell(1), {
+    bold: true,
+    fontSize: 16,
+    fontColor: C.white,
+    bgColor: C.titleBg,
+    hAlign: 'center',
+    vAlign: 'middle',
+  });
+  return row;
+}
+
+// ─── Helper: agregar fila de subtítulo (metadata) ────────────────────────────
+function addSubtitleRow(
+  ws: ExcelJS.Worksheet,
+  text: string,
+  colCount: number
+): ExcelJS.Row {
+  const row = ws.addRow([text]);
+  row.height = 20;
+  ws.mergeCells(row.number, 1, row.number, colCount);
+  styleCell(row.getCell(1), {
+    fontSize: 10,
+    italic: true,
+    fontColor: C.white,
+    bgColor: C.headerBg,
+    hAlign: 'center',
+    vAlign: 'middle',
+  });
+  return row;
+}
+
+// ─── Helper: agregar fila de encabezados de columna ──────────────────────────
+function addHeaderRow(
+  ws: ExcelJS.Worksheet,
+  headers: string[]
+): ExcelJS.Row {
+  const row = ws.addRow(headers);
+  row.height = 22;
+  row.eachCell((cell) => {
+    styleCell(cell, {
+      bold: true,
+      fontSize: 11,
+      fontColor: C.white,
+      bgColor: C.headerBg,
+      hAlign: 'center',
+      vAlign: 'middle',
+      border: true,
+    });
+  });
+  return row;
+}
+
+// ─── Helpers de datos para tickets ───────────────────────────────────────────
+const getTransporte = (t: any): string =>
+  t.cdata?.dataValues?.transporteName ||
+  t.cdata?.TransporteName?.value ||
+  t.cdata?.transporte || '-';
+
+const getSector = (t: any): string =>
+  t.cdata?.dataValues?.sectorName ||
+  t.cdata?.SectorName?.value ||
+  t.cdata?.sector || '-';
+
+const getSlaName = (t: any): string => t.sla?.name ?? '-';
+
+const getSlaCumplido = (t: any): string => {
+  if (!t.sla || t.sla.grace_period == null || !t.created) return '-';
+  const grace = Number(t.sla.grace_period);
+  const start = new Date(t.created);
+  const end   = t.closed ? new Date(t.closed) : new Date();
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || isNaN(grace)) return '-';
+  const hours = (end.getTime() - start.getTime()) / 3_600_000;
+  if (!t.closed) return hours > grace ? 'No' : 'Pendiente';
+  return hours <= grace ? 'Sí' : 'No';
+};
+
+// ─── Export: Tickets (Analytics / Reportes) ──────────────────────────────────
+export interface TicketExportOptions {
   filename?: string;
-  includeFilters?: boolean;
+  sheetTitle?: string;
+  periodo?: string;
   filters?: Record<string, any>;
 }
 
-/**
- * Convert tickets data to CSV format
- */
-export const exportTicketsToCSV = (tickets: Ticket[], options: ExportOptions = {}) => {
-  if (tickets.length === 0) {
-    alert('No hay datos para exportar. Aplique filtros o espere a que se carguen los datos.');
-    return;
-  }
+export const exportTicketsToExcel = async (
+  tickets: Ticket[],
+  options: TicketExportOptions = {}
+): Promise<void> => {
+  if (tickets.length === 0) return;
 
   const {
-    filename = `tickets_analytics_${new Date().toISOString().slice(0, 10)}.csv`,
-    includeFilters = true,
-    filters = {}
+    filename    = `tickets_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    sheetTitle  = 'Reporte de Tickets',
+    periodo     = '',
+    filters     = {},
   } = options;
 
-  // Mostrar mensaje de confirmación con el número de registros
-  const confirmMessage = `Se exportarán ${tickets.length} registros a CSV. ¿Continuar?`;
-  if (!confirm(confirmMessage)) {
-    return;
-  }
+  const wb = new ExcelJS.Workbook();
+  wb.creator  = 'Dashboard Soporte IT';
+  wb.created  = new Date();
+  wb.modified = new Date();
 
-  // CSV Headers
+  // ── Hoja principal ───────────────────────────────────────────────
+  const ws = wb.addWorksheet('Tickets', {
+    pageSetup: { orientation: 'landscape', fitToPage: true },
+    views: [{ state: 'frozen', ySplit: 4 }],
+  });
+
+  const COLS = 10;
   const headers = [
-    'Nº Ticket',
-    'Asunto',
-    'Estado',
-    'Usuario',
-    'Agente',
-    'Sector/Sucursal',
-    'Transporte',
-    'SLA',
-    'SLA Cumplido',
-    'Fecha Creación'
+    'Nº Ticket', 'Asunto', 'Estado', 'Usuario', 'Agente',
+    'Sector / Sucursal', 'Transporte', 'SLA', 'SLA Cumplido', 'Fecha Creación',
   ];
 
-  // Convert tickets to CSV rows
-  const csvRows = tickets.map(ticket => {
-    // Función helper para obtener transporte de forma robusta
-    const getTransporteValue = (ticket: any): string => {
-      // Intentar múltiples formas de acceder al transporte
-      const transporteValue = 
-        ticket.cdata?.dataValues?.transporteName ||  // Estructura optimizada
-        ticket.cdata?.TransporteName?.value ||        // Estructura original
-        ticket.cdata?.transporte ||                   // Campo directo
-        null;
-      
-      return transporteValue ? String(transporteValue) : '-';
-    };
+  ws.columns = [
+    { width: 13 }, { width: 52 }, { width: 13 }, { width: 26 }, { width: 26 },
+    { width: 22 }, { width: 16 }, { width: 16 }, { width: 15 }, { width: 16 },
+  ];
 
-    // Función helper para obtener sector de forma robusta
-    const getSectorValue = (ticket: any): string => {
-      const sectorValue = 
-        ticket.cdata?.dataValues?.sectorName ||       // Estructura optimizada
-        ticket.cdata?.SectorName?.value ||            // Estructura original
-        ticket.cdata?.sector ||                       // Campo directo
-        null;
-      
-      return sectorValue ? String(sectorValue) : '-';
-    };
-
-    // Helper para obtener nombre de SLA
-    const getSlaName = (ticket: any): string => {
-      return ticket.sla?.name ? String(ticket.sla.name) : '-';
-    };
-
-    // Helper para determinar si el SLA está cumplido
-    // Lógica basada en slaRoutes (TIMESTAMPDIFF HOUR entre created y closed):
-    // - Si el ticket está cerrado: comparar horas entre created y closed vs grace_period
-    //     * diffHoras <= grace_period  => "Sí" (cumplido)
-    //     * diffHoras >  grace_period  => "No" (no cumplido)
-    // - Si el ticket está abierto: comparar horas entre created y ahora
-    //     * diffHoras > grace_period  => "No" (ya vencido)
-    //     * diffHoras <= grace_period => "Pendiente"
-    const getSlaCumplido = (ticket: any): string => {
-      if (!ticket.sla || ticket.sla.grace_period == null) return '-';
-      if (!ticket.created) return '-';
-
-      const graceHours = Number(ticket.sla.grace_period);
-      const createdDate = new Date(ticket.created);
-      const endDate = ticket.closed ? new Date(ticket.closed) : new Date();
-
-      if (isNaN(createdDate.getTime()) || isNaN(endDate.getTime()) || isNaN(graceHours)) {
-        return '-';
-      }
-
-      const diffMs = endDate.getTime() - createdDate.getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
-
-      if (!ticket.closed) {
-        // Ticket abierto
-        return diffHours > graceHours ? 'No' : 'Pendiente';
-      }
-
-      // Ticket cerrado
-      return diffHours <= graceHours ? 'Sí' : 'No';
-    };
-
-    return [
-      ticket.number || '-',
-      (ticket.cdata?.subject || '-').replace(/"/g, '""'), // Escape quotes
-      (ticket.status?.name || '-').replace(/"/g, '""'),
-      ticket.user ? `${ticket.user.name}`.replace(/"/g, '""') : '-',
-      ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}`.replace(/"/g, '""') : '-',
-      getSectorValue(ticket).replace(/"/g, '""'),
-      getTransporteValue(ticket).replace(/"/g, '""'),
-      getSlaName(ticket).replace(/"/g, '""'),
-      getSlaCumplido(ticket).replace(/"/g, '""'),
-      ticket.created ? new Date(ticket.created).toLocaleDateString('es-ES') : '-'
-    ];
-  });
-
-  // Build CSV content
-  let csvContent = '';
-  
-  // Add metadata header if filters are included
-  if (includeFilters) {
-    csvContent += `# Reporte de Tickets - Exportado el ${new Date().toLocaleString('es-ES')}\n`;
-    csvContent += `# Total de registros exportados: ${tickets.length}\n`;
-    
-    if (Object.keys(filters).length > 0) {
-      csvContent += '# Filtros aplicados:\n';
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) {
-          let filterName = key;
-          switch (key) {
-            case 'transporte': filterName = 'Transporte'; break;
-            case 'sla': filterName = 'SLA'; break;
-            case 'staff': filterName = 'Agente'; break;
-            case 'organization': filterName = 'Sector/Organización'; break;
-            case 'statuses': filterName = 'Estados'; break;
-            case 'startDate': filterName = 'Fecha desde'; break;
-            case 'endDate': filterName = 'Fecha hasta'; break;
-          }
-          csvContent += `# ${filterName}: ${value}\n`;
-        }
-      });
-    } else {
-      csvContent += '# Filtros aplicados: Ninguno (todos los registros disponibles)\n';
-    }
-    csvContent += '\n';
+  // Título + subtítulo
+  addTitleRow(ws, `DASHBOARD SOPORTE IT — ${sheetTitle}`, COLS);
+  const meta: string[] = [
+    `Exportado: ${new Date().toLocaleString('es-AR')}`,
+    `Total: ${tickets.length} registros`,
+  ];
+  if (periodo) meta.splice(1, 0, `Período: ${periodo}`);
+  const activeFilters = Object.entries(filters).filter(([, v]) => v);
+  if (activeFilters.length > 0) {
+    const filterStr = activeFilters.map(([k, v]) => `${k}: ${v}`).join(' | ');
+    meta.push(`Filtros: ${filterStr}`);
   }
+  addSubtitleRow(ws, meta.join('   ·   '), COLS);
 
-  // Add headers
-  csvContent += headers.map(header => `"${header}"`).join(',') + '\n';
+  // Fila vacía separadora
+  ws.addRow([]).height = 6;
 
-  // Add data rows
-  csvRows.forEach(row => {
-    csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
+  // Encabezados
+  addHeaderRow(ws, headers);
+
+  // ── Datos ────────────────────────────────────────────────────────
+  tickets.forEach((t, i) => {
+    const slaCumplido = getSlaCumplido(t);
+    const isAlt = i % 2 === 1;
+
+    const row = ws.addRow([
+      t.number || '-',
+      t.cdata?.subject || '-',
+      t.status?.name || '-',
+      t.user?.name || '-',
+      t.AssignedStaff
+        ? `${t.AssignedStaff.firstname} ${t.AssignedStaff.lastname}`
+        : '-',
+      getSector(t),
+      getTransporte(t),
+      getSlaName(t),
+      slaCumplido,
+      t.created ? new Date(t.created).toLocaleDateString('es-AR') : '-',
+    ]);
+
+    row.height = 18;
+
+    row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+      const isSlacol = colNum === 9; // columna SLA Cumplido
+      let bgColor: ArgbColor = isAlt ? C.rowAlt : C.white;
+      let textColor: ArgbColor | undefined;
+
+      if (isSlacol) {
+        if (slaCumplido === 'Sí')       { bgColor = C.greenBg;  textColor = C.greenText; }
+        else if (slaCumplido === 'No')  { bgColor = C.redBg;    textColor = C.redText;   }
+        else if (slaCumplido === 'Pendiente') { bgColor = C.yellowBg; textColor = C.yellowText; }
+      }
+
+      styleCell(cell, {
+        bgColor,
+        fontColor: textColor,
+        bold: isSlacol && slaCumplido !== '-',
+        hAlign: colNum === 1 || colNum >= 7 ? 'center' : 'left',
+        border: true,
+      });
+    });
   });
 
-  // Create and download file
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  saveAs(blob, filename);
+  // ── Hoja de información ──────────────────────────────────────────
+  const wsInfo = wb.addWorksheet('Información');
+  wsInfo.columns = [{ width: 25 }, { width: 50 }];
+  addTitleRow(wsInfo, 'INFORMACIÓN DEL REPORTE', 2);
+  wsInfo.addRow([]);
+  [
+    ['Generado por', 'Dashboard Soporte IT'],
+    ['Fecha de exportación', new Date().toLocaleString('es-AR')],
+    ['Total de registros', tickets.length.toString()],
+    ...(periodo ? [['Período', periodo]] : []),
+    ...activeFilters.map(([k, v]) => [k, String(v)]),
+  ].forEach(([label, value]) => {
+    const row = wsInfo.addRow([label, value]);
+    styleCell(row.getCell(1), { bold: true, bgColor: C.rowAlt, border: true });
+    styleCell(row.getCell(2), { border: true });
+    row.height = 18;
+  });
 
-  // Mostrar mensaje de éxito
-  setTimeout(() => {
-    alert(`✅ Exportación CSV completada exitosamente.\n${tickets.length} registros exportados a ${filename}`);
-  }, 500);
+  // ── Generar archivo ──────────────────────────────────────────────
+  const buffer = await wb.xlsx.writeBuffer();
+  saveAs(
+    new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }),
+    filename
+  );
+  logger.info(`Excel exportado: ${tickets.length} registros → ${filename}`);
 };
 
-/**
- * Exporta tickets a Excel usando SheetJS - genera archivos .xlsx reales
- * Reemplaza la implementación anterior que generaba HTML
- */
-export const exportTicketsToExcel = (tickets: Ticket[], options: ExportOptions = {}) => {
-  if (tickets.length === 0) {
-    alert('No hay datos para exportar. Aplique filtros o espere a que se carguen los datos.');
-    return;
-  }
+// ─── Export: Análisis SLA por agente ─────────────────────────────────────────
+export interface SlaStatRow {
+  agente: string;
+  total_tickets: number;
+  tickets_sla_cumplido: number;
+  tickets_sla_vencido: number;
+  porcentaje_sla_cumplido: number;
+  diferencia_sla_promedio: string;
+  tiempo_promedio_resolucion: string;
+  [key: string]: any;
+}
+
+export interface SlaExportOptions {
+  filename?: string;
+  periodo?: string;
+}
+
+export const exportSlaStatsToExcel = async (
+  stats: SlaStatRow[],
+  options: SlaExportOptions = {}
+): Promise<void> => {
+  if (stats.length === 0) return;
 
   const {
-    filename = `tickets_analytics_${new Date().toISOString().slice(0, 10)}.xlsx`,
-    includeFilters = true,
-    filters = {}
+    filename = `sla_analisis_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    periodo  = '',
   } = options;
 
-  // Mostrar mensaje de confirmación con el número de registros
-  const confirmMessage = `Se exportarán ${tickets.length} registros a Excel. ¿Continuar?`;
-  if (!confirm(confirmMessage)) {
-    return;
-  }
+  const wb = new ExcelJS.Workbook();
+  wb.creator  = 'Dashboard Soporte IT';
+  wb.created  = new Date();
+  wb.modified = new Date();
 
-  try {
-    // Función helper para obtener transporte de forma robusta
-    const getTransporteValue = (ticket: any): string => {
-      const transporteValue = 
-        ticket.cdata?.dataValues?.transporteName ||  // Estructura optimizada
-        ticket.cdata?.TransporteName?.value ||        // Estructura original
-        ticket.cdata?.transporte ||                   // Campo directo
-        null;
-      
-      return transporteValue ? String(transporteValue) : '-';
-    };
+  const ws = wb.addWorksheet('Análisis SLA', {
+    pageSetup: { orientation: 'landscape', fitToPage: true },
+    views: [{ state: 'frozen', ySplit: 4 }],
+  });
 
-    // Función helper para obtener sector de forma robusta
-    const getSectorValue = (ticket: any): string => {
-      const sectorValue = 
-        ticket.cdata?.dataValues?.sectorName ||       // Estructura optimizada
-        ticket.cdata?.SectorName?.value ||            // Estructura original
-        ticket.cdata?.sector ||                       // Campo directo
-        null;
-      
-      return sectorValue ? String(sectorValue) : '-';
-    };
+  const headers = [
+    'Agente', 'Total Tickets', 'Cumplidos', 'Vencidos',
+    '% Cumplimiento', 'Diferencia SLA (prom)', 'T. Prom. Resolución',
+  ];
+  const COLS = headers.length;
 
-    // Helper para obtener nombre de SLA
-    const getSlaName = (ticket: any): string => {
-      return ticket.sla?.name ? String(ticket.sla.name) : '-';
-    };
+  ws.columns = [
+    { width: 30 }, { width: 16 }, { width: 14 }, { width: 14 },
+    { width: 18 }, { width: 24 }, { width: 24 },
+  ];
 
-    // Helper para determinar si el SLA está cumplido (misma lógica que en CSV)
-    // - Si el ticket está cerrado: comparar horas entre created y closed vs grace_period
-    //     * diffHoras <= grace_period  => "Sí" (cumplido)
-    //     * diffHoras >  grace_period  => "No" (no cumplido)
-    // - Si el ticket está abierto: comparar horas entre created y ahora
-    //     * diffHoras > grace_period  => "No" (ya vencido)
-    //     * diffHoras <= grace_period => "Pendiente"
-    const getSlaCumplido = (ticket: any): string => {
-      if (!ticket.sla || ticket.sla.grace_period == null) return '-';
-      if (!ticket.created) return '-';
+  // Título + subtítulo
+  addTitleRow(ws, 'DASHBOARD SOPORTE IT — Análisis SLA por Agente', COLS);
+  const meta = [
+    `Exportado: ${new Date().toLocaleString('es-AR')}`,
+    `Total agentes: ${stats.length}`,
+  ];
+  if (periodo) meta.splice(1, 0, `Período: ${periodo}`);
+  addSubtitleRow(ws, meta.join('   ·   '), COLS);
 
-      const graceHours = Number(ticket.sla.grace_period);
-      const createdDate = new Date(ticket.created);
-      const endDate = ticket.closed ? new Date(ticket.closed) : new Date();
+  ws.addRow([]).height = 6;
+  addHeaderRow(ws, headers);
 
-      if (isNaN(createdDate.getTime()) || isNaN(endDate.getTime()) || isNaN(graceHours)) {
-        return '-';
-      }
+  // ── Datos ────────────────────────────────────────────────────────
+  stats.forEach((s, i) => {
+    const pct = Number(s.porcentaje_sla_cumplido) || 0;
+    const isAlt = i % 2 === 1;
 
-      const diffMs = endDate.getTime() - createdDate.getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
+    const row = ws.addRow([
+      s.agente || '-',
+      s.total_tickets,
+      s.tickets_sla_cumplido,
+      s.tickets_sla_vencido,
+      pct / 100,
+      s.diferencia_sla_promedio || '-',
+      s.tiempo_promedio_resolucion || '-',
+    ]);
+    row.height = 18;
 
-      if (!ticket.closed) {
-        // Ticket abierto
-        return diffHours > graceHours ? 'No' : 'Pendiente';
-      }
+    // Colorear % cumplimiento
+    let pctBg: ArgbColor = C.redBg, pctText: ArgbColor = C.redText;
+    if (pct >= 80)      { pctBg = C.greenBg;  pctText = C.greenText;  }
+    else if (pct >= 50) { pctBg = C.yellowBg; pctText = C.yellowText; }
 
-      // Ticket cerrado
-      return diffHours <= graceHours ? 'Sí' : 'No';
-    };
+    row.eachCell({ includeEmpty: true }, (cell, col) => {
+      const isPct = col === 5;
+      styleCell(cell, {
+        bgColor: isPct ? pctBg : (isAlt ? C.rowAlt : C.white),
+        fontColor: isPct ? pctText : undefined,
+        bold: isPct,
+        hAlign: col === 1 ? 'left' : 'center',
+        border: true,
+        numFmt: isPct ? '0.0%' : undefined,
+      });
+    });
+  });
 
-    // Convertir tickets a array de objetos para SheetJS
-    const ticketsData = tickets.map(ticket => ({
-      'Nº Ticket': ticket.number || '-',
-      'Asunto': ticket.cdata?.subject || '-',
-      'Estado': ticket.status?.name || '-',
-      'Usuario': ticket.user ? ticket.user.name : '-',
-      'Agente': ticket.AssignedStaff ? `${ticket.AssignedStaff.firstname} ${ticket.AssignedStaff.lastname}` : '-',
-      'Sector/Sucursal': getSectorValue(ticket),
-      'Transporte': getTransporteValue(ticket),
-      'SLA': getSlaName(ticket),
-      'SLA Cumplido': getSlaCumplido(ticket),
-      'Fecha Creación': ticket.created ? new Date(ticket.created).toLocaleDateString('es-ES') : '-'
-    }));
+  // Fila de totales
+  const totalTickets    = stats.reduce((s, r) => s + r.total_tickets, 0);
+  const totalCumplidos  = stats.reduce((s, r) => s + r.tickets_sla_cumplido, 0);
+  const totalVencidos   = stats.reduce((s, r) => s + r.tickets_sla_vencido, 0);
+  const pctTotal        = totalTickets > 0 ? totalCumplidos / totalTickets : 0;
 
-    // Crear worksheet principal con los datos según Context7
-    const worksheet = XLSX.utils.json_to_sheet(ticketsData);
+  const totRow = ws.addRow(['TOTALES', totalTickets, totalCumplidos, totalVencidos, pctTotal, '', '']);
+  totRow.height = 22;
+  totRow.eachCell({ includeEmpty: true }, (cell, col) => {
+    styleCell(cell, {
+      bold: true,
+      bgColor: C.totalsBg,
+      hAlign: col === 1 ? 'left' : 'center',
+      border: true,
+      numFmt: col === 5 ? '0.0%' : undefined,
+    });
+  });
 
-    // Crear workbook y añadir worksheet
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets");
-
-    // Si incluye filtros, crear una hoja adicional con metadatos
-    if (includeFilters) {
-      const metadataData = [
-        ['Reporte de Tickets'],
-        ['Fecha de exportación', new Date().toLocaleString('es-ES')],
-        ['Total de registros', tickets.length.toString()],
-        [''], // Línea vacía
-        ['Filtros aplicados:']
-      ];
-
-      if (Object.keys(filters).length > 0) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value) {
-            let filterName = key;
-            switch (key) {
-              case 'transporte': filterName = 'Transporte'; break;
-              case 'sla': filterName = 'SLA'; break;
-              case 'staff': filterName = 'Agente'; break;
-              case 'organization': filterName = 'Sector/Organización'; break;
-              case 'statuses': filterName = 'Estados'; break;
-              case 'startDate': filterName = 'Fecha desde'; break;
-              case 'endDate': filterName = 'Fecha hasta'; break;
-            }
-            metadataData.push([filterName, String(value)]);
-          }
-        });
-      } else {
-        metadataData.push(['Sin filtros', 'Todos los registros disponibles']);
-      }
-
-      // Crear worksheet de metadatos
-      const metadataWorksheet = XLSX.utils.aoa_to_sheet(metadataData);
-      XLSX.utils.book_append_sheet(workbook, metadataWorksheet, "Información");
-    }
-
-    // Calcular ancho de columnas automáticamente
-    const colWidths = [
-      { wch: 12 },  // Nº Ticket
-      { wch: 50 },  // Asunto
-      { wch: 12 },  // Estado
-      { wch: 25 },  // Usuario
-      { wch: 25 },  // Agente
-      { wch: 20 },  // Sector/Sucursal
-      { wch: 15 },  // Transporte
-      { wch: 15 },  // SLA
-      { wch: 14 },  // SLA Cumplido
-      { wch: 15 }   // Fecha Creación
-    ];
-    worksheet["!cols"] = colWidths;
-
-    // Generar archivo Excel con compresión según Context7
-    XLSX.writeFile(workbook, filename, { compression: true });
-
-    // Mostrar mensaje de éxito
-    setTimeout(() => {
-      alert(`✅ Exportación Excel completada exitosamente.\n${tickets.length} registros exportados a ${filename}\n\nArchivo Excel real (.xlsx) generado correctamente.`);
-    }, 500);
-
-  } catch (error) {
-    console.error('Error durante la exportación a Excel:', error);
-    alert('❌ Error al generar el archivo Excel. Por favor, inténtelo de nuevo.');
-  }
+  // ── Generar archivo ──────────────────────────────────────────────
+  const buffer = await wb.xlsx.writeBuffer();
+  saveAs(
+    new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }),
+    filename
+  );
+  logger.info(`SLA Excel exportado: ${stats.length} agentes → ${filename}`);
 };

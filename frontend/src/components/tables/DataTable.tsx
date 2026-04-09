@@ -1,7 +1,8 @@
 import React from 'react';
 import type { Ticket } from '../../types';
 import { formatDate } from '../../utils/formatters';
-import { DocumentTextIcon, ChevronUpIcon, ChevronDownIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon } from '@heroicons/react/24/outline';
+import { TrendingUp, TrendingDown, ArrowUpDown } from 'lucide-react';
 import logger from '../../utils/logger';
 
 interface DataTableProps {
@@ -15,7 +16,6 @@ interface DataTableProps {
 
 
 const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicketClick, sortField = null, sortDir = 'desc', onSort }) => {
-
   const tableHeaders = [
     'Número',
     'Asunto',
@@ -26,6 +26,7 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
     'Tipo Solicitud',
     'Creación',
   ];
+
 
   const getSLAStatus = (ticket: Ticket): { label: string; style: React.CSSProperties } => {
     const sla = ticket.sla;
@@ -85,32 +86,31 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
           {totalCount} {totalCount === 1 ? 'resultado' : 'resultados'}
         </span>
       </div>
-      
+
       <div className="overflow-x-auto">
         <table className="min-w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: 'var(--bg-tertiary)' }}>
               {tableHeaders.map((header) => {
-                const isSortable = header !== 'Estado SLA' && header !== 'Sector' && header !== 'Tipo Solicitud' && !!onSort;
+                const isSortable = header !== 'Estado SLA' && !!onSort;
                 const isActive = sortField === header;
                 return (
                   <th
                     key={header}
                     scope="col"
-                    className="group"
                     onClick={() => isSortable && onSort!(header)}
                     style={{ padding: '0.65rem 1rem', textAlign: 'left', fontSize: '0.6875rem', fontWeight: 600, color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border-subtle)', cursor: isSortable ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap' }}
                   >
-                    <div className="flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1">
                       {header}
                       {isSortable && (
                         isActive
                           ? sortDir === 'asc'
-                            ? <ChevronUpIcon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-                            : <ChevronDownIcon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
-                          : <ChevronUpDownIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: 'var(--text-muted)' }} />
+                            ? <TrendingUp className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                            : <TrendingDown className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--accent-primary)' }} />
+                          : <ArrowUpDown className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
                       )}
-                    </div>
+                    </span>
                   </th>
                 );
               })}
@@ -122,10 +122,10 @@ const DataTable: React.FC<DataTableProps> = ({ tickets, totalCount = 0, onTicket
                 const slaStatus = getSLAStatus(ticket);
                 const isUnassigned = !ticket.AssignedStaff;
                 return (
-                  <tr 
-                    key={ticket.ticket_id} 
+                  <tr
+                    key={ticket.ticket_id}
                     className="transition-colors duration-150 cursor-pointer"
-                    style={{ 
+                    style={{
                       background: isUnassigned ? 'color-mix(in srgb, var(--warning) 8%, var(--bg-secondary))' : 'var(--bg-secondary)',
                       borderBottom: idx < tickets.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                     }}

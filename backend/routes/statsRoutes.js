@@ -153,117 +153,29 @@ router.get('/tickets-by-sector', async (req, res, next) => {
   }
 });
 
+// Cache del field_id del campo de organización en formularios custom
+let _cachedOrgFieldId = null;
+async function getOrgFieldId() {
+  if (_cachedOrgFieldId !== null) return _cachedOrgFieldId;
+  const rows = await sequelize.query(
+    "SELECT id FROM ost_form_field WHERE name = 'sector' AND form_id = 2 LIMIT 1",
+    { type: sequelize.QueryTypes.SELECT }
+  );
+  _cachedOrgFieldId = rows.length > 0 ? rows[0].id : 36; // fallback al ID conocido
+  return _cachedOrgFieldId;
+}
+
 /**
  * GET /api/stats/tickets-by-organization
  * Devuelve un conteo de tickets agrupados por organización.
- * Parámetros: year, month, debug, fieldId, explore
+ * Parámetros: year, month
  */
 router.get('/tickets-by-organization', async (req, res, next) => {
-  const { year, month, debug, fieldId, explore } = req.query;
+  const { year, month } = req.query;
 
   try {
     const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
-    
-    // Si se pide explore, mostrar todos los campos con datos
-    if (explore === 'true') {
-      const fieldsWithData = await sequelize.query(`
-        SELECT
-          fev.field_id,
-          ff.label,
-          ff.name,
-          fev.value,
-          COUNT(*) as count
-        FROM ost_form_entry_values fev
-        INNER JOIN ost_form_field ff ON fev.field_id = ff.field_id
-        INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
-        INNER JOIN ost_ticket t ON fe.object_id = t.ticket_id
-        INNER JOIN ost_department d ON t.dept_id = d.id
-        WHERE fe.object_type = 'T'
-          AND d.name IN (:allowedDepts)
-          AND fev.value IS NOT NULL
-          AND fev.value != ''
-          AND LENGTH(fev.value) > 2
-        GROUP BY fev.field_id, ff.label, ff.name, fev.value
-        HAVING count > 10
-        ORDER BY fev.field_id, count DESC
-        LIMIT 50
-      `, {
-        replacements: { allowedDepts: allowedDepartmentNames },
-        type: sequelize.QueryTypes.SELECT
-      });
-
-      return res.json({
-        explore: true,
-        fieldsWithData,
-        message: "Buscar field_id y values que contengan empresas (ej: 'Empresa X', 'Corp Y') vs sucursales ('Pacheco', 'Romero')"
-      });
-    }
-
-    // Si se pide debug, devolver información de debugging
-    if (debug === 'true') {
-      // Ver todos los campos de formulario disponibles que podrían contener empresas
-      const allFields = await sequelize.query(`
-        SELECT field_id, form_id, type, label, name, hint
-        FROM ost_form_field
-        WHERE (label LIKE '%empresa%' OR label LIKE '%Empresa%'
-            OR label LIKE '%compañ%' OR label LIKE '%organiz%'
-            OR name LIKE '%empresa%' OR name LIKE '%company%')
-        ORDER BY field_id
-      `, {
-        type: sequelize.QueryTypes.SELECT
-      });
-
-      // Ver valores de muestra de field_id = 36 (actual)
-      const field36Sample = await sequelize.query(`
-        SELECT
-          fev.value,
-          COUNT(*) as count
-        FROM ost_form_entry_values fev
-        INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
-        WHERE fe.object_type = 'T'
-          AND fev.field_id = 36
-          AND fev.value IS NOT NULL
-        GROUP BY fev.value
-        ORDER BY count DESC
-        LIMIT 10
-      `, {
-        type: sequelize.QueryTypes.SELECT
-      });
-
-      // Ver otros campos que podrían ser empresas
-      const otherFields = await sequelize.query(`
-        SELECT
-          fev.field_id,
-          ff.label,
-          fev.value,
-          COUNT(*) as count
-        FROM ost_form_entry_values fev
-        INNER JOIN ost_form_field ff ON fev.field_id = ff.field_id
-        INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
-        WHERE fe.object_type = 'T'
-          AND fev.field_id != 36
-          AND fev.value IS NOT NULL
-          AND fev.value != ''
-          AND ff.type IN ('text', 'list', 'choices')
-        GROUP BY fev.field_id, ff.label, fev.value
-        HAVING count > 20
-        ORDER BY fev.field_id, count DESC
-        LIMIT 30
-      `, {
-        type: sequelize.QueryTypes.SELECT
-      });
-
-      return res.json({
-        debug: true,
-        allFields,
-        field36Sample,
-        otherFields,
-        message: "Buscar field_id que contenga empresas reales (no sucursales como Pacheco)"
-      });
-    }
-
-    // Permitir probar diferentes field_id
-    const targetFieldId = fieldId ? parseInt(fieldId, 10) : 36;
+    const targetFieldId = await getOrgFieldId();
 
     // Construcción del filtro de fecha para SQL directo
     let dateFilter = '';
@@ -370,158 +282,6 @@ router.get('/tickets-by-organization', async (req, res, next) => {
   } catch (error) {
     logger.error('❌ Error al generar estadísticas de organización:', error);
     next(error);
-  }
-});
-
-/**
- * DEBUGGING: Endpoint temporal para investigar el problema de organizaciones
- */
-router.get('/debug-organizations', async (req, res, next) => {
-  try {
-    const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
-
-    // 1. Ver cuántos tickets hay en total de los departamentos permitidos
-    const totalTickets = await sequelize.query(`
-      SELECT COUNT(*) as total
-      FROM ost_ticket t
-      INNER JOIN ost_department d ON t.dept_id = d.id
-      WHERE d.name IN (:allowedDepts)
-    `, {
-      replacements: { allowedDepts: allowedDepartmentNames },
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    // 2. Ver cuántos usuarios únicos están en esos tickets
-    const uniqueUsers = await sequelize.query(`
-      SELECT COUNT(DISTINCT t.user_id) as unique_users
-      FROM ost_ticket t
-      INNER JOIN ost_department d ON t.dept_id = d.id
-      WHERE d.name IN (:allowedDepts)
-    `, {
-      replacements: { allowedDepts: allowedDepartmentNames },
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    // 3. Ver muestra de usuarios de tickets con sus org_id
-    const userSample = await sequelize.query(`
-      SELECT DISTINCT t.user_id, u.name as user_name, u.org_id
-      FROM ost_ticket t
-      INNER JOIN ost_user u ON t.user_id = u.id
-      INNER JOIN ost_department d ON t.dept_id = d.id
-      WHERE d.name IN (:allowedDepts)
-      LIMIT 10
-    `, {
-      replacements: { allowedDepts: allowedDepartmentNames },
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    // 4. Ver distribución de org_id en tickets de soporte IT
-    const orgDistribution = await sequelize.query(`
-      SELECT
-        u.org_id,
-        COUNT(*) as ticket_count
-      FROM ost_ticket t
-      INNER JOIN ost_user u ON t.user_id = u.id
-      INNER JOIN ost_department d ON t.dept_id = d.id
-      WHERE d.name IN (:allowedDepts)
-      GROUP BY u.org_id
-      ORDER BY ticket_count DESC
-      LIMIT 10
-    `, {
-      replacements: { allowedDepts: allowedDepartmentNames },
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    // 5. Ver organizaciones reales que existen
-    const allOrgs = await sequelize.query(`
-      SELECT id, name FROM ost_organization ORDER BY name
-    `, {
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    res.json({
-      debug: {
-        totalTickets: totalTickets[0].total,
-        uniqueUsers: uniqueUsers[0].unique_users,
-        userSample,
-        orgDistribution,
-        allOrganizations: allOrgs,
-        message: "Revisar si org_id de users coincide con id de organizations"
-      }
-    });
-
-  } catch (error) {
-    logger.error('❌ Error en debug organizaciones:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * DEBUGGING: Investigar campos custom disponibles
- */
-router.get('/debug-fields', async (req, res, next) => {
-  try {
-    // 1. Ver todos los campos de formulario disponibles
-    const allFields = await sequelize.query(`
-      SELECT field_id, form_id, type, label, name, hint, configuration
-      FROM ost_form_field
-      WHERE type IN ('text', 'memo', 'list', 'choices')
-      ORDER BY field_id
-    `, {
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    // 2. Ver valores de muestra de algunos tickets recientes
-    const sampleValues = await sequelize.query(`
-      SELECT
-        fev.field_id,
-        ff.label,
-        ff.name,
-        fev.value,
-        COUNT(*) as value_count
-      FROM ost_form_entry_values fev
-      INNER JOIN ost_form_field ff ON fev.field_id = ff.field_id
-      INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
-      WHERE fe.object_type = 'T'
-        AND fev.value IS NOT NULL
-        AND fev.value != ''
-        AND ff.type IN ('text', 'list', 'choices')
-      GROUP BY fev.field_id, ff.label, ff.name, fev.value
-      HAVING value_count > 5
-      ORDER BY fev.field_id, value_count DESC
-      LIMIT 50
-    `, {
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    // 3. Ver valores específicos de field_id = 36 (que estamos usando actualmente)
-    const field36Values = await sequelize.query(`
-      SELECT
-        fev.value,
-        COUNT(*) as count
-      FROM ost_form_entry_values fev
-      INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
-      WHERE fe.object_type = 'T'
-        AND fev.field_id = 36
-        AND fev.value IS NOT NULL
-      GROUP BY fev.value
-      ORDER BY count DESC
-      LIMIT 20
-    `, {
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    res.json({
-      debug: true,
-      allFields,
-      sampleValues,
-      field36Values,
-      message: "Buscar campo que contenga empresas (no sucursales)"
-    });
-
-  } catch (error) {
-    logger.error('❌ Error en debug fields:', error);
-    res.status(500).json({ error: error.message });
   }
 });
 

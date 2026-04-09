@@ -3,6 +3,15 @@ import { MagnifyingGlassIcon, AdjustmentsHorizontalIcon, XMarkIcon, FunnelIcon }
 import AdvancedSearchModal from '../modals/AdvancedSearchModal';
 import type { AdvancedFilters } from '../../types';
 
+function useDebounce(value: string, delay: number): string {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
 interface SearchBarProps {
   onSearch: (searchTerm: string) => void;
   onApplyFilters: (filters: AdvancedFilters) => void;
@@ -11,40 +20,23 @@ interface SearchBarProps {
   showSlaStatus?: boolean;
 }
 
-const SearchBar: React.FC<SearchBarProps> = ({ 
-  onSearch, 
-  onApplyFilters, 
+const SearchBar: React.FC<SearchBarProps> = ({
+  onSearch,
+  onApplyFilters,
   loading = false,
   activeFilters = false,
-  showSlaStatus = false 
+  showSlaStatus = false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Debounce implementation
-  const useDebounce = (value: string, delay: number) => {
-    const [debouncedValue, setDebouncedValue] = useState(value);
-
-    useEffect(() => {
-      const handler = setTimeout(() => {
-        setDebouncedValue(value);
-        setIsTyping(false);
-      }, delay);
-
-      return () => {
-        clearTimeout(handler);
-      };
-    }, [value, delay]);
-
-    return debouncedValue;
-  };
 
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
   // Trigger search when debounced value changes
   useEffect(() => {
     onSearch(debouncedSearchTerm);
+    setIsTyping(false);
   }, [debouncedSearchTerm, onSearch]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

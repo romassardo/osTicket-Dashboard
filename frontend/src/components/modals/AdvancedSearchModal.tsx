@@ -55,24 +55,14 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
   const [selectedSlaStatus, setSelectedSlaStatus] = useState<string>('');
 
 
-  // DEBUG: Monitorear cambios en selectedStatuses
   useEffect(() => {
-    logger.debug('🔍 Modal: selectedStatuses cambió a:', selectedStatuses);
-  }, [selectedStatuses]);
-
-  // DEBUG: Monitorear cuando se abre/cierra el modal
-  useEffect(() => {
-    logger.debug('🔍 Modal: isOpen cambió a:', isOpen);
-    if (!isOpen) {
-      logger.debug('🔍 Modal: Cerrando modal, estados actuales:', {
-        selectedStatuses,
-        startDate,
-        endDate,
-        selectedOrg,
-        selectedStaff
-      });
-    }
-  }, [isOpen, selectedStatuses, startDate, endDate, selectedOrg, selectedStaff]);
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen) {
@@ -92,10 +82,7 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
       fetchData('/api/statuses/simple', setStatuses);
       fetchData('/api/tickets/options/sector', setOrganizations);
       fetchData('/api/staff/simple', setStaff);
-      fetchData('/api/tickets/options/sla', (data) => {
-        logger.debug('Modal: SLA options recibidas:', data);
-        setSlaOptions(data);
-      });
+      fetchData('/api/tickets/options/sla', setSlaOptions);
       fetchData('/api/tickets/options/requestType', setRequestTypeOptions);
     }
   }, [isOpen]);
@@ -105,7 +92,6 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
       const newStatuses = prev.includes(statusId)
         ? prev.filter(id => id !== statusId)
         : [...prev, statusId];
-      logger.debug('Modal: Estado de statuses actualizado:', newStatuses);
       return newStatuses;
     });
   };
@@ -120,7 +106,6 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
       selectedRequestType: selectedRequestType,
     };
     if (selectedSlaStatus) filtersToApply.slaStatus = selectedSlaStatus;
-    logger.debug('Modal: Aplicando filtros:', filtersToApply);
     onApplyFilters(filtersToApply);
     onClose();
   };
@@ -134,7 +119,6 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
     setSelectedSla('');
     setSelectedRequestType('');
     setSelectedSlaStatus('');
-    logger.debug('Modal: Filtros limpiados');
   };
 
   const chipBase: React.CSSProperties = {
@@ -163,11 +147,15 @@ const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({ isOpen, onClo
 
   return (
     <div className={`fixed inset-0 z-50 flex justify-center items-center transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={`w-full max-w-2xl transform transition-all duration-300 ${isOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="advanced-search-modal-title"
         style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-xl)', border: '1px solid var(--border-subtle)', padding: '1.5rem' }}>
         <div className="flex items-center justify-between mb-6 pb-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-          <h2 className="font-display" style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)' }}>Filtros avanzados</h2>
+          <h2 id="advanced-search-modal-title" className="font-display" style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)' }}>Filtros avanzados</h2>
           <button 
             onClick={onClose}
             style={{ color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer', borderRadius: 'var(--radius-md)', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}

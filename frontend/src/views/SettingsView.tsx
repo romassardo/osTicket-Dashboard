@@ -6,16 +6,145 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Label } from "../components/ui/label";
 import { useTheme } from "../context/ThemeContext";
 import { useConfig } from "../context/ConfigContext";
+import { TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
+
+interface Holiday {
+  id: number;
+  name: string;
+  date: string; // YYYY-MM-DD
+}
+
+const FERIADOS_2026: Omit<Holiday, 'id'>[] = [
+  { date: '2026-01-01', name: 'Año Nuevo' },
+  { date: '2026-02-16', name: 'Carnaval' },
+  { date: '2026-02-17', name: 'Carnaval' },
+  { date: '2026-03-24', name: 'Día Nacional de la Memoria por la Verdad y la Justicia' },
+  { date: '2026-04-02', name: 'Día del Veterano y de los Caídos en la Guerra de Malvinas' },
+  { date: '2026-04-03', name: 'Viernes Santo' },
+  { date: '2026-05-01', name: 'Día del Trabajador' },
+  { date: '2026-05-25', name: 'Día de la Revolución de Mayo' },
+  { date: '2026-06-17', name: 'Paso a la Inmortalidad del Gral. Martín Miguel de Güemes' },
+  { date: '2026-06-20', name: 'Paso a la Inmortalidad del Gral. Manuel Belgrano' },
+  { date: '2026-07-09', name: 'Día de la Independencia' },
+  { date: '2026-08-17', name: 'Paso a la Inmortalidad del Gral. José de San Martín' },
+  { date: '2026-10-12', name: 'Día del Respeto a la Diversidad Cultural' },
+  { date: '2026-11-23', name: 'Día de la Soberanía Nacional' },
+  { date: '2026-12-08', name: 'Inmaculada Concepción de María' },
+  { date: '2026-12-25', name: 'Navidad' },
+];
+
+function formatHolidayDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+function useHolidays() {
+  const [holidays, setHolidays] = React.useState<Holiday[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const fetchHolidays = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/holidays');
+      if (!res.ok) throw new Error('Error al cargar feriados');
+      const data = await res.json();
+      setHolidays(data.holidays || []);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => { fetchHolidays(); }, [fetchHolidays]);
+
+  const addHoliday = async (name: string, date: string) => {
+    const res = await fetch('/api/holidays', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, date }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Error al agregar feriado');
+    }
+    await fetchHolidays();
+  };
+
+  const deleteHoliday = async (id: number) => {
+    const res = await fetch(`/api/holidays/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Error al eliminar feriado');
+    }
+    await fetchHolidays();
+  };
+
+  return { holidays, loading, error, addHoliday, deleteHoliday, fetchHolidays };
+}
 
 const SettingsView: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const { config, updateConfig, resetConfig, saveConfig, isDirty } = useConfig();
   const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
+  const { holidays, loading: holidaysLoading, error: holidaysError, addHoliday, deleteHoliday } = useHolidays();
+  const [newHolidayName, setNewHolidayName] = React.useState('');
+  const [newHolidayDate, setNewHolidayDate] = React.useState('');
+  const [holidayActionError, setHolidayActionError] = React.useState<string | null>(null);
+  const [loadingAction, setLoadingAction] = React.useState<string | null>(null);
 
   const handleSaveConfig = () => {
     saveConfig();
     setShowSaveSuccess(true);
     setTimeout(() => setShowSaveSuccess(false), 3000);
+  };
+
+  const handleAddHoliday = async () => {
+    if (!newHolidayName.trim() || !newHolidayDate) {
+      setHolidayActionError('Completá el nombre y la fecha del feriado.');
+      return;
+    }
+    setHolidayActionError(null);
+    setLoadingAction('add');
+    try {
+      await addHoliday(newHolidayName.trim(), newHolidayDate);
+      setNewHolidayName('');
+      setNewHolidayDate('');
+    } catch (e: any) {
+      setHolidayActionError(e.message);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleDeleteHoliday = async (id: number) => {
+    setHolidayActionError(null);
+    setLoadingAction(`del-${id}`);
+    try {
+      await deleteHoliday(id);
+    } catch (e: any) {
+      setHolidayActionError(e.message);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleLoadFeriados2026 = async () => {
+    setHolidayActionError(null);
+    setLoadingAction('seed');
+    const existingDates = new Set(holidays.map(h => h.date));
+    const toAdd = FERIADOS_2026.filter(f => !existingDates.has(f.date));
+    try {
+      for (const f of toAdd) {
+        await addHoliday(f.name, f.date);
+      }
+    } catch (e: any) {
+      setHolidayActionError(e.message);
+    } finally {
+      setLoadingAction(null);
+    }
   };
 
   return (
@@ -217,6 +346,109 @@ const SettingsView: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Holidays Management */}
+          <Card style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg font-medium font-display">Feriados</CardTitle>
+                  <CardDescription style={{ color: 'var(--text-muted)' }}>
+                    Los feriados son excluidos del cálculo de SLA. Horario laboral: Lun–Vie 8:30–17:30.
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleLoadFeriados2026}
+                  disabled={loadingAction === 'seed'}
+                  style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}
+                >
+                  {loadingAction === 'seed' ? 'Cargando...' : 'Cargar feriados 2026'}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Add new holiday */}
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Nombre</Label>
+                  <input
+                    type="text"
+                    value={newHolidayName}
+                    onChange={e => setNewHolidayName(e.target.value)}
+                    placeholder="Ej: Día del Trabajador"
+                    maxLength={60}
+                    style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', background: 'var(--bg-tertiary)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', outline: 'none' }}
+                    onKeyDown={e => e.key === 'Enter' && handleAddHoliday()}
+                  />
+                </div>
+                <div style={{ width: 160 }}>
+                  <Label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>Fecha</Label>
+                  <input
+                    type="date"
+                    value={newHolidayDate}
+                    onChange={e => setNewHolidayDate(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', background: 'var(--bg-tertiary)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', outline: 'none' }}
+                  />
+                </div>
+                <Button
+                  onClick={handleAddHoliday}
+                  disabled={loadingAction === 'add'}
+                  className="flex items-center gap-1"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  Agregar
+                </Button>
+              </div>
+
+              {holidayActionError && (
+                <p style={{ color: 'var(--error)', fontSize: '0.8125rem' }}>{holidayActionError}</p>
+              )}
+
+              {/* Holiday list */}
+              {holidaysLoading ? (
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>Cargando feriados...</p>
+              ) : holidaysError ? (
+                <p style={{ color: 'var(--error)', fontSize: '0.8125rem' }}>{holidaysError}</p>
+              ) : holidays.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', fontStyle: 'italic' }}>
+                  No hay feriados configurados. Usá el botón "Cargar feriados 2026" para agregar los días oficiales.
+                </p>
+              ) : (
+                <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                  {holidays.map((h, idx) => (
+                    <div
+                      key={h.id}
+                      className="flex items-center justify-between"
+                      style={{
+                        padding: '0.6rem 1rem',
+                        borderBottom: idx < holidays.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                        background: idx % 2 === 0 ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--accent-primary)', minWidth: 80 }}>
+                          {formatHolidayDate(h.date)}
+                        </span>
+                        <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)' }}>{h.name}</span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteHoliday(h.id)}
+                        disabled={loadingAction === `del-${h.id}`}
+                        title="Eliminar feriado"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', opacity: loadingAction === `del-${h.id}` ? 0.4 : 1, transition: 'color 150ms ease' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--error)')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

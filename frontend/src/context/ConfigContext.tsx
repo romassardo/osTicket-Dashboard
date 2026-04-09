@@ -82,16 +82,8 @@ const saveConfigToStorage = (config: AppConfig): void => {
 // Provider del contexto
 export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
   const [config, setConfig] = useState<AppConfig>(loadConfigFromStorage);
-  const [savedConfig, setSavedConfig] = useState<AppConfig>(loadConfigFromStorage);
+  const [savedConfig, setSavedConfig] = useState<AppConfig>(config);
   const [isDirty, setIsDirty] = useState<boolean>(false);
-
-  // Cargar configuración al inicializar
-  useEffect(() => {
-    const loadedConfig = loadConfigFromStorage();
-    setConfig(loadedConfig);
-    setSavedConfig(loadedConfig);
-    setIsDirty(false);
-  }, []);
 
   // Detectar cambios no guardados
   useEffect(() => {

@@ -1,7 +1,36 @@
 const express = require('express');
 const { Op, fn, col } = require('sequelize');
-const { Ticket, User, Department, Staff, Organization, TicketStatus, TicketPriority, HelpTopic, SLA } = require('../models');
+const models = require('../models');
+const { Ticket, User, Department, Staff, Organization, TicketStatus, TicketPriority, HelpTopic, SLA, TicketCdata, ListItems, sequelize: db } = models;
 const logger = require('../utils/logger');
+
+// Cache módulo-nivel: field_ids de campos de formulario (no cambian en runtime)
+let _cachedTpSolicitudFieldId = null;
+let _cachedSectorFieldId = null;
+
+async function getSectorFieldId() {
+    if (_cachedSectorFieldId !== null) return _cachedSectorFieldId;
+    const rows = await db.query(
+        "SELECT id AS field_id FROM ost_form_field WHERE name = 'sector' LIMIT 1",
+        { type: db.QueryTypes.SELECT }
+    );
+    _cachedSectorFieldId = rows.length > 0 ? rows[0].field_id : null;
+    if (_cachedSectorFieldId) logger.info(`Sector field_id cacheado: ${_cachedSectorFieldId}`);
+    return _cachedSectorFieldId;
+}
+
+async function getTpSolicitudFieldId() {
+    if (_cachedTpSolicitudFieldId !== null) return _cachedTpSolicitudFieldId;
+    const rows = await db.query(
+        "SELECT id AS field_id FROM ost_form_field WHERE name LIKE '%tpsolicitud%' OR name LIKE '%TPSolicitud%' OR label LIKE '%TPSolicitud%' OR label LIKE '%Tipo de Solicitud%' LIMIT 1",
+        { type: db.QueryTypes.SELECT }
+    );
+    _cachedTpSolicitudFieldId = rows.length > 0 ? rows[0].field_id : null;
+    if (_cachedTpSolicitudFieldId) {
+        logger.info(`TPSolicitud field_id cacheado: ${_cachedTpSolicitudFieldId}`);
+    }
+    return _cachedTpSolicitudFieldId;
+}
 
 const router = express.Router();
 
@@ -11,15 +40,34 @@ const asyncHandler = fn => (req, res, next) => {
 };
 
 // Helper: Construir ORDER BY para Sequelize a partir de params del frontend
-function buildOrder(sortBy, sortDir, models) {
+async function buildOrder(sortBy, sortDir, models) {
     const dir = sortDir === 'asc' ? 'ASC' : 'DESC';
     const { Staff, User, TicketCdata } = models;
+
+    // Subconsulta reutilizable para campos de formulario dinámico
+    const fevSubquery = (fieldId) => db.literal(
+        `(SELECT fev.value FROM ost_form_entry_values fev ` +
+        `JOIN ost_form_entry fe ON fe.id = fev.entry_id ` +
+        `WHERE fe.object_id = \`Ticket\`.\`ticket_id\` ` +
+        `AND fe.object_type = 'T' AND fev.field_id = ${fieldId} LIMIT 1)`
+    );
+
     switch (sortBy) {
         case 'number':  return [['number', dir]];
         case 'created': return [['created', dir]];
         case 'agente':  return [[{ model: Staff, as: 'AssignedStaff' }, 'firstname', dir], ['created', 'DESC']];
         case 'usuario': return [[{ model: User, as: 'user' }, 'name', dir], ['created', 'DESC']];
         case 'subject': return [[{ model: TicketCdata, as: 'cdata' }, 'subject', dir], ['created', 'DESC']];
+        case 'sector': {
+            const fieldId = await getSectorFieldId();
+            if (!fieldId) return [['created', 'DESC']];
+            return [[fevSubquery(fieldId), dir], ['created', 'DESC']];
+        }
+        case 'requestType': {
+            const fieldId = await getTpSolicitudFieldId();
+            if (!fieldId) return [['created', 'DESC']];
+            return [[fevSubquery(fieldId), dir], ['created', 'DESC']];
+        }
         default:        return [['created', 'DESC']];
     }
 }
@@ -56,23 +104,19 @@ router.get('/', asyncHandler(async (req, res) => {
         }
     }
     
-    // Filtro por tipo de solicitud (TPSolicitud) - usa subquery en ost_form_entry_values
+    // Filtro por tipo de solicitud (TPSolicitud) - field_id cacheado al inicio
     if (requestType && requestType !== 'all') {
-        const sequelize = require('../models').sequelize;
-        const fieldRows = await sequelize.query(
-            "SELECT `id` AS field_id FROM `ost_form_field` WHERE `name` LIKE '%tpsolicitud%' OR `name` LIKE '%TPSolicitud%' OR `label` LIKE '%TPSolicitud%' LIMIT 1",
-            { type: sequelize.QueryTypes.SELECT }
-        );
-        if (fieldRows && fieldRows.length > 0) {
-            const matchingTickets = await sequelize.query(`
+        const fieldId = await getTpSolicitudFieldId();
+        if (fieldId) {
+            const matchingTickets = await db.query(`
                 SELECT fe.object_id AS ticket_id
                 FROM ost_form_entry_values fev
                 INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
                 WHERE fe.object_type = 'T' AND fev.field_id = :fieldId
                   AND fev.value LIKE :pattern
             `, {
-                replacements: { fieldId: fieldRows[0].field_id, pattern: `%${requestType}%` },
-                type: sequelize.QueryTypes.SELECT
+                replacements: { fieldId, pattern: `%${requestType}%` },
+                type: db.QueryTypes.SELECT
             });
             const ids = matchingTickets.map(r => r.ticket_id);
             where.ticket_id = { ...(where.ticket_id || {}), [Op.in]: ids.length > 0 ? ids : [0] };
@@ -159,19 +203,19 @@ router.get('/', asyncHandler(async (req, res) => {
             { model: User, as: 'user', attributes: ['name'], required: false },
             { model: HelpTopic, attributes: ['topic'], required: false },
             {
-                model: require('../models').TicketCdata,
+                model: TicketCdata,
                 as: 'cdata',
                 attributes: ['subject', 'sector', 'transporte'],
                 required: false,
                 include: [
                     {
-                        model: require('../models').ListItems,
+                        model: ListItems,
                         as: 'SectorName',
                         attributes: ['id', 'value'],
                         required: false
                     },
                     {
-                        model: require('../models').ListItems,
+                        model: ListItems,
                         as: 'TransporteName',
                         attributes: ['id', 'value'],
                         required: false
@@ -181,16 +225,15 @@ router.get('/', asyncHandler(async (req, res) => {
         ],
         limit: parseInt(limit, 10),
         offset,
-        order: buildOrder(sortBy, sortDir, require('../models')),
+        order: await buildOrder(sortBy, sortDir, models),
         subQuery: false,
         distinct: true
     });
-    
+
     logger.debug(`Consulta completada - Total: ${count}, Devolviendo: ${rows.length}`);
-    
+
     // Enriquecer con Tipo de Solicitud (TPSolicitud)
-    const sequelizeInstance = require('../models').sequelize;
-    const enrichedRows = await enrichWithRequestType(rows, sequelizeInstance);
+    const enrichedRows = await enrichWithRequestType(rows, db);
 
     res.json({
         tickets: enrichedRows,
@@ -205,14 +248,11 @@ router.get('/', asyncHandler(async (req, res) => {
 
 // GET /api/tickets/reports - Obtener tickets para reportes con filtros y paginación
 router.get('/reports', async (req, res) => {
-    logger.info('GET /api/tickets/reports');
-    logger.info(`Query recibido: ${JSON.stringify(req.query)}`);
+    const { page = 1, limit = 100, search, month, year, status, priority, department, sla, team, topic, location, staff, sector, transporte, requestType, startDate, endDate, sortBy, sortDir } = req.query;
 
-    const { page = 1, limit = 10, search, month, year, status, priority, department, sla, team, topic, location, staff, sector, transporte, requestType, startDate, endDate, sortBy, sortDir } = req.query;
-    logger.info('Paso 1: Parámetros extraídos.');
-
-    const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-    logger.info(`Paso 2: Offset calculado: ${offset}`);
+    const parsedLimit = Math.min(parseInt(limit, 10) || 100, 20000); // tope de seguridad
+    const parsedPage  = Math.max(parseInt(page, 10) || 1, 1);
+    const offset = (parsedPage - 1) * parsedLimit;
 
     let where = {};
     // Incluir asociaciones para obtener nombres legibles
@@ -251,19 +291,19 @@ router.get('/reports', async (req, res) => {
             required: false
         },
         {
-            model: require('../models').TicketCdata,
+            model: TicketCdata,
             as: 'cdata',
             attributes: ['subject', 'sector', 'transporte'],
             required: false,
             include: [
                 {
-                    model: require('../models').ListItems,
+                    model: ListItems,
                     as: 'SectorName',
                     attributes: ['id', 'value'],
                     required: false
                 },
                 {
-                    model: require('../models').ListItems,
+                    model: ListItems,
                     as: 'TransporteName',
                     attributes: ['id', 'value'],
                     required: false
@@ -297,23 +337,19 @@ router.get('/reports', async (req, res) => {
             where.sla_id = slaId;
         }
     }
-    // Filtro por tipo de solicitud (TPSolicitud)
+    // Filtro por tipo de solicitud (TPSolicitud) - field_id cacheado
     if (requestType && requestType !== 'all') {
-        const sequelizeInst = require('../models').sequelize;
-        const fieldRows = await sequelizeInst.query(
-            "SELECT `id` AS field_id FROM `ost_form_field` WHERE `name` LIKE '%tpsolicitud%' OR `name` LIKE '%TPSolicitud%' OR `label` LIKE '%TPSolicitud%' LIMIT 1",
-            { type: sequelizeInst.QueryTypes.SELECT }
-        );
-        if (fieldRows && fieldRows.length > 0) {
-            const matchingTickets = await sequelizeInst.query(`
+        const fieldId = await getTpSolicitudFieldId();
+        if (fieldId) {
+            const matchingTickets = await db.query(`
                 SELECT fe.object_id AS ticket_id
                 FROM ost_form_entry_values fev
                 INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
                 WHERE fe.object_type = 'T' AND fev.field_id = :fieldId
                   AND fev.value LIKE :pattern
             `, {
-                replacements: { fieldId: fieldRows[0].field_id, pattern: `%${requestType}%` },
-                type: sequelizeInst.QueryTypes.SELECT
+                replacements: { fieldId, pattern: `%${requestType}%` },
+                type: db.QueryTypes.SELECT
             });
             const ids = matchingTickets.map(r => r.ticket_id);
             where.ticket_id = { ...(where.ticket_id || {}), [Op.in]: ids.length > 0 ? ids : [0] };
@@ -361,36 +397,33 @@ router.get('/reports', async (req, res) => {
     });
 
     try {
-        logger.info(`[REPORTS_LOG] 🔍 Ejecutando consulta con filtros: ${JSON.stringify(where, null, 2)}`);
         const { count, rows } = await Ticket.findAndCountAll({
             where,
             include,
-            limit: parseInt(limit, 10),
+            limit: parsedLimit,
             offset,
-            order: buildOrder(sortBy, sortDir, require('../models')),
+            order: await buildOrder(sortBy, sortDir, models),
             subQuery: false,
             distinct: true,
         });
 
-        logger.info(`[REPORTS_LOG] ✅ Consulta exitosa. Tickets encontrados: ${count}.`);
+        logger.info(`/reports: ${count} tickets encontrados, devolviendo ${rows.length}`);
 
         // Enriquecer con Tipo de Solicitud (TPSolicitud)
-        const sequelizeForEnrich = require('../models').sequelize;
-        const enrichedRows = await enrichWithRequestType(rows, sequelizeForEnrich);
+        const enrichedRows = await enrichWithRequestType(rows, db);
 
         return res.status(200).json({
             tickets: enrichedRows,
             pagination: {
                 total_items: count,
-                total_pages: Math.ceil(count / parseInt(limit, 10)),
-                current_page: parseInt(page, 10),
-                per_page: parseInt(limit, 10)
+                total_pages: Math.ceil(count / parsedLimit),
+                current_page: parsedPage,
+                per_page: parsedLimit
             }
         });
 
     } catch (error) {
-        logger.error(`[REPORTS_LOG] ❌ Error en la ruta /reports: ${error.message}`);
-        console.error(error); // Log completo del error para diagnóstico
+        logger.error(`/reports error: ${error.message}`);
         return res.status(500).json({
             message: 'Error interno del servidor al procesar la solicitud de reportes.',
             error: error.message
@@ -398,11 +431,12 @@ router.get('/reports', async (req, res) => {
     }
 });
 
-// GET /api/tickets/stats - Obtener estadísticas de tickets
+// GET /api/tickets/stats - DEPRECATED: getTicketCounts fue removida; usar /api/tickets/count
 router.get('/stats', asyncHandler(async (req, res) => {
-    const { month, year } = req.query;
-    const stats = await getTicketCounts({ month, year });
-    res.json(stats);
+    res.status(410).json({
+        error: 'Endpoint deprecado',
+        message: 'Usar /api/tickets/count para obtener estadísticas de tickets'
+    });
 }));
 
 // REMOVED: /stats/by-transport — referenced undefined Location model
@@ -439,45 +473,52 @@ router.get('/count', asyncHandler(async (req, res) => {
         },
         attributes: []
     };
-    
-    // Obtener conteos básicos (solo Soporte IT)
-    const totalTickets = await Ticket.count({ 
-        where,
-        include: [departmentInclude]
-    });
-    
-    // Obtener conteos por estado dinámicamente (solo Soporte IT)
-    const statusCounts = await Ticket.findAll({
-        attributes: [
-            'status_id',
-            [fn('COUNT', col('ticket_id')), 'count']
-        ],
-        include: [
-            {
-                model: TicketStatus,
-                as: 'status',
-                attributes: ['name']
-            },
-            departmentInclude
-        ],
-        where,
-        group: ['status_id', 'status.id'],
-        raw: false
-    });
-    
+
+    // Ejecutar statusCounts y totalPendingCount en paralelo (de 3 queries seriales → 2 paralelas)
+    const [statusCounts, totalPendingCount] = await Promise.all([
+        // Conteos por estado (de estos se deriva totalTickets sumando)
+        Ticket.findAll({
+            attributes: [
+                'status_id',
+                [fn('COUNT', col('ticket_id')), 'count']
+            ],
+            include: [
+                { model: TicketStatus, as: 'status', attributes: ['name'] },
+                departmentInclude
+            ],
+            where,
+            group: ['status_id', 'status.id'],
+            raw: false
+        }),
+        // Total acumulado pendiente (sin filtro de fecha — siempre es "todos los abiertos")
+        Ticket.count({
+            include: [
+                {
+                    model: TicketStatus,
+                    as: 'status',
+                    where: { name: { [Op.notIn]: ['Resuelto', 'Cerrado'] } }
+                },
+                departmentInclude
+            ]
+        })
+    ]);
+
     // Procesar conteos por estado
     let openTickets = 0;
     let closedTickets = 0;
     let pendingTickets = 0;
     const byStatus = {};
     
+    let totalTickets = 0;
     statusCounts.forEach(item => {
         const statusName = item.status?.name?.toLowerCase() || '';
         const count = parseInt(item.dataValues.count) || 0;
-        
+
+        totalTickets += count;
+
         // Agregar al objeto byStatus para la gráfica
         byStatus[item.status?.name || 'Desconocido'] = count;
-        
+
         // Categorizar estados
         if (statusName.includes('open') || statusName.includes('abierto') || statusName.includes('nuevo')) {
             openTickets += count;
@@ -487,26 +528,7 @@ router.get('/count', asyncHandler(async (req, res) => {
             pendingTickets += count;
         }
     });
-    
-    // Obtener total de tickets pendientes acumulados (todos los tickets NO cerrados - solo Soporte IT)
-    // Esto incluye tickets abiertos del mes actual + tickets abiertos de meses anteriores
-    // Basado en los estados que vimos: "Abierto" = pendiente, "Resuelto" y "Cerrado" = no pendiente
-    const totalPendingCount = await Ticket.count({
-        include: [
-            {
-                model: TicketStatus,
-                as: 'status',
-                where: {
-                    // Solo incluir estados que NO sean "Resuelto" o "Cerrado"
-                    name: {
-                        [Op.notIn]: ['Resuelto', 'Cerrado']
-                    }
-                }
-            },
-            departmentInclude
-        ]
-    });
-    
+
     res.json({
         total: totalTickets,
         open: openTickets,
@@ -785,39 +807,18 @@ router.get('/options/staff', asyncHandler(async (req, res) => {
 // GET /api/tickets/options/sector - Obtener opciones de sector (desde ListItems)
 router.get('/options/sector', asyncHandler(async (req, res) => {
   try {
-    // Obtener sectores únicos desde TicketCdata que tengan valores no nulos
-    const { TicketCdata, ListItems } = require('../models');
-    
-    // Primero obtener todos los IDs de sector únicos que se usan en tickets
-    const usedSectorIds = await TicketCdata.findAll({
-      attributes: [[fn('DISTINCT', col('sector')), 'sector']],
-      where: {
-        sector: { [Op.not]: null }
-      },
-      raw: true
-    });
-    
-    if (usedSectorIds.length === 0) {
-      return res.json([]);
-    }
-    
-    // Obtener los nombres de los sectores desde ListItems
-    const sectorIds = usedSectorIds.map(item => item.sector);
+    // 1 sola query con subquery en lugar de 2 queries separadas
     const sectorOptions = await ListItems.findAll({
       attributes: ['id', 'value'],
       where: {
-        id: { [Op.in]: sectorIds }
+        id: {
+          [Op.in]: db.literal('(SELECT DISTINCT sector FROM ost_ticket__cdata WHERE sector IS NOT NULL)')
+        }
       },
       order: [['value', 'ASC']]
     });
-    
-    // Formatear para que coincida con el formato esperado
-    const formattedSectors = sectorOptions.map(sector => ({
-      id: sector.id,
-      name: sector.value
-    }));
-    
-    res.json(formattedSectors);
+
+    res.json(sectorOptions.map(s => ({ id: s.id, name: s.value })));
   } catch (error) {
     logger.error('Error obteniendo opciones de sector:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
@@ -827,39 +828,18 @@ router.get('/options/sector', asyncHandler(async (req, res) => {
 // GET /api/tickets/options/transporte - Obtener opciones de transporte
 router.get('/options/transporte', asyncHandler(async (req, res) => {
   try {
-    const { TicketCdata, ListItems } = require('../models');
-    
-    // Obtener todos los IDs de transporte únicos que se usan en tickets
-    const usedTransporteIds = await TicketCdata.findAll({
-      attributes: [[fn('DISTINCT', col('transporte')), 'transporte']],
-      where: {
-        transporte: { [Op.not]: null }
-      },
-      raw: true
-    });
-    
-    if (usedTransporteIds.length === 0) {
-      return res.json([]);
-    }
-    
-    // Obtener los nombres de los transportes desde ListItems
-    const transporteIds = usedTransporteIds.map(item => item.transporte);
-    
+    // 1 sola query con subquery en lugar de 2 queries separadas
     const transporteOptions = await ListItems.findAll({
       attributes: ['id', 'value'],
       where: {
-        id: { [Op.in]: transporteIds }
+        id: {
+          [Op.in]: db.literal('(SELECT DISTINCT transporte FROM ost_ticket__cdata WHERE transporte IS NOT NULL)')
+        }
       },
       order: [['value', 'ASC']]
     });
-    
-    // Formatear para que coincida con el formato esperado por el frontend
-    const formattedTransporte = transporteOptions.map(transporte => ({
-      id: transporte.id,
-      name: transporte.value || `ID: ${transporte.id}`
-    }));
-    
-    res.json(formattedTransporte);
+
+    res.json(transporteOptions.map(t => ({ id: t.id, name: t.value || `ID: ${t.id}` })));
   } catch (error) {
     logger.error('Error obteniendo opciones de transporte:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
@@ -886,7 +866,7 @@ router.get('/options/sla', asyncHandler(async (req, res) => {
     logger.info(`[DEBUG] /api/tickets/options/sla - SLAs formateados: ${formattedSla.length}`);
     res.json(formattedSla);
   } catch (error) {
-    console.error('❌ Error obteniendo opciones de SLA:', error);
+    logger.error('❌ Error obteniendo opciones de SLA (stack):', error.stack);
     logger.error('Error obteniendo opciones de SLA:', {
       message: error.message,
       stack: error.stack
@@ -912,23 +892,19 @@ router.get('/options/status', asyncHandler(async (req, res) => {
 
 // Helper: Obtener TPSolicitud (Tipo de Solicitud) para un array de tickets
 // Hace un batch query y mergea el resultado en cada ticket
-async function enrichWithRequestType(tickets, sequelize) {
+async function enrichWithRequestType(tickets, sequelizeInst) {
     if (!tickets || tickets.length === 0) return tickets;
 
     const ticketIds = tickets.map(t => t.ticket_id || t.dataValues?.ticket_id).filter(Boolean);
     if (ticketIds.length === 0) return tickets;
 
     try {
-        // Buscar field_id de TPSolicitud
-        const fieldRows = await sequelize.query(
-            "SELECT `id` AS field_id FROM `ost_form_field` WHERE `name` LIKE '%tpsolicitud%' OR `name` LIKE '%TPSolicitud%' OR `label` LIKE '%TPSolicitud%' OR `label` LIKE '%Tipo de Solicitud%' LIMIT 1",
-            { type: sequelize.QueryTypes.SELECT }
-        );
-        if (!fieldRows || fieldRows.length === 0) return tickets;
-        const fieldId = fieldRows[0].field_id;
+        // Usar field_id cacheado (evita 1 query por cada llamada a enrichWithRequestType)
+        const fieldId = await getTpSolicitudFieldId();
+        if (!fieldId) return tickets;
 
         // Batch query para todos los tickets de la página
-        const values = await sequelize.query(`
+        const values = await db.query(`
             SELECT fe.object_id AS ticket_id, fev.value AS raw_val
             FROM ost_form_entry_values fev
             INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
@@ -938,7 +914,7 @@ async function enrichWithRequestType(tickets, sequelize) {
               AND fev.value IS NOT NULL AND fev.value != ''
         `, {
             replacements: { fieldId, ticketIds },
-            type: sequelize.QueryTypes.SELECT
+            type: db.QueryTypes.SELECT
         });
 
         // Parsear JSON values → mapa ticket_id → nombre
@@ -974,15 +950,12 @@ async function enrichWithRequestType(tickets, sequelize) {
 
 // GET /api/tickets/options/requestType - Obtener opciones de Tipo de Solicitud
 router.get('/options/requestType', asyncHandler(async (req, res) => {
-    const sequelize = require('../models').sequelize;
     try {
-        const fieldRows = await sequelize.query(
-            "SELECT `id` AS field_id FROM `ost_form_field` WHERE `name` LIKE '%tpsolicitud%' OR `name` LIKE '%TPSolicitud%' OR `label` LIKE '%TPSolicitud%' OR `label` LIKE '%Tipo de Solicitud%' LIMIT 1",
-            { type: sequelize.QueryTypes.SELECT }
-        );
-        if (!fieldRows || fieldRows.length === 0) return res.json([]);
+        // Usar field_id cacheado
+        const fieldId = await getTpSolicitudFieldId();
+        if (!fieldId) return res.json([]);
 
-        const rows = await sequelize.query(`
+        const rows = await db.query(`
             SELECT DISTINCT fev.value AS raw_val
             FROM ost_form_entry_values fev
             INNER JOIN ost_form_entry fe ON fev.entry_id = fe.id
@@ -993,8 +966,8 @@ router.get('/options/requestType', asyncHandler(async (req, res) => {
               AND fev.value IS NOT NULL AND fev.value != ''
               AND d.name IN ('Soporte Informatico', 'Soporte IT')
         `, {
-            replacements: { fieldId: fieldRows[0].field_id },
-            type: sequelize.QueryTypes.SELECT
+            replacements: { fieldId },
+            type: db.QueryTypes.SELECT
         });
 
         // Parsear y deduplicar
@@ -1024,17 +997,15 @@ router.get('/options/requestType', asyncHandler(async (req, res) => {
 // GET /api/tickets/:id - Obtener detalle completo de un ticket específico
 router.get('/:id', asyncHandler(async (req, res) => {
     const ticketId = req.params.id;
-    const sequelize = require('../models').sequelize; // Obtener instancia de sequelize
-
     try {
         logger.info(`Consultando detalle para ticket ID: ${ticketId}`);
 
         // 1. Obtener el ticket principal
-        const ticket = await Ticket.findOne({ 
+        const ticket = await Ticket.findOne({
             where: { ticket_id: ticketId },
             include: [
                 {
-                    model: require('../models').TicketCdata,
+                    model: TicketCdata,
                     as: 'cdata',
                     attributes: ['subject', 'sector', 'transporte'],
                     required: false

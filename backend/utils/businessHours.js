@@ -406,12 +406,84 @@ async function verificarCumplimientoSLA(fechaCreacion, fechaCierre, gracePeriodH
   };
 }
 
+/**
+ * Versión síncrona de calcularHorasHabiles — requiere feriados ya cargados.
+ * Usar cuando se procesan muchos tickets en batch (evita Promise.all con N tareas async).
+ * @param {Date|string} fechaInicio
+ * @param {Date|string} fechaFin
+ * @param {Object} feriados - resultado de cargarFeriados()
+ * @returns {number}
+ */
+function calcularHorasHabilesSync(fechaInicio, fechaFin, feriados) {
+  let inicio = new Date(fechaInicio);
+  let fin = new Date(fechaFin);
+
+  if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) return 0;
+  if (inicio >= fin) return 0;
+
+  inicio = ajustarAHorarioHabil(inicio, feriados);
+  if (inicio >= fin) return 0;
+
+  const feriadoSet = _buildFeriadoSet(feriados, inicio.getFullYear(), fin.getFullYear());
+
+  if (_mismaFecha(inicio, fin)) {
+    const finLaboral = getFinHorarioLaboral(inicio);
+    const finEfectivo = fin < finLaboral ? fin : finLaboral;
+    if (inicio < finEfectivo) {
+      return Math.round(((finEfectivo - inicio) / (1000 * 60 * 60)) * 100) / 100;
+    }
+    return 0;
+  }
+
+  let horasHabiles = 0;
+
+  const finDia1 = getFinHorarioLaboral(inicio);
+  if (inicio < finDia1) {
+    horasHabiles += (finDia1 - inicio) / (1000 * 60 * 60);
+  }
+
+  const dia2 = new Date(inicio);
+  dia2.setDate(dia2.getDate() + 1);
+  dia2.setHours(0, 0, 0, 0);
+
+  const diaUltimo = new Date(fin);
+  diaUltimo.setHours(0, 0, 0, 0);
+
+  if (dia2 < diaUltimo) {
+    const diasHabiles = _contarDiasHabiles(dia2, diaUltimo, feriadoSet);
+    horasHabiles += diasHabiles * HOURS_PER_DAY;
+  }
+
+  const inicioUltDia = getInicioHorarioLaboral(fin);
+  const finUltDia = getFinHorarioLaboral(fin);
+  const finEfectivoUlt = fin < finUltDia ? fin : finUltDia;
+
+  if (finEfectivoUlt > inicioUltDia && _esDiaHabilRapido(diaUltimo, feriadoSet)) {
+    horasHabiles += (finEfectivoUlt - inicioUltDia) / (1000 * 60 * 60);
+  }
+
+  return Math.round(horasHabiles * 100) / 100;
+}
+
+/**
+ * Invalida el cache de feriados para que se recargue desde la BD en la próxima llamada.
+ * Llamar después de agregar o eliminar feriados via API.
+ */
+function invalidarCacheFeriados() {
+  feriadosCache = null;
+  feriadosCacheTime = null;
+  feriadosLoadingPromise = null;
+  logger.info('🔄 Cache de feriados invalidado');
+}
+
 // Exportar funciones
 module.exports = {
   calcularHorasHabiles,
+  calcularHorasHabilesSync,
   calcularEstadoSLA,
   verificarCumplimientoSLA,
   cargarFeriados,
+  invalidarCacheFeriados,
   esDiaHabil,
   esFeriado,
   HOURS_PER_DAY,

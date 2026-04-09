@@ -7,7 +7,7 @@ interface SLADetailTableProps {
   loading?: boolean;
 }
 
-type SortField = 'agente' | 'mes' | 'total_tickets' | 'porcentaje_sla_cumplido' | 'tiempo_promedio_resolucion';
+type SortField = 'agente' | 'mes' | 'total_tickets' | 'tickets_sla_cumplido' | 'tickets_sla_vencido' | 'porcentaje_sla_cumplido' | 'tiempo_primera_respuesta_segundos' | 'tiempo_promedio_resolucion';
 type SortOrder = 'asc' | 'desc';
 
 // Helper para traducir nombres de meses al español
@@ -114,9 +114,21 @@ const SLADetailTable: React.FC<SLADetailTableProps> = ({ stats, loading }) => {
           aVal = a.total_tickets;
           bVal = b.total_tickets;
           break;
+        case 'tickets_sla_cumplido':
+          aVal = Number(a.tickets_sla_cumplido) || 0;
+          bVal = Number(b.tickets_sla_cumplido) || 0;
+          break;
+        case 'tickets_sla_vencido':
+          aVal = Number(a.tickets_sla_vencido) || 0;
+          bVal = Number(b.tickets_sla_vencido) || 0;
+          break;
         case 'porcentaje_sla_cumplido':
           aVal = a.porcentaje_sla_cumplido;
           bVal = b.porcentaje_sla_cumplido;
+          break;
+        case 'tiempo_primera_respuesta_segundos':
+          aVal = a.tiempo_primera_respuesta_segundos || 0;
+          bVal = b.tiempo_primera_respuesta_segundos || 0;
           break;
         case 'tiempo_promedio_resolucion':
           aVal = a.tiempo_resolucion_segundos || 0;
@@ -246,11 +258,23 @@ const SLADetailTable: React.FC<SLADetailTableProps> = ({ stats, loading }) => {
                   <SortIcon field="total_tickets" />
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Cumplido
+              <th
+                onClick={() => handleSort('tickets_sla_cumplido')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <div className="flex items-center gap-2">
+                  Cumplido
+                  <SortIcon field="tickets_sla_cumplido" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Vencido
+              <th
+                onClick={() => handleSort('tickets_sla_vencido')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <div className="flex items-center gap-2">
+                  Vencido
+                  <SortIcon field="tickets_sla_vencido" />
+                </div>
               </th>
               <th 
                 onClick={() => handleSort('porcentaje_sla_cumplido')}
@@ -261,8 +285,14 @@ const SLADetailTable: React.FC<SLADetailTableProps> = ({ stats, loading }) => {
                   <SortIcon field="porcentaje_sla_cumplido" />
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Tiempo 1° Resp.
+              <th
+                onClick={() => handleSort('tiempo_primera_respuesta_segundos')}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <div className="flex items-center gap-2">
+                  Tiempo 1° Resp.
+                  <SortIcon field="tiempo_primera_respuesta_segundos" />
+                </div>
               </th>
               <th 
                 onClick={() => handleSort('tiempo_promedio_resolucion')}

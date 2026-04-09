@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AlertTriangle, Clock, RefreshCw, XCircle, AlertOctagon, Filter } from 'lucide-react';
+import { AlertTriangle, Clock, RefreshCw, XCircle, AlertOctagon, Filter, TrendingUp, TrendingDown, ArrowUpDown } from 'lucide-react';
 import { getSLAAlerts } from '../services/api';
 import logger from '../utils/logger';
 import type { SLAAlerts, TicketEnRiesgo } from '../types';
@@ -7,6 +7,9 @@ import TicketDetailModal from '../components/modals/TicketDetailModal';
 import { Tooltip } from '../components/ui/Tooltip';
 
 type Categoria = 'todos' | 'vencido' | 'critico' | 'riesgo';
+type AlertSortField = 'number' | '_cat' | 'agente_asignado' | 'nombre_sla' | 'porcentaje_consumido' | 'horas_restantes' | 'priority_id' | 'horas_desde_ultima_actividad';
+
+const CAT_ORDER: Record<string, number> = { vencido: 0, critico: 1, riesgo: 2 };
 
 const SLAAlertView: React.FC = () => {
   const [alerts, setAlerts] = useState<SLAAlerts | null>(null);
@@ -18,6 +21,13 @@ const SLAAlertView: React.FC = () => {
   const [filterCategoria, setFilterCategoria] = useState<Categoria>('todos');
   const [filterTicket, setFilterTicket] = useState('');
   const [filterAgent, setFilterAgent] = useState('');
+  const [sortField, setSortField] = useState<AlertSortField>('porcentaje_consumido');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const handleAlertSort = (field: AlertSortField) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('desc'); }
+  };
 
   const normalizeTicket = (ticket: any): TicketEnRiesgo => ({
     ...ticket,
@@ -89,6 +99,26 @@ const SLAAlertView: React.FC = () => {
       return true;
     });
   }, [allTickets, filterCategoria, filterTicket, filterAgent]);
+
+  const sortedTickets = useMemo(() => {
+    const arr = [...filteredTickets];
+    arr.sort((a, b) => {
+      const aRaw = (a as any)[sortField];
+      const bRaw = (b as any)[sortField];
+      if (aRaw == null) return 1;
+      if (bRaw == null) return -1;
+      if (sortField === '_cat') {
+        const diff = (CAT_ORDER[aRaw] ?? 99) - (CAT_ORDER[bRaw] ?? 99);
+        return sortDir === 'asc' ? diff : -diff;
+      }
+      if (typeof aRaw === 'number' && typeof bRaw === 'number') {
+        return sortDir === 'asc' ? aRaw - bRaw : bRaw - aRaw;
+      }
+      const cmp = String(aRaw).localeCompare(String(bRaw), 'es');
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return arr;
+  }, [filteredTickets, sortField, sortDir]);
 
   const catBadge = (cat: 'vencido' | 'critico' | 'riesgo') => {
     const cfg = {
@@ -249,37 +279,41 @@ const SLAAlertView: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
+            {(() => {
+              const SortTh = ({ field, tooltip, children }: { field: AlertSortField; tooltip: string; children: React.ReactNode }) => (
+                <th
+                  onClick={() => handleAlertSort(field)}
+                  className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 select-none"
+                >
+                  <Tooltip text={tooltip} position="below">
+                    <span className="inline-flex items-center gap-1">
+                      {children}
+                      {sortField === field
+                        ? sortDir === 'asc'
+                          ? <TrendingUp className="w-3 h-3" />
+                          : <TrendingDown className="w-3 h-3" />
+                        : <ArrowUpDown className="w-3 h-3 opacity-30" />
+                      }
+                    </span>
+                  </Tooltip>
+                </th>
+              );
+              return (
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-700">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <Tooltip text="Número de ticket en osTicket. Click para ver detalle." position="below"><span>Ticket</span></Tooltip>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <Tooltip text="Categoría de alerta: Vencido (>100% SLA), Crítico (90-100%), En Riesgo (70-90%)." position="below"><span>Estado</span></Tooltip>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <Tooltip text="Agente de Soporte IT asignado al ticket." position="below"><span>Agente</span></Tooltip>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <Tooltip text="Nombre del SLA asignado al ticket. Define el tiempo máximo de resolución." position="below"><span>SLA</span></Tooltip>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <Tooltip text="Porcentaje del tiempo SLA ya consumido en horas hábiles (Lun-Vie 8:30-17:30, sin feriados)." position="below"><span>% Consumido</span></Tooltip>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <Tooltip text="Horas hábiles restantes antes de vencer el SLA. Si es negativo, indica cuánto se excedió." position="below"><span>Restante</span></Tooltip>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <Tooltip text="Prioridad asignada al ticket según el Help Topic." position="below"><span>Prioridad</span></Tooltip>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <Tooltip text="Tiempo transcurrido en horas hábiles desde la última actividad en el ticket." position="below"><span>Últ. Actividad</span></Tooltip>
-                  </th>
+                  <SortTh field="number" tooltip="Número de ticket en osTicket. Click para ver detalle.">Ticket</SortTh>
+                  <SortTh field="_cat" tooltip="Categoría de alerta: Vencido (>100% SLA), Crítico (90-100%), En Riesgo (70-90%).">Estado</SortTh>
+                  <SortTh field="agente_asignado" tooltip="Agente de Soporte IT asignado al ticket.">Agente</SortTh>
+                  <SortTh field="nombre_sla" tooltip="Nombre del SLA asignado al ticket. Define el tiempo máximo de resolución.">SLA</SortTh>
+                  <SortTh field="porcentaje_consumido" tooltip="Porcentaje del tiempo SLA ya consumido en horas hábiles (Lun-Vie 8:30-17:30, sin feriados).">% Consumido</SortTh>
+                  <SortTh field="horas_restantes" tooltip="Horas hábiles restantes antes de vencer el SLA. Si es negativo, indica cuánto se excedió.">Restante</SortTh>
+                  <SortTh field="priority_id" tooltip="Prioridad asignada al ticket según el Help Topic.">Prioridad</SortTh>
+                  <SortTh field="horas_desde_ultima_actividad" tooltip="Tiempo transcurrido en horas hábiles desde la última actividad en el ticket.">Últ. Actividad</SortTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
-                {filteredTickets.map((ticket) => {
+                {sortedTickets.map((ticket) => {
                   const pct = ticket.porcentaje_consumido;
                   const barColor = pct >= 100 ? 'bg-red-500' : pct >= 90 ? 'bg-orange-500' : 'bg-yellow-500';
                   const pctTextColor = pct >= 100 ? 'text-red-600' : pct >= 90 ? 'text-orange-600' : 'text-yellow-600';
@@ -328,6 +362,8 @@ const SLAAlertView: React.FC = () => {
                 })}
               </tbody>
             </table>
+              );
+            })()}
           </div>
         )}
       </div>

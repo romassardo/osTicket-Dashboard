@@ -3,15 +3,47 @@ const express = require('express');
 const router = express.Router();
 const { sequelize } = require('../models');
 const logger = require('../utils/logger');
-const { 
-  calcularHorasHabiles, 
-  calcularEstadoSLA, 
+const {
+  calcularHorasHabiles,
+  calcularHorasHabilesSync,
+  calcularEstadoSLA,
   verificarCumplimientoSLA,
   cargarFeriados,
-  HOURS_PER_DAY 
+  HOURS_PER_DAY
 } = require('../utils/businessHours');
 const { formatHorasHabiles, formatDiferenciaSLA, formatTime, formatPrimeraRespuesta } = require('../utils/formatters');
 const cache = require('../utils/cache');
+
+// Cache de IDs de departamentos de Soporte IT (estático — no cambia en runtime)
+let _cachedSoporteITDeptIds = null;
+async function getSoporteITDeptIds() {
+  if (_cachedSoporteITDeptIds !== null) return _cachedSoporteITDeptIds;
+  const rows = await sequelize.query(
+    "SELECT id FROM ost_department WHERE name IN ('Soporte Informatico', 'Soporte IT')",
+    { type: sequelize.QueryTypes.SELECT }
+  );
+  _cachedSoporteITDeptIds = rows.map(r => r.id);
+  logger.info(`SLA: dept_ids cacheados: [${_cachedSoporteITDeptIds.join(', ')}]`);
+  return _cachedSoporteITDeptIds;
+}
+
+// Helper: construir filtro de fecha como rango (permite uso de índice en columna closed)
+function buildClosedDateFilter(year, month, replacements) {
+  if (year && month) {
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+    replacements.fechaInicio = new Date(y, m - 1, 1);
+    replacements.fechaFin = new Date(y, m, 1);
+    return 'AND t.closed >= :fechaInicio AND t.closed < :fechaFin';
+  }
+  if (year) {
+    const y = parseInt(year, 10);
+    replacements.fechaInicio = new Date(y, 0, 1);
+    replacements.fechaFin = new Date(y + 1, 0, 1);
+    return 'AND t.closed >= :fechaInicio AND t.closed < :fechaFin';
+  }
+  return '';
+}
 
 /**
  * GET /api/sla/stats
@@ -30,18 +62,10 @@ router.get('/stats', async (req, res, next) => {
       return res.json(cached);
     }
 
-    let dateFilter = '';
     const replacements = {};
 
-    // Construir filtros de fecha (por fecha de cierre, que es lo relevante para SLA)
-    if (year && month) {
-      dateFilter = 'AND YEAR(t.closed) = :year AND MONTH(t.closed) = :month';
-      replacements.year = parseInt(year, 10);
-      replacements.month = parseInt(month, 10);
-    } else if (year) {
-      dateFilter = 'AND YEAR(t.closed) = :year';
-      replacements.year = parseInt(year, 10);
-    }
+    // Filtro de fecha como rango (permite uso de índice en closed)
+    const dateFilter = buildClosedDateFilter(year, month, replacements);
 
     // Filtro por agente específico
     let agentFilter = '';
@@ -50,8 +74,20 @@ router.get('/stats', async (req, res, next) => {
       replacements.agentId = parseInt(agent, 10);
     }
 
+    // Pre-cargar dept_ids y feriados en paralelo (evita queries repetidas)
+    const [deptIds, feriados] = await Promise.all([
+      getSoporteITDeptIds(),
+      cargarFeriados()
+    ]);
+
+    // dept_ids son enteros propios de la DB (no user input), se embeben directo
+    const deptIdsLiteral = deptIds.length > 0
+      ? deptIds.map(id => parseInt(id, 10)).join(',')
+      : '0';
+    const deptFilter = `AND t.dept_id IN (${deptIdsLiteral})`;
+
     // Obtener tickets individuales para calcular horas hábiles
-    const query = `
+    const queryStr = `
       SELECT
         t.ticket_id,
         t.created,
@@ -70,7 +106,7 @@ router.get('/stats', async (req, res, next) => {
       LEFT JOIN ost_staff s ON s.staff_id = t.staff_id
       LEFT JOIN ost_sla s_sla ON s_sla.id = t.sla_id
       LEFT JOIN (
-        SELECT 
+        SELECT
           th.object_id AS ticket_id,
           MIN(te.created) AS first_response
         FROM ost_thread th
@@ -79,7 +115,7 @@ router.get('/stats', async (req, res, next) => {
         GROUP BY th.object_id
       ) fr ON fr.ticket_id = t.ticket_id
       WHERE t.closed IS NOT NULL
-        AND d.name IN ('Soporte Informatico', 'Soporte IT')
+        ${deptFilter}
         AND t.staff_id IS NOT NULL
         AND t.staff_id > 0
         ${dateFilter}
@@ -87,35 +123,32 @@ router.get('/stats', async (req, res, next) => {
       ORDER BY t.closed DESC
     `;
 
-    const tickets = await sequelize.query(query, {
+    const tickets = await sequelize.query(queryStr, {
       replacements,
       type: sequelize.QueryTypes.SELECT
     });
 
     logger.info(`SLA Stats: Procesando ${tickets.length} tickets con horas hábiles...`);
 
-    // Calcular horas hábiles para cada ticket
-    const ticketsConHorasHabiles = await Promise.all(
-      tickets.map(async (ticket) => {
-        const horasHabiles = await calcularHorasHabiles(ticket.created, ticket.closed);
-        const gracePeriod = ticket.grace_period || 24;
-        const cumplido = horasHabiles <= gracePeriod;
-        const diferencia = gracePeriod - horasHabiles;
-        
-        let horasPrimeraRespuesta = null;
-        if (ticket.first_response) {
-          horasPrimeraRespuesta = await calcularHorasHabiles(ticket.created, ticket.first_response);
-        }
+    // Calcular horas hábiles de forma SÍNCRONA (feriados pre-cargados una sola vez)
+    const ticketsConHorasHabiles = tickets.map((ticket) => {
+      const horasHabiles = calcularHorasHabilesSync(ticket.created, ticket.closed, feriados);
+      const gracePeriod = ticket.grace_period || 24;
+      const cumplido = horasHabiles <= gracePeriod;
+      const diferencia = gracePeriod - horasHabiles;
 
-        return {
-          ...ticket,
-          horas_habiles_resolucion: horasHabiles,
-          cumplido_sla: cumplido,
-          diferencia_sla: diferencia,
-          horas_primera_respuesta: horasPrimeraRespuesta
-        };
-      })
-    );
+      const horasPrimeraRespuesta = ticket.first_response
+        ? calcularHorasHabilesSync(ticket.created, ticket.first_response, feriados)
+        : null;
+
+      return {
+        ...ticket,
+        horas_habiles_resolucion: horasHabiles,
+        cumplido_sla: cumplido,
+        diferencia_sla: diferencia,
+        horas_primera_respuesta: horasPrimeraRespuesta
+      };
+    });
 
     // Agrupar directamente por agente (consolidado, sin subdividir por SLA)
     const agentes = {};
@@ -254,33 +287,40 @@ router.get('/alerts', async (req, res, next) => {
 
     logger.info(`🚨 Procesando ${ticketsAbiertos.length} tickets abiertos con horas hábiles...`);
 
-    // Calcular estado SLA con horas hábiles para cada ticket
-    const ticketsConEstado = await Promise.all(
-      ticketsAbiertos.map(async (ticket) => {
-        const estado = await calcularEstadoSLA(ticket.fecha_creacion, ticket.sla_horas);
-        
-        // Calcular horas desde última actividad (también en horas hábiles)
-        const horasUltimaActividad = ticket.ultima_actividad 
-          ? await calcularHorasHabiles(ticket.ultima_actividad, new Date())
-          : estado.horasTranscurridas;
+    // Pre-cargar feriados una sola vez para procesamiento síncrono
+    const feriados = await cargarFeriados();
+    const ahora = new Date();
 
-        return {
-          ticket_id: ticket.ticket_id,
-          number: ticket.number,
-          agente_asignado: ticket.agente_asignado,
-          nombre_sla: ticket.nombre_sla,
-          fecha_creacion: ticket.fecha_creacion,
-          sla_horas: ticket.sla_horas,
-          horas_transcurridas: estado.horasTranscurridas,
-          horas_restantes: estado.horasRestantes,
-          porcentaje_consumido: estado.porcentajeConsumido,
-          vencido: estado.vencido,
-          priority_id: ticket.priority_id,
-          prioridad_nombre: ticket.prioridad_nombre,
-          horas_desde_ultima_actividad: Math.round(horasUltimaActividad * 10) / 10
-        };
-      })
-    );
+    // Calcular estado SLA de forma SÍNCRONA (sin Promise.all con N tareas)
+    const ticketsConEstado = ticketsAbiertos.map((ticket) => {
+      const horasTranscurridas = calcularHorasHabilesSync(ticket.fecha_creacion, ahora, feriados);
+      const gracePeriodHoras = ticket.sla_horas;
+      const horasRestantes = gracePeriodHoras - horasTranscurridas;
+      const porcentajeConsumido = gracePeriodHoras > 0
+        ? Math.round((horasTranscurridas / gracePeriodHoras) * 100 * 10) / 10
+        : 0;
+      const vencido = horasTranscurridas >= gracePeriodHoras;
+
+      const horasUltimaActividad = ticket.ultima_actividad
+        ? calcularHorasHabilesSync(ticket.ultima_actividad, ahora, feriados)
+        : horasTranscurridas;
+
+      return {
+        ticket_id: ticket.ticket_id,
+        number: ticket.number,
+        agente_asignado: ticket.agente_asignado,
+        nombre_sla: ticket.nombre_sla,
+        fecha_creacion: ticket.fecha_creacion,
+        sla_horas: ticket.sla_horas,
+        horas_transcurridas: Math.round(horasTranscurridas * 10) / 10,
+        horas_restantes: Math.round(horasRestantes * 10) / 10,
+        porcentaje_consumido: porcentajeConsumido,
+        vencido,
+        priority_id: ticket.priority_id,
+        prioridad_nombre: ticket.prioridad_nombre,
+        horas_desde_ultima_actividad: Math.round(horasUltimaActividad * 10) / 10
+      };
+    });
 
     // Clasificar tickets
     const ticketsVencidos = [];
@@ -367,15 +407,9 @@ router.get('/tickets', async (req, res, next) => {
     let statusFilter = '';
     const replacements = {};
 
-    // Filtro de fecha (últimos 3 meses por defecto si no se especifica)
-    if (year && month) {
-      dateFilter = 'AND YEAR(t.closed) = :year AND MONTH(t.closed) = :month';
-      replacements.year = parseInt(year, 10);
-      replacements.month = parseInt(month, 10);
-    } else if (year) {
-      dateFilter = 'AND YEAR(t.closed) = :year';
-      replacements.year = parseInt(year, 10);
-    } else {
+    // Filtro de fecha como rango (permite uso de índice en closed)
+    dateFilter = buildClosedDateFilter(year, month, replacements);
+    if (!dateFilter) {
       // Por defecto: últimos 3 meses
       dateFilter = 'AND t.closed >= DATE_SUB(NOW(), INTERVAL 3 MONTH)';
     }
@@ -521,17 +555,19 @@ router.get('/summary', async (req, res, next) => {
       return res.json(cached);
     }
 
-    let dateFilter = '';
     const replacements = {};
+    const dateFilter = buildClosedDateFilter(year, month, replacements);
 
-    if (year && month) {
-      dateFilter = 'AND YEAR(t.closed) = :year AND MONTH(t.closed) = :month';
-      replacements.year = parseInt(year, 10);
-      replacements.month = parseInt(month, 10);
-    } else if (year) {
-      dateFilter = 'AND YEAR(t.closed) = :year';
-      replacements.year = parseInt(year, 10);
-    }
+    // Pre-cargar dept_ids y feriados en paralelo
+    const [deptIds, feriados] = await Promise.all([
+      getSoporteITDeptIds(),
+      cargarFeriados()
+    ]);
+
+    const deptIdsLiteralSum = deptIds.length > 0
+      ? deptIds.map(id => parseInt(id, 10)).join(',')
+      : '0';
+    const deptFilter = `AND t.dept_id IN (${deptIdsLiteralSum})`;
 
     // Obtener tickets cerrados con sus datos de SLA y primera respuesta
     const tickets = await sequelize.query(`
@@ -545,7 +581,7 @@ router.get('/summary', async (req, res, next) => {
       INNER JOIN ost_department d ON d.id = t.dept_id
       LEFT JOIN ost_sla s_sla ON s_sla.id = t.sla_id
       LEFT JOIN (
-        SELECT 
+        SELECT
           th.object_id AS ticket_id,
           MIN(te.created) AS first_response
         FROM ost_thread th
@@ -554,22 +590,22 @@ router.get('/summary', async (req, res, next) => {
         GROUP BY th.object_id
       ) fr ON fr.ticket_id = t.ticket_id
       WHERE t.closed IS NOT NULL
-        AND d.name IN ('Soporte Informatico', 'Soporte IT')
+        ${deptFilter}
         ${dateFilter}
     `, {
       replacements,
       type: sequelize.QueryTypes.SELECT
     });
 
-    // Calcular usando horas hábiles (consistente con /stats)
+    // Calcular usando horas hábiles SÍNCRONAS (feriados pre-cargados)
     let ticketsCumplidos = 0;
     let ticketsVencidos = 0;
     let sumaTiempoResolucion = 0;
     let sumaTiempoPrimeraRespuesta = 0;
     let cuentaPrimeraRespuesta = 0;
 
-    const resultados = await Promise.all(tickets.map(async (ticket) => {
-      const horasResolucion = await calcularHorasHabiles(ticket.created, ticket.closed);
+    const resultados = tickets.map((ticket) => {
+      const horasResolucion = calcularHorasHabilesSync(ticket.created, ticket.closed, feriados);
       const gracePeriod = ticket.grace_period || 0;
       const cumplido = horasResolucion <= gracePeriod;
 
@@ -579,13 +615,13 @@ router.get('/summary', async (req, res, next) => {
       sumaTiempoResolucion += horasResolucion;
 
       if (ticket.first_response) {
-        const horasPrimeraRespuesta = await calcularHorasHabiles(ticket.created, ticket.first_response);
+        const horasPrimeraRespuesta = calcularHorasHabilesSync(ticket.created, ticket.first_response, feriados);
         sumaTiempoPrimeraRespuesta += horasPrimeraRespuesta;
         cuentaPrimeraRespuesta++;
       }
 
       return { horasResolucion, cumplido };
-    }));
+    });
 
     const totalTickets = tickets.length;
     const porcentajeCumplimiento = totalTickets > 0

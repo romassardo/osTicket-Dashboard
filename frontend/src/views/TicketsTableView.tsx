@@ -127,6 +127,7 @@ const TicketsTableView: React.FC = memo(() => {
         const colToKey: Record<string, string> = {
           'Número': 'number', 'Asunto': 'subject', 'Agente': 'agente',
           'Usuario': 'usuario', 'Creación': 'created',
+          'Sector': 'sector', 'Tipo Solicitud': 'requestType',
         };
         const key = colToKey[sortField];
         if (key) {
@@ -215,18 +216,13 @@ const TicketsTableView: React.FC = memo(() => {
   }, [fetchTickets]);
 
   useEffect(() => {
+    const intervalMs = config.refreshInterval * 1000;
     const intervalId = setInterval(() => {
-      logger.info('🔄 Auto-refreshing tickets...');
       fetchTickets(true);
-    }, 60000); // 60 segundos
+    }, intervalMs);
 
-    logger.info('✅ Auto-refresh iniciado (cada 60 segundos)');
-
-    return () => {
-      clearInterval(intervalId);
-      logger.info('🛑 Auto-refresh detenido');
-    };
-  }, [fetchTickets]);
+    return () => clearInterval(intervalId);
+  }, [fetchTickets, config.refreshInterval]);
 
   const handleSearch = useCallback((newSearchTerm: string) => {
     setCurrentPage(1); // Reset to first page on new search
@@ -245,16 +241,22 @@ const TicketsTableView: React.FC = memo(() => {
   }, []);
 
   const handleSort = useCallback((header: string) => {
-    setSortField(prev => {
-      if (prev === header) {
-        setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-        return prev;
+    if (sortField === header) {
+      if (sortDir === 'desc') {
+        // Tercer click: quitar sort → volver a default
+        setSortField(null);
+        setSortDir('desc');
+      } else {
+        // Segundo click: pasar a desc
+        setSortDir('desc');
       }
+    } else {
+      // Primera vez en esta columna: asc
+      setSortField(header);
       setSortDir('asc');
-      return header;
-    });
+    }
     setCurrentPage(1);
-  }, []);
+  }, [sortField, sortDir]);
 
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);

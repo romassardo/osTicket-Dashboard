@@ -31,21 +31,21 @@ function App() {
       <NotificationProvider>
         <SidebarProvider>
           <FilterProvider>
-          <BrowserRouter basename="/dashboard">
-            <Suspense fallback={<LoadingSpinner />}>
-              <Routes>
-                <Route path="/" element={<DashboardLayout />}>
-                  <Route index element={<DashboardView />} />
-                <Route path="tickets" element={<TicketsTableView />} />
-                <Route path="analytics" element={<AnalyticsView />} />
-                <Route path="sla" element={<SLAOverviewView />} />
-                <Route path="sla-alerts" element={<SLAAlertView />} />
-                <Route path="settings" element={<SettingsView />} />
-              </Route>
-              <Route path="*" element={<NotFoundView />} /> {/* Ruta para páginas no encontradas */}
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+            <BrowserRouter basename="/dashboard">
+              <Suspense fallback={<LoadingSpinner />}>
+                <Routes>
+                  <Route path="/" element={<DashboardLayout />}>
+                    <Route index element={<DashboardView />} />
+                    <Route path="tickets" element={<TicketsTableView />} />
+                    <Route path="analytics" element={<AnalyticsView />} />
+                    <Route path="sla" element={<SLAOverviewView />} />
+                    <Route path="sla-alerts" element={<SLAAlertView />} />
+                    <Route path="settings" element={<SettingsView />} />
+                  </Route>
+                  <Route path="*" element={<NotFoundView />} />
+                </Routes>
+              </Suspense>
+            </BrowserRouter>
           </FilterProvider>
         </SidebarProvider>
       </NotificationProvider>

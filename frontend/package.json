@@ -26,6 +26,7 @@
     "@types/recharts": "^1.8.29",
     "axios": "^1.9.0",
     "class-variance-authority": "^0.7.1",
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "howler": "^2.2.4",
     "lucide-react": "^0.525.0",

@@ -4,7 +4,7 @@ import { DataTable } from '../components/tables/DataTable.tsx';
 import SearchBar from '../components/tables/SearchBar.tsx';
 import Pagination from '../components/tables/Pagination.tsx';
 import { ArrowPathIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
-import { exportTicketsToExcel, exportTicketsToCSV } from '../utils/exportUtils';
+import { exportTicketsToExcel } from '../utils/exportUtils';
 import { useConfig } from '../context/ConfigContext';
 import { useDebounce } from '../lib/hooks';
 import logger from '../utils/logger';
@@ -186,17 +186,30 @@ const AnalyticsView: React.FC = memo(() => {
     const colToKey: Record<string, string> = {
       'Número': 'number', 'Asunto': 'subject', 'Agente': 'agente',
       'Usuario': 'usuario', 'Creación': 'created',
+      'Sector': 'sector', 'Tipo Solicitud': 'requestType',
     };
     const key = colToKey[header];
     if (!key) return;
-    setSortField(prev => {
-      const newDir = prev === header ? (sortDir === 'asc' ? 'desc' : 'asc') : 'asc';
-      setSortDir(newDir);
-      setFilters((f: any) => ({ ...f, sortBy: key, sortDir: newDir }));
-      setCurrentPage(1);
-      return header;
-    });
-  }, [sortDir]);
+
+    if (sortField === header) {
+      if (sortDir === 'desc') {
+        // Tercer click: quitar sort → volver a default
+        setSortField(null);
+        setSortDir('desc');
+        setFilters((f: any) => { const { sortBy: _sb, sortDir: _sd, ...rest } = f; return rest; });
+      } else {
+        // Segundo click: pasar a desc
+        setSortDir('desc');
+        setFilters((f: any) => ({ ...f, sortBy: key, sortDir: 'desc' }));
+      }
+    } else {
+      // Primera vez en esta columna: asc
+      setSortField(header);
+      setSortDir('asc');
+      setFilters((f: any) => ({ ...f, sortBy: key, sortDir: 'asc' }));
+    }
+    setCurrentPage(1);
+  }, [sortField, sortDir]);
 
   // Contar filtros activos para indicador visual
   const activeFilterCount = useMemo(() => {
@@ -237,32 +250,15 @@ const AnalyticsView: React.FC = memo(() => {
         return;
       }
 
-      // DEBUG: Log de la estructura de datos para debuggear el problema de transporte
-      logger.info('🔍 DEBUG EXPORTACIÓN: Estructura de datos recibidos:');
-      logger.info('🔍 DEBUG EXPORTACIÓN: Primer ticket completo:', JSON.stringify(allTicketsFiltered[0], null, 2));
-      logger.info('🔍 DEBUG EXPORTACIÓN: Cantidad total de tickets tras filtro SLA:', allTicketsFiltered.length);
-
-      // Verificar la estructura de cdata para transporte en los primeros 3 tickets
-      allTicketsFiltered.slice(0, 3).forEach((ticket: any, index: number) => {
-        logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1} cdata:`, JSON.stringify(ticket.cdata, null, 2));
-        logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1} transporte value:`, ticket.cdata?.transporte);
-        if (ticket.cdata?.TransporteName) {
-          logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1} TransporteName:`, JSON.stringify(ticket.cdata.TransporteName, null, 2));
-        }
-        if (ticket.cdata?.dataValues) {
-          logger.info(`🔍 DEBUG EXPORTACIÓN: Ticket ${index + 1} dataValues:`, JSON.stringify(ticket.cdata.dataValues, null, 2));
-        }
-      });
-
       // Generate filename with current date and time
       const now = new Date();
       const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.xlsx`;
       
       // Use the secure Excel export function with ALL filtered data
-      exportTicketsToExcel(allTicketsFiltered, {
+      await exportTicketsToExcel(allTicketsFiltered, {
         filename: fileName,
-        includeFilters: true,
-        filters: filters
+        sheetTitle: 'Análisis Avanzado de Tickets',
+        filters: filters,
       });
 
       logger.info(`Excel exportado exitosamente con ${allTicketsForExport.length} registros`);
@@ -274,50 +270,6 @@ const AnalyticsView: React.FC = memo(() => {
     }
   }, [fetchAllTicketsForExport, filters]);
 
-  // Memoizar exportToCSV para evitar recreaciones
-  const exportToCSV = useCallback(async () => {
-    setIsExporting(true);
-    try {
-      // Obtener TODOS los tickets filtrados para exportación
-      const allTicketsForExport = await fetchAllTicketsForExport(filters);
-
-      const currentSlaStatus = (filters as any).slaStatus as
-        | 'cumplido'
-        | 'no_cumplido'
-        | 'en_curso'
-        | undefined;
-
-      const allTicketsFiltered = filterTicketsBySlaStatus(
-        allTicketsForExport,
-        currentSlaStatus === 'cumplido' || currentSlaStatus === 'no_cumplido' || currentSlaStatus === 'en_curso'
-          ? currentSlaStatus
-          : undefined
-      );
-      
-      if (allTicketsFiltered.length === 0) {
-        alert('No hay datos para exportar con los filtros aplicados.');
-        return;
-      }
-
-      // Generate filename with current date and time
-      const now = new Date();
-      const fileName = `tickets_analytics_${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}.csv`;
-      
-      // Use the secure CSV export function with ALL filtered data
-      exportTicketsToCSV(allTicketsFiltered, {
-        filename: fileName,
-        includeFilters: true,
-        filters: filters
-      });
-
-      logger.info(`CSV exportado exitosamente con ${allTicketsForExport.length} registros`);
-    } catch (error) {
-      logger.error('Error durante la exportación a CSV:', error);
-      alert('Error al exportar a CSV. Por favor, inténtelo de nuevo.');
-    } finally {
-      setIsExporting(false);
-    }
-  }, [fetchAllTicketsForExport, filters]);
 
   const currentSlaStatusForView = (filters as any).slaStatus as
     | 'cumplido'
@@ -349,15 +301,6 @@ const AnalyticsView: React.FC = memo(() => {
           >
             <DocumentChartBarIcon className="w-4 h-4" />
             <span>{isExporting ? 'Exportando...' : 'Excel'}</span>
-          </button>
-          <button 
-            onClick={exportToCSV}
-            disabled={isExporting || isLoading}
-            className="header-button"
-            title="Exportar como CSV (.csv)"
-          >
-            <DocumentChartBarIcon className="w-4 h-4" />
-            <span>{isExporting ? 'Exportando...' : 'CSV'}</span>
           </button>
           <button
             onClick={() => fetchTickets(filters, currentPage)}

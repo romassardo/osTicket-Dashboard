@@ -4,6 +4,7 @@ import { getSLAStats } from '../services/api';
 import logger from '../utils/logger';
 import { useFilter } from '../context/FilterContext';
 import { Tooltip } from '../components/ui/Tooltip';
+import { exportSlaStatsToExcel } from '../utils/exportUtils';
 
 interface SLAStat {
   agente: string;
@@ -31,6 +32,7 @@ const SLAStatsView: React.FC = () => {
     setContextMonth(val === '' ? null : val - 1);
   };
   
+  const [isExporting, setIsExporting] = useState(false);
   const [sortBy, setSortBy] = useState<keyof SLAStat>('porcentaje_sla_cumplido');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -107,26 +109,21 @@ const SLAStatsView: React.FC = () => {
   const totalVencidos = validStats.reduce((s, a) => s + a.tickets_sla_vencido, 0);
   const pctCumplimiento = totalTickets > 0 ? (totalCumplidos / totalTickets) * 100 : 0;
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
+    if (isExporting || filteredAndSorted.length === 0) return;
+    setIsExporting(true);
     try {
-      const headers = ['Agente', 'Total Tickets', 'Cumplidos', 'Vencidos', '% Cumplimiento', 'Diferencia SLA', 'T. Prom. Resolución'];
-      const esc = (v: any) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const headerRow = `<tr>${headers.map(h => `<th style="background:#f3f4f6;font-weight:bold;">${esc(h)}</th>`).join('')}</tr>`;
-      const bodyRows = filteredAndSorted.map((s: SLAStat) =>
-        `<tr><td>${esc(s.agente)}</td><td>${s.total_tickets}</td><td>${s.tickets_sla_cumplido}</td><td>${s.tickets_sla_vencido}</td><td>${s.porcentaje_sla_cumplido.toFixed(1)}%</td><td>${esc(s.diferencia_sla_promedio)}</td><td>${esc(s.tiempo_promedio_resolucion)}</td></tr>`
-      ).join('');
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body><table border="1">${headerRow}${bodyRows}</table></body></html>`;
-      const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `sla_analisis_${new Date().toISOString().split('T')[0]}.xls`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      const periodoStr = selectedMonth !== ''
+        ? `${new Date(2000, (selectedMonth as number) - 1).toLocaleDateString('es-AR', { month: 'long' })} ${selectedYear}`
+        : String(selectedYear);
+      await exportSlaStatsToExcel(filteredAndSorted, {
+        periodo: periodoStr,
+        filename: `sla_analisis_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      });
     } catch (error) {
       logger.error('Error al exportar:', error);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -202,9 +199,10 @@ const SLAStatsView: React.FC = () => {
             </select>
             <button
               onClick={exportToExcel}
+              disabled={isExporting || filteredAndSorted.length === 0}
               className="header-button"
             >
-              <Download className="w-4 h-4" /> Excel
+              <Download className="w-4 h-4" /> {isExporting ? '...' : 'Excel'}
             </button>
             <button
               onClick={() => fetchStats(true)}
@@ -337,11 +335,7 @@ const SLAStatsView: React.FC = () => {
                     </Tooltip>
                   </th>
                   <SortHeader column="diferencia_sla_horas" tooltip="Diferencia promedio entre el tiempo SLA permitido y el tiempo real de resolución. Positivo = resolvió antes del límite. Negativo = se excedió del SLA.">Dif. SLA</SortHeader>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <Tooltip text="Tiempo promedio que tarda el agente en resolver un ticket, medido en horas hábiles (Lun-Vie 8:30-17:30, sin feriados). Se calcula desde la creación hasta el cierre del ticket." position="below">
-                      <span>T. Resolución</span>
-                    </Tooltip>
-                  </th>
+                  <SortHeader column="tiempo_promedio_resolucion" tooltip="Tiempo promedio que tarda el agente en resolver un ticket, medido en horas hábiles (Lun-Vie 8:30-17:30, sin feriados). Se calcula desde la creación hasta el cierre del ticket.">T. Resolución</SortHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">

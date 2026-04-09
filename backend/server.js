@@ -13,10 +13,8 @@ const envPath = './config/.env';
 
 if (fs.existsSync(envLocalPath)) {
   dotenv.config({ path: envLocalPath });
-  console.log('🔧 Usando configuración LOCAL: .env.local');
 } else {
   dotenv.config({ path: envPath });
-  console.log('🌐 Usando configuración PRODUCCIÓN: .env');
 }
 
 // LUEGO importar módulos que usen las variables de entorno
@@ -35,6 +33,7 @@ const priorityRoutes = require('./routes/priorityRoutes');
 const helpTopicRoutes = require('./routes/helpTopicRoutes');
 const statsRoutes = require('./routes/statsRoutes'); // <-- AÑADIR NUEVA RUTA
 const slaRoutes = require('./routes/slaRoutes');
+const holidayRoutes = require('./routes/holidayRoutes');
 const errorHandler = require('./middleware/errorHandler');
 const { apiLimiter, slaLimiter } = require('./middleware/rateLimiter');
 const { validateQueryParams } = require('./middleware/validateParams');
@@ -46,16 +45,38 @@ const app = express();
 // Usará el valor de BACKEND_PORT del archivo .env, o 3001 si no está definido
 const PORT = process.env.BACKEND_PORT || 3001;
 
-// Middleware para parsear JSON en las solicitudes
-app.use(express.json());
+// Headers de seguridad HTTP (sin helmet, configuración manual)
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  // En producción se añadiría Strict-Transport-Security vía Nginx
+  next();
+});
 
-// Middleware para habilitar CORS
-app.use(cors()); // Esto permitirá todas las solicitudes CORS por defecto
+// Middleware para parsear JSON en las solicitudes (limitar tamaño para prevenir ataques)
+app.use(express.json({ limit: '1mb' }));
+
+// CORS: restringir a origen conocido en producción
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:5173', 'http://localhost:3001'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Permitir requests sin origin (curl, Postman, mismo servidor)
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origen no permitido: ${origin}`));
+  },
+  credentials: false,
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Compresión gzip/brotli para reducir tamaño de respuestas (~60-80% menos)
 app.use(compression());
-// Para configuraciones más específicas, consulta la documentación de CORS: https://www.npmjs.com/package/cors
-// Ejemplo: app.use(cors({ origin: 'http://localhost:5173' }));
 
 // Ruta de prueba para verificar que el servidor funciona
 // Ruta de prueba que ahora será manejada por el servidor de archivos estáticos
@@ -80,13 +101,22 @@ app.use(compression());
 //   }
 // });
 
+// Health check (sin rate limiting ni auth — para monitoreo)
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime(), env: process.env.NODE_ENV || 'development' });
+});
+
 // --- API Endpoints ---
 
 // Rate limiting global para todas las rutas API
 app.use('/api/', apiLimiter);
 
 // Validación de parámetros comunes en rutas que los usan
-app.use('/api/tickets', validateQueryParams);
+// /reports es exportación masiva — excluido del límite de paginación
+app.use('/api/tickets', (req, res, next) => {
+  if (req.path.startsWith('/reports')) return next();
+  return validateQueryParams(req, res, next);
+});
 app.use('/api/sla', validateQueryParams);
 app.use('/api/stats', validateQueryParams);
 
@@ -104,6 +134,7 @@ app.use('/api/priorities', priorityRoutes);
 app.use('/api/helptopics', helpTopicRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/sla', slaRoutes);
+app.use('/api/holidays', holidayRoutes);
 
 logger.info('Todas las rutas API registradas');
 
@@ -138,6 +169,12 @@ async function startServer() {
     // Esto también autenticará la conexión
     await db.sequelize.sync(); // { force: true } o { alter: true } si se necesitan cambios destructivos
     logger.info('Modelos disponibles:', Object.keys(db.models));
+
+    const env = process.env.NODE_ENV || 'development';
+    logger.info(`Ambiente: ${env} | Puerto: ${PORT}`);
+    if (fs.existsSync(envLocalPath)) {
+      logger.info('Configuración: .env.local (desarrollo local)');
+    }
 
     app.listen(PORT, () => {
       logger.info(`Servidor backend escuchando en http://localhost:${PORT}`);
