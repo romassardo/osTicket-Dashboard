@@ -64,7 +64,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // GET a single staff member by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const staffId = req.params.id;
     const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
@@ -122,9 +122,9 @@ router.get('/:id/tickets', async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    // Filtro temporal para solo mostrar tickets del mes actual (junio 2025)
-    const year = parseInt(req.query.year) || 2025;
-    const month = parseInt(req.query.month) || 6;
+    const now = new Date();
+    const year = parseInt(req.query.year) || now.getFullYear();
+    const month = parseInt(req.query.month) || (now.getMonth() + 1);
     
     const startOfMonth = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00.000Z`);
     const endOfMonth = new Date(startOfMonth);

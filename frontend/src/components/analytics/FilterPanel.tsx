@@ -70,23 +70,6 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
 
   // Memoizar función handleApply para evitar recreaciones
   const handleApply = useCallback(() => {
-    // LOG TEMPORAL: Debug valores seleccionados
-    console.log('🔍 FILTERPANEL - Valores seleccionados:', {
-      selectedStaff,
-      selectedStatus,
-      selectedSla,
-      selectedSector,
-      startDate,
-      endDate,
-      selectedSlaStatus
-    });
-    console.log('🔍 FILTERPANEL - Opciones disponibles:', {
-      staffOptions: staffOptions.length,
-      statusOptions: statusOptions.length,
-      slaOptions: slaOptions.length,
-      sectorOptions: sectorOptions.length
-    });
-    
     const filters: AppliedFilters = {};
     if (searchText.trim() !== '') filters.search = searchText.trim();
     if (selectedSla !== '') filters.sla = parseInt(selectedSla, 10);
@@ -96,8 +79,7 @@ const FilterPanel: React.FC<FilterPanelProps> = memo(({
     if (startDate !== '') filters.startDate = startDate;
     if (endDate !== '') filters.endDate = endDate;
     if (selectedSlaStatus !== '') filters.slaStatus = selectedSlaStatus as AppliedFilters['slaStatus'];
-    
-    console.log('🔍 FILTERPANEL - Filtros construidos:', filters);
+
     onApplyFilters(filters);
   }, [
     searchText,

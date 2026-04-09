@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   XMarkIcon, 
   DocumentTextIcon, 
@@ -17,7 +18,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { formatDate } from '../../utils/formatters';
 import type { TicketDetail } from '../../types';
-import logger from '../../utils/logger';
 
 interface TicketThread {
   entry_id: number;
@@ -38,8 +38,7 @@ interface CustomField {
   field_type: string;
 }
 
-// Función para obtener el detalle del ticket
-const getTicketDetail = async (ticketId: number): Promise<TicketDetail> => {
+const fetchTicketDetail = async (ticketId: number): Promise<TicketDetail> => {
   const response = await fetch(`/api/tickets/${ticketId}`);
   if (!response.ok) {
     throw new Error(`Error ${response.status}: ${response.statusText}`);
@@ -54,81 +53,59 @@ interface TicketDetailModalProps {
 }
 
 const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, ticketId }) => {
-  const [ticketDetail, setTicketDetail] = useState<TicketDetail | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data: ticketDetail, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ['ticketDetail', ticketId],
+    queryFn: () => fetchTicketDetail(ticketId!),
+    enabled: isOpen && ticketId !== null,
+    staleTime: 2 * 60 * 1000, // 2 min — detalle de ticket no cambia frecuentemente
+  });
 
-  useEffect(() => {
-    if (isOpen && ticketId) {
-      fetchTicketDetail();
-    }
-  }, [isOpen, ticketId]);
+  const error = queryError ? (queryError instanceof Error ? queryError.message : 'Error desconocido') : null;
 
-  const fetchTicketDetail = async () => {
-    if (!ticketId) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/tickets/${ticketId}`);
-      
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('🔍 DATOS DEL TICKET RECIBIDOS:', data);
-      console.log('🔍 ASUNTO:', data.subject);
-      console.log('🔍 THREADS:', data.threads);
-      console.log('🔍 PRIMER THREAD:', data.threads?.[0]);
-      setTicketDetail(data);
-      logger.info(`Detalle de ticket ${ticketId} cargado exitosamente`);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
-      setError(errorMessage);
-      logger.error(`Error al cargar detalle del ticket ${ticketId}:`, errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusColor = (status?: string) => {
+  const getStatusStyle = (status?: string): React.CSSProperties => {
     switch (status?.toLowerCase()) {
       case 'abierto':
       case 'open':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
+        return { background: 'color-mix(in srgb, var(--success) 15%, transparent)', color: 'var(--success)' };
       case 'cerrado':
       case 'closed':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300';
+        return { background: 'var(--bg-tertiary)', color: 'var(--text-muted)' };
       case 'resuelto':
       case 'resolved':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
+        return { background: 'color-mix(in srgb, var(--info) 15%, transparent)', color: 'var(--info)' };
       default:
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
+        return { background: 'color-mix(in srgb, var(--warning) 15%, transparent)', color: 'var(--warning)' };
     }
   };
 
-  const getPriorityColor = (priority?: string) => {
+  const getPriorityStyle = (priority?: string): React.CSSProperties => {
     switch (priority?.toLowerCase()) {
       case 'alta':
       case 'high':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
+        return { background: 'color-mix(in srgb, var(--error) 15%, transparent)', color: 'var(--error)' };
       case 'media':
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
+        return { background: 'color-mix(in srgb, var(--warning) 15%, transparent)', color: 'var(--warning)' };
       case 'baja':
       case 'low':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
+        return { background: 'color-mix(in srgb, var(--success) 15%, transparent)', color: 'var(--success)' };
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300';
+        return { background: 'var(--bg-tertiary)', color: 'var(--text-muted)' };
     }
   };
 
-  const renderThreadBody = (body: string) => {
-    // Limpiar HTML básico y mostrar texto plano
-    const cleanText = body.replace(/<[^>]*>/g, '').trim();
-    return cleanText.length > 300 ? `${cleanText.substring(0, 300)}...` : cleanText;
+  const renderThreadBody = (body: string): string => {
+    // Sanitizar: eliminar tags HTML y decodificar entidades comunes
+    const stripped = body
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return stripped.length > 400 ? `${stripped.substring(0, 400)}...` : stripped;
   };
 
   const parseCustomFieldValue = (value: string): string => {
@@ -197,7 +174,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                   <p style={{ color: 'var(--error)', fontWeight: 500 }}>Error al cargar el ticket</p>
                   <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>{error}</p>
                   <button
-                    onClick={fetchTicketDetail}
+                    onClick={() => refetch()}
                     style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: 'var(--accent-primary)', color: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'var(--font-body)' }}
                   >
                     Reintentar
@@ -211,74 +188,62 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                 {/* Información General */}
                 <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
                   <h3 className="font-display flex items-center mb-4" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    <InformationCircleIcon className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
+                    <InformationCircleIcon className="w-5 h-5 mr-2" style={{ color: 'var(--accent-primary)' }} />
                     Información General
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                         Asunto
                       </label>
-                      <p className="text-gray-900 dark:text-white font-medium">
+                      <p style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
                         {ticketDetail.subject || 'Sin asunto'}
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                         Estado
                       </label>
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        ticketDetail.status?.name === 'Open' 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                          : ticketDetail.status?.name === 'Closed'
-                          ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
-                      }`}>
+                      <span style={{ display: 'inline-flex', padding: '0.15rem 0.6rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-full)', ...getStatusStyle(ticketDetail.status?.name) }}>
                         {ticketDetail.status?.name || 'Sin estado'}
                       </span>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                         Prioridad
                       </label>
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        ticketDetail.priority?.priority === 'High'
-                          ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                          : ticketDetail.priority?.priority === 'Normal'
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
-                      }`}>
+                      <span style={{ display: 'inline-flex', padding: '0.15rem 0.6rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-full)', ...getPriorityStyle(ticketDetail.priority?.priority) }}>
                         {ticketDetail.priority?.priority || 'Sin prioridad'}
                       </span>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                         Departamento
                       </label>
-                      <p className="text-gray-900 dark:text-white">
+                      <p style={{ color: 'var(--text-primary)' }}>
                         {ticketDetail.department?.name || 'Sin departamento'}
                       </p>
                     </div>
                     {ticketDetail.customFields?.find(f => f.field_name === 'Empresa') && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Empresa</label>
-                        <p className="text-gray-900 dark:text-white">
+                        <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Empresa</label>
+                        <p style={{ color: 'var(--text-primary)' }}>
                           {parseCustomFieldValue(ticketDetail.customFields.find(f => f.field_name === 'Empresa')!.field_value)}
                         </p>
                       </div>
                     )}
                     {ticketDetail.customFields?.find(f => f.field_name === 'Localidad / Sucursal / Sector') && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Localidad / Sucursal / Sector</label>
-                        <p className="text-gray-900 dark:text-white">
+                        <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Localidad / Sucursal / Sector</label>
+                        <p style={{ color: 'var(--text-primary)' }}>
                           {parseCustomFieldValue(ticketDetail.customFields.find(f => f.field_name === 'Localidad / Sucursal / Sector')!.field_value)}
                         </p>
                       </div>
                     )}
                     {ticketDetail.customFields?.find(f => f.field_name === 'Transporte') && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Transporte</label>
-                        <p className="text-gray-900 dark:text-white">
+                        <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Transporte</label>
+                        <p style={{ color: 'var(--text-primary)' }}>
                           {parseCustomFieldValue(ticketDetail.customFields.find(f => f.field_name === 'Transporte')!.field_value)}
                         </p>
                       </div>
@@ -289,33 +254,33 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                 {/* Personas Involucradas */}
                 <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
                   <h3 className="font-display flex items-center mb-4" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    <UserGroupIcon className="w-5 h-5 mr-2 text-purple-600 dark:text-purple-400" />
+                    <UserGroupIcon className="w-5 h-5 mr-2" style={{ color: 'var(--accent-primary)' }} />
                     Personas Involucradas
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        <UserIcon className="w-4 h-4 inline mr-1" />
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                        <UserIcon className="w-4 h-4 mr-1" />
                         Usuario
                       </label>
-                      <div className="text-gray-900 dark:text-white">
-                        <p className="font-medium">{ticketDetail.user?.name || 'Usuario desconocido'}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{(ticketDetail.user as any)?.email || ''}</p>
+                      <div>
+                        <p style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{ticketDetail.user?.name || 'Usuario desconocido'}</p>
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{(ticketDetail.user as any)?.email || ''}</p>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        <UserIcon className="w-4 h-4 inline mr-1" />
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                        <UserIcon className="w-4 h-4 mr-1" />
                         Agente Asignado
                       </label>
-                      <div className="text-gray-900 dark:text-white">
-                        <p className="font-medium">
-                          {ticketDetail.AssignedStaff 
+                      <div>
+                        <p style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                          {ticketDetail.AssignedStaff
                             ? `${ticketDetail.AssignedStaff.firstname} ${ticketDetail.AssignedStaff.lastname}`
                             : 'Sin asignar'
                           }
                         </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
                           {(ticketDetail.AssignedStaff as any)?.email || ''}
                         </p>
                       </div>
@@ -326,23 +291,23 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                 {/* Fechas */}
                 <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
                   <h3 className="font-display flex items-center mb-4" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    <ClockIcon className="w-5 h-5 mr-2 text-green-600 dark:text-green-400" />
+                    <ClockIcon className="w-5 h-5 mr-2" style={{ color: 'var(--success)' }} />
                     Fechas
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                         Fecha de Creación
                       </label>
-                      <p className="text-gray-900 dark:text-white">
+                      <p style={{ color: 'var(--text-primary)' }}>
                         {ticketDetail.created ? new Date(ticketDetail.created).toLocaleString('es-ES') : 'N/A'}
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                         Fecha de Cierre
                       </label>
-                      <p className="text-gray-900 dark:text-white">
+                      <p style={{ color: 'var(--text-primary)' }}>
                         {ticketDetail.closed ? new Date(ticketDetail.closed).toLocaleString('es-ES') : 'Aún abierto'}
                       </p>
                     </div>
@@ -354,55 +319,53 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                 {ticketDetail.threads && ticketDetail.threads.length > 0 && (
                   <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
                     <h3 className="font-display flex items-center mb-4" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      <ChatBubbleLeftRightIcon className="w-5 h-5 mr-2 text-indigo-600 dark:text-indigo-400" />
+                      <ChatBubbleLeftRightIcon className="w-5 h-5 mr-2" style={{ color: 'var(--accent-primary)' }} />
                       Conversación ({ticketDetail.threads.length})
                     </h3>
-                     <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {ticketDetail.threads.map((thread, index) => (
-                        <div key={thread.entry_id} className="border border-gray-200 dark:border-slate-600 rounded-lg p-4">
+                    <div className="space-y-4" style={{ maxHeight: '24rem', overflowY: 'auto' }}>
+                      {ticketDetail.threads.map((thread) => (
+                        <div key={thread.entry_id} style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
                           <div className="flex justify-between items-start mb-3">
                             <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
-                                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                                  {thread.staff_firstname ? thread.staff_firstname[0] : 
-                                   thread.user_name ? thread.user_name[0] : 
+                              <div style={{ width: '2.5rem', height: '2.5rem', background: 'var(--accent-primary-glow)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                                  {thread.staff_firstname ? thread.staff_firstname[0] :
+                                   thread.user_name ? thread.user_name[0] :
                                    thread.poster ? thread.poster[0] : '?'}
                                 </span>
                               </div>
                               <div>
-                                <p className="font-medium text-gray-900 dark:text-white text-sm">
-                                  {thread.staff_firstname && thread.staff_lastname 
+                                <p style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: '0.875rem' }}>
+                                  {thread.staff_firstname && thread.staff_lastname
                                     ? `${thread.staff_firstname} ${thread.staff_lastname}`.trim()
                                     : thread.user_name || thread.poster || 'Usuario'
                                   }
                                 </p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                   {thread.created ? new Date(thread.created).toLocaleString('es-ES') : ''}
                                 </p>
                               </div>
                             </div>
-                            <span className={`px-2 py-1 text-xs rounded-full ${
-                              thread.staff_id 
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                                : 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
-                            }`}>
+                            <span style={{
+                              padding: '0.15rem 0.6rem', fontSize: '0.75rem', borderRadius: 'var(--radius-full)',
+                              ...(thread.staff_id
+                                ? { background: 'color-mix(in srgb, var(--success) 15%, transparent)', color: 'var(--success)' }
+                                : { background: 'color-mix(in srgb, var(--info) 15%, transparent)', color: 'var(--info)' })
+                            }}>
                               {thread.staff_id ? 'Agente' : 'Usuario'}
                             </span>
                           </div>
-                          
-                          {/* Título del thread si existe */}
+
                           {thread.title && (
-                            <h4 className="font-semibold text-gray-900 dark:text-white mb-2 text-base">
+                            <h4 style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem', fontSize: '0.9375rem' }}>
                               {thread.title}
                             </h4>
                           )}
-                          
-                          {/* Contenido del thread */}
-                          <div className="text-sm text-gray-700 dark:text-gray-300 prose prose-sm max-w-none">
-                            <div dangerouslySetInnerHTML={{ 
-                              __html: thread.body || '<p class="text-gray-500 italic">Sin contenido</p>' 
-                            }} />
-                          </div>
+
+                          {/* Renderizado seguro: sin dangerouslySetInnerHTML */}
+                          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
+                            {renderThreadBody(thread.body || 'Sin contenido')}
+                          </p>
                         </div>
                       ))}
                     </div>

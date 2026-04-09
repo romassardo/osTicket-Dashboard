@@ -5,7 +5,7 @@ const { TicketPriority, Ticket, Department, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 // GET all ticket priorities related to allowed departments
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
     const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
     
@@ -45,7 +45,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET a single ticket priority by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const priorityId = req.params.id;
     const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];

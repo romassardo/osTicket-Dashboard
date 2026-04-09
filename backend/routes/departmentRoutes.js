@@ -5,7 +5,7 @@ const { Department, Ticket, User, TicketStatus, Staff, TicketCdata, HelpTopic, s
 const { Op } = require('sequelize');
 
 // GET all departments
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
     const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
     const departments = await Department.findAll({
@@ -23,7 +23,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET a single department by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const departmentId = req.params.id;
     const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];

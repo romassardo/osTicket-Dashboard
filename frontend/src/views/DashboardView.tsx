@@ -35,7 +35,7 @@ const DashboardView: React.FC = () => {
   }, [setSelectedYear]);
 
   // Consulta unificada para obtener todas las métricas del mes seleccionado
-  const { data: ticketCounts, isLoading: isLoadingCounts, isError: isErrorCounts } = useQuery({
+  const { data: ticketCounts, isLoading: isLoadingCounts, isError: isErrorCounts, refetch: refetchCounts } = useQuery({
     queryKey: ['ticketCounts', selectedYear, selectedMonth],
     queryFn: () => {
       const startDate = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
@@ -77,7 +77,7 @@ const DashboardView: React.FC = () => {
     return (
       <div style={{ borderRadius: 'var(--radius-lg)', border: '1px solid var(--error)', background: 'var(--bg-secondary)', padding: '2rem', textAlign: 'center' }}>
         <p style={{ fontWeight: 500, color: 'var(--error)' }}>Error al cargar los datos del dashboard.</p>
-        <button style={{ marginTop: '1rem', borderRadius: 'var(--radius-md)', background: 'var(--bg-tertiary)', padding: '0.5rem 1rem', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
+        <button onClick={() => refetchCounts()} style={{ marginTop: '1rem', borderRadius: 'var(--radius-md)', background: 'var(--bg-tertiary)', padding: '0.5rem 1rem', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
           Reintentar
         </button>
       </div>
@@ -141,36 +141,32 @@ const DashboardView: React.FC = () => {
 
         {/* Hero Metrics - KPIs principales usando grid profesional */}
         <div className="kpi-grid">
-          <StatCard 
-            title="Total Tickets" 
-            value={ticketCounts?.total ?? 0} 
+          <StatCard
+            title="Total Tickets"
+            value={ticketCounts?.total ?? 0}
             subtitle={fullMonthTitle}
             icon="total"
-            trend="+5%"
             tooltip="Todos los tickets creados durante este mes, sin importar su estado actual."
           />
-          <StatCard 
-            title="Tickets Abiertos" 
-            value={ticketCounts?.open ?? 0} 
+          <StatCard
+            title="Tickets Abiertos"
+            value={ticketCounts?.open ?? 0}
             subtitle={fullMonthTitle}
             icon="open"
-            trend="-2%"
             tooltip="Tickets creados este mes que aún no han sido resueltos ni cerrados."
           />
-          <StatCard 
-            title="Total Pendientes" 
+          <StatCard
+            title="Total Pendientes"
             value={ticketCounts?.totalPendingAccumulated ?? 0}
             subtitle="Acumulado"
             icon="pending"
-            trend="+8%"
             tooltip="La suma histórica de todos los tickets abiertos y no resueltos, incluyendo meses anteriores."
           />
-          <StatCard 
-            title="Tickets Cerrados" 
-            value={ticketCounts?.closed ?? 0} 
+          <StatCard
+            title="Tickets Cerrados"
+            value={ticketCounts?.closed ?? 0}
             subtitle={fullMonthTitle}
             icon="closed"
-            trend="+12%"
             tooltip="Tickets creados en este mes que actualmente tienen estado 'Resuelto' o 'Cerrado'."
           />
         </div>

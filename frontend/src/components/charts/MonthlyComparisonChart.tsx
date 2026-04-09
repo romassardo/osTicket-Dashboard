@@ -30,10 +30,26 @@ interface CustomTooltipProps {
   label?: string;
 }
 
-const MonthlyComparisonChart: React.FC<MonthlyComparisonChartProps> = ({ 
-  currentYear, 
-  currentMonth, 
-  className = '' 
+const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-[var(--bg-secondary)] border border-[var(--bg-accent)] rounded-lg p-3 shadow-lg">
+        <p className="text-[var(--text-primary)] font-medium mb-2">{`${label}`}</p>
+        {payload.map((entry, index) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {`${entry.dataKey}: ${entry.value} tickets`}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+const MonthlyComparisonChart: React.FC<MonthlyComparisonChartProps> = ({
+  currentYear,
+  currentMonth,
+  className = ''
 }) => {
   // Estado para los selectores de comparación (por defecto: mes actual vs mes anterior)
   const [compareMonth, setCompareMonth] = useState(() => {
@@ -69,23 +85,6 @@ const MonthlyComparisonChart: React.FC<MonthlyComparisonChartProps> = ({
     Array.from({ length: 5 }, (_, i) => currentYear - i), 
     [currentYear]
   );
-
-  // Custom Tooltip
-  const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-[var(--bg-secondary)] border border-[var(--bg-accent)] rounded-lg p-3 shadow-lg">
-          <p className="text-[var(--text-primary)] font-medium mb-2">{`${label}`}</p>
-          {payload.map((entry, index) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {`${entry.dataKey}: ${entry.value} tickets`}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Manejar cambios en los selectores
   const handleCompareMonthChange = (event: React.ChangeEvent<HTMLSelectElement>) => {

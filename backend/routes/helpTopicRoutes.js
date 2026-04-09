@@ -33,7 +33,7 @@ const filterByAllowedDepartments = async (req, res, next) => {
 router.use(filterByAllowedDepartments);
 
 // GET - Obtener todos los temas de ayuda (filtrando por departamentos permitidos)
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
     const helpTopics = await HelpTopic.findAll({
       attributes: ['topic_id', 'topic', 'isactive', 'dept_id'],
@@ -68,7 +68,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET - Obtener un tema de ayuda específico por ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const helpTopic = await HelpTopic.findOne({
       attributes: ['topic_id', 'topic', 'isactive', 'dept_id', 'priority_id', 'notes', 'created', 'updated'],
@@ -106,7 +106,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // GET - Obtener tickets asociados a un tema de ayuda específico
-router.get('/:id/tickets', async (req, res) => {
+router.get('/:id/tickets', async (req, res, next) => {
   try {
     // Primero verificamos que el tema de ayuda pertenece a un departamento permitido
     const helpTopic = await HelpTopic.findOne({
@@ -184,7 +184,7 @@ router.get('/:id/tickets', async (req, res) => {
 });
 
 // GET - Contar tickets por tema de ayuda
-router.get('/:id/tickets/count', async (req, res) => {
+router.get('/:id/tickets/count', async (req, res, next) => {
   try {
     // Verificar que el tema pertenece a un departamento permitido
     const helpTopic = await HelpTopic.findOne({

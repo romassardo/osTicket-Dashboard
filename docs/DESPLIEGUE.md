@@ -438,3 +438,11 @@ Post-despliegue:
 
 **Última actualización:** Octubre 2025  
 **Versión:** v1.2
+
+Para actualizar el dashboard:
+```bash
+cd /var/www/dashboardsop
+git pull origin main
+cd frontend && npm run build && cd ..
+pm2 restart dashboard-osticket
+```

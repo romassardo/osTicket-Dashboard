@@ -5,7 +5,7 @@ const { User, Ticket, Department, TicketStatus, Staff, sequelize } = require('..
 const { Op } = require('sequelize');
 
 // GET all users related to allowed departments
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
     const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
     
@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET a single user by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const userId = req.params.id;
     const allowedDepartmentNames = ['Soporte Informatico', 'Soporte IT'];
